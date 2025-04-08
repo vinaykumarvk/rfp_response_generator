@@ -677,18 +677,19 @@ function ResponsesTable({
                   </div>
                 )}
                 
-                <div className="flex flex-col gap-2">
-                  <div className="flex items-center gap-2">
+                <div className="space-y-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <div className="text-xs text-slate-500">
                       {response.timestamp ? formatDate(response.timestamp) : "—"}
                     </div>
-                    {response.modelProvider ? (
+                    
+                    {response.modelProvider && (
                       <div className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-800">
                         {response.modelProvider.includes("MOA") 
                           ? "MOA" 
                           : response.modelProvider.split(' ')[0]}
                       </div>
-                    ) : null}
+                    )}
                   </div>
                   
                   <div className="flex justify-end space-x-2">
