@@ -677,15 +677,15 @@ function ResponsesTable({
                   </div>
                 )}
                 
-                <div className="space-y-2">
-                  <div className="flex flex-wrap items-center gap-2">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
                     <div className="text-xs text-slate-500">
                       {response.timestamp ? formatDate(response.timestamp) : "—"}
                     </div>
                     
                     {response.modelProvider && (
-                      <div className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-800">
-                        {response.modelProvider.includes("MOA") 
+                      <div className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">
+                        Model: {response.modelProvider.includes("MOA") 
                           ? "MOA" 
                           : response.modelProvider.split(' ')[0]}
                       </div>
