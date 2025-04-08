@@ -404,6 +404,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
             // Parse the output as JSON
             const result = JSON.parse(stdout);
             
+            // Check if we have a generated response
+            if (!result.generated_response && !result.error) {
+              console.log("Warning: No generated_response found in Python output");
+              
+              // Try to extract a response from the raw output if JSON parsing succeeded but no response field
+              if (typeof stdout === 'string' && stdout.trim().length > 0) {
+                if (stdout.includes("Response:")) {
+                  const responseMatch = stdout.match(/Response:([\s\S]+?)(?=\{|$)/);
+                  if (responseMatch && responseMatch[1]) {
+                    result.generated_response = "Response:" + responseMatch[1].trim();
+                    console.log("Extracted response from raw output");
+                  }
+                }
+              }
+              
+              // If we still don't have a response, set a default one
+              if (!result.generated_response) {
+                result.generated_response = "Response could not be generated. Please try again.";
+              }
+            }
+            
             // If requirementId is provided, update the requirement in the database
             if (requirementId) {
               const id = parseInt(requirementId);
@@ -462,9 +483,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   const savedData = await storage.createResponseWithReferences(
                     {
                       requirement: requirement,
-                      finalResponse: result.generated_response,
+                      finalResponse: result.generated_response || "Response could not be generated. Please try again.",
                       category: result.category || '',
                       timestamp: new Date().toISOString(),
+                      modelProvider: provider,
                       // If there was an existing requirement, update it instead of creating a new one
                       ...(existingRequirement || {})
                     },
