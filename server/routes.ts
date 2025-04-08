@@ -1,8 +1,10 @@
-import type { Express, Request, Response } from "express";
+import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertRfpResponseSchema, insertExcelRequirementResponseSchema } from "@shared/schema";
 import { fromZodError } from "zod-validation-error";
+import { spawn } from "child_process";
+import * as path from "path";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // API routes - prefix with /api
@@ -328,6 +330,97 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error processing Excel file:", error);
       return res.status(500).json({ message: "Failed to process Excel file" });
+    }
+  });
+
+  // Generate AI response for a requirement
+  app.post("/api/generate-response", async (req: Request, res: Response) => {
+    try {
+      const { requirement, provider = "openai", requirementId } = req.body;
+      
+      if (!requirement) {
+        return res.status(400).json({ message: "Requirement text is required" });
+      }
+      
+      // Use Python script to generate response
+      const scriptPath = path.resolve(__dirname, 'rfp_response_generator.py');
+      
+      return new Promise<void>((resolve, reject) => {
+        // Spawn Python process
+        const process = spawn('python3', [scriptPath, requirement, provider]);
+        
+        let stdout = '';
+        let stderr = '';
+        
+        // Collect stdout data
+        process.stdout.on('data', (data) => {
+          stdout += data.toString();
+        });
+        
+        // Collect stderr data
+        process.stderr.on('data', (data) => {
+          stderr += data.toString();
+        });
+        
+        // Handle process close
+        process.on('close', async (code) => {
+          if (code !== 0) {
+            console.error(`Python process exited with code ${code}`);
+            console.error(`Error output: ${stderr}`);
+            res.status(500).json({ 
+              message: "Failed to generate response", 
+              error: stderr 
+            });
+            resolve();
+            return;
+          }
+          
+          try {
+            // Parse the output as JSON
+            const result = JSON.parse(stdout);
+            
+            // If requirementId is provided, update the requirement in the database
+            if (requirementId) {
+              const id = parseInt(requirementId);
+              if (!isNaN(id)) {
+                const updatedResponse = await storage.updateExcelRequirementResponse(id, { 
+                  finalResponse: result.generated_response 
+                });
+                
+                if (updatedResponse) {
+                  result.saved = true;
+                  result.updatedResponse = updatedResponse;
+                }
+              }
+            }
+            
+            res.json(result);
+          } catch (error) {
+            console.error("Failed to parse Python output:", error);
+            res.status(500).json({ 
+              message: "Failed to parse response", 
+              error: stdout 
+            });
+          }
+          resolve();
+        });
+        
+        // Handle process error
+        process.on('error', (error) => {
+          console.error(`Failed to start Python process: ${error}`);
+          res.status(500).json({ 
+            message: "Failed to start response generator", 
+            error: error.message 
+          });
+          reject(error);
+        });
+      });
+    } catch (error) {
+      console.error("Error generating response:", error);
+      return res.status(500).json({ 
+        message: "Failed to generate response",
+        error: error instanceof Error ? error.message : "Unknown error" 
+      });
     }
   });
 
