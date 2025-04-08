@@ -41,6 +41,7 @@ export default function GenerateResponse() {
   const [similarResponses, setSimilarResponses] = useState<SimilarResponse[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [modelProvider, setModelProvider] = useState<string>("openai");
+  const [useModelMixture, setUseModelMixture] = useState<boolean>(false); // Whether to use MOA (Mixture of Agents)
   const [showSimilarResponses, setShowSimilarResponses] = useState(false);
   const [activeTab, setActiveTab] = useState<string>("response");
   const [selectedRequirementId, setSelectedRequirementId] = useState<number | undefined>(undefined);
@@ -236,7 +237,7 @@ export default function GenerateResponse() {
             },
             body: JSON.stringify({
               requirement: requirement.requirement,
-              provider: modelProvider,
+              provider: useModelMixture ? "moa" : modelProvider,
               requirementId: requirement.id
             })
           });
@@ -390,22 +391,54 @@ export default function GenerateResponse() {
                   </div>
                   
                   {/* AI Model selection */}
-                  <div className="space-y-2">
-                    <Label>AI Model</Label>
-                    <RadioGroup 
-                      value={modelProvider}
-                      onValueChange={setModelProvider}
-                      className="flex space-x-4"
-                    >
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="openai" id="openai" />
-                        <Label htmlFor="openai" className="cursor-pointer">OpenAI</Label>
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label>AI Model Type</Label>
+                      <RadioGroup 
+                        value={useModelMixture ? "moa" : "single"}
+                        onValueChange={(val) => setUseModelMixture(val === "moa")}
+                        className="flex space-x-4"
+                      >
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="single" id="single-model" />
+                          <Label htmlFor="single-model" className="cursor-pointer">Single Model</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="moa" id="moa-model" />
+                          <Label htmlFor="moa-model" className="cursor-pointer">Mixture of Agents (MOA)</Label>
+                        </div>
+                      </RadioGroup>
+                    </div>
+                    
+                    {!useModelMixture && (
+                      <div className="space-y-2 pl-4 border-l-2 border-slate-200">
+                        <Label>Single Model Provider</Label>
+                        <RadioGroup 
+                          value={modelProvider}
+                          onValueChange={setModelProvider}
+                          className="flex space-x-4"
+                          disabled={useModelMixture}
+                        >
+                          <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="openai" id="openai" />
+                            <Label htmlFor="openai" className="cursor-pointer">OpenAI</Label>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="anthropic" id="anthropic" />
+                            <Label htmlFor="anthropic" className="cursor-pointer">Anthropic</Label>
+                          </div>
+                        </RadioGroup>
                       </div>
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="anthropic" id="anthropic" />
-                        <Label htmlFor="anthropic" className="cursor-pointer">Anthropic</Label>
+                    )}
+                    
+                    {useModelMixture && (
+                      <div className="pl-4 border-l-2 border-slate-200 p-3 bg-slate-50 rounded-md">
+                        <p className="text-sm text-slate-600">
+                          <span className="font-medium">Mixture of Agents:</span> Responses will be generated using 
+                          OpenAI, DeepSeek, and Anthropic/Claude models together, then synthesized into a single optimized response.
+                        </p>
                       </div>
-                    </RadioGroup>
+                    )}
                   </div>
                   
                   {/* Requirements selection */}
