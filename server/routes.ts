@@ -168,6 +168,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return res.json(templates);
   });
 
+  // Handle Excel file upload for analysis
+  app.post("/api/analyze-excel", async (req: Request, res: Response) => {
+    try {
+      // This is a placeholder endpoint for now
+      // In the future, we'll implement file upload handling and processing with multer
+      // The real implementation will call the Python script for analysis
+      
+      // For now, return a mock response
+      setTimeout(() => {
+        res.status(200).json({
+          message: "Excel file analyzed successfully",
+          analyzedRows: 25,
+          matchedRows: 18
+        });
+      }, 1000);
+    } catch (error) {
+      console.error("Error processing Excel file:", error);
+      return res.status(500).json({ message: "Failed to process Excel file" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

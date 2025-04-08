@@ -7,6 +7,7 @@ import RfpDetails from "@/pages/RfpDetails";
 import TemplateSelection from "@/pages/TemplateSelection";
 import GenerateResponse from "@/pages/GenerateResponse";
 import PreviewExport from "@/pages/PreviewExport";
+import ExcelAnalyzer from "@/pages/ExcelAnalyzer";
 
 function Router() {
   return (
@@ -15,6 +16,7 @@ function Router() {
       <Route path="/template-selection" component={TemplateSelection} />
       <Route path="/generate-response" component={GenerateResponse} />
       <Route path="/preview-export" component={PreviewExport} />
+      <Route path="/excel-analyzer" component={ExcelAnalyzer} />
       <Route component={NotFound} />
     </Switch>
   );
