@@ -435,6 +435,10 @@ export default function GenerateResponse() {
                     <RadioGroupItem value="anthropic" id="reprocess-anthropic" />
                     <Label htmlFor="reprocess-anthropic" className="cursor-pointer">Anthropic</Label>
                   </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="deepseek" id="reprocess-deepseek" />
+                    <Label htmlFor="reprocess-deepseek" className="cursor-pointer">Deepseek</Label>
+                  </div>
                 </RadioGroup>
               </div>
             )}
@@ -574,6 +578,10 @@ export default function GenerateResponse() {
                           <div className="flex items-center space-x-2">
                             <RadioGroupItem value="anthropic" id="anthropic" />
                             <Label htmlFor="anthropic" className="cursor-pointer">Anthropic</Label>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="deepseek" id="deepseek" />
+                            <Label htmlFor="deepseek" className="cursor-pointer">Deepseek</Label>
                           </div>
                         </RadioGroup>
                       </div>
