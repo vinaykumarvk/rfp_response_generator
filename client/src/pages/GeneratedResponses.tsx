@@ -665,13 +665,13 @@ function ResponsesTable({
               <CardContent className="p-4">
                 <div className="flex justify-between items-start mb-2">
                   <div className="font-medium text-primary">{response.category}</div>
-                  {response.modelProvider && (
-                    <div className="text-xs px-2 py-1 bg-slate-100 rounded-full">
+                  {response.modelProvider ? (
+                    <div className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-800">
                       {response.modelProvider.includes("MOA") 
                         ? "MOA" 
                         : response.modelProvider.split(' ')[0]}
                     </div>
-                  )}
+                  ) : "—"}
                 </div>
                 
                 <div className="text-sm font-medium mb-2 line-clamp-2">
