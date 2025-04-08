@@ -665,13 +665,6 @@ function ResponsesTable({
               <CardContent className="p-4">
                 <div className="flex justify-between items-start mb-2">
                   <div className="font-medium text-primary">{response.category}</div>
-                  {response.modelProvider ? (
-                    <div className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-800">
-                      {response.modelProvider.includes("MOA") 
-                        ? "MOA" 
-                        : response.modelProvider.split(' ')[0]}
-                    </div>
-                  ) : "—"}
                 </div>
                 
                 <div className="text-sm font-medium mb-2 line-clamp-2">
@@ -684,12 +677,21 @@ function ResponsesTable({
                   </div>
                 )}
                 
-                <div className="flex justify-between items-center mt-2">
-                  <div className="text-xs text-slate-500">
-                    {response.timestamp ? formatDate(response.timestamp) : "—"}
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center gap-2">
+                    <div className="text-xs text-slate-500">
+                      {response.timestamp ? formatDate(response.timestamp) : "—"}
+                    </div>
+                    {response.modelProvider ? (
+                      <div className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-800">
+                        {response.modelProvider.includes("MOA") 
+                          ? "MOA" 
+                          : response.modelProvider.split(' ')[0]}
+                      </div>
+                    ) : null}
                   </div>
                   
-                  <div className="flex space-x-2">
+                  <div className="flex justify-end space-x-2">
                     <Button 
                       variant="ghost" 
                       size="sm"
