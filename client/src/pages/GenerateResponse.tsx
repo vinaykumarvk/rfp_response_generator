@@ -4,12 +4,13 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { MessageSquare, Loader2, Save, RefreshCw, BookOpen, History, Check, Filter, Search, ChevronRight } from "lucide-react";
+import { MessageSquare, Loader2, Save, RefreshCw, BookOpen, History, Check, Filter, Search, ChevronRight, RotateCw } from "lucide-react";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import ReferencePanel from "@/components/ReferencePanel";
 import { useToast } from "@/hooks/use-toast";
 
@@ -55,6 +56,10 @@ export default function GenerateResponse() {
   const [progressValue, setProgressValue] = useState(0);
   const [processedCount, setProcessedCount] = useState(0);
   const [totalToProcess, setTotalToProcess] = useState(0);
+  const [showReprocessModal, setShowReprocessModal] = useState(false);
+  const [reprocessModelProvider, setReprocessModelProvider] = useState<string>("openai");
+  const [reprocessUseModelMixture, setReprocessUseModelMixture] = useState<boolean>(false);
+  const [reprocessing, setReprocessing] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -115,6 +120,69 @@ export default function GenerateResponse() {
   };
 
   // Single response generation is now handled through batch generation
+  
+  // Function to handle reprocessing a response with a different model
+  const handleReprocess = async () => {
+    if (!selectedRequirementId) return;
+    
+    setReprocessing(true);
+    setErrorMessage(null);
+    
+    try {
+      const selectedReq = requirements.find(r => r.id === selectedRequirementId);
+      
+      if (selectedReq?.id) {
+        const response = await fetch("/api/generate-response", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            requirement: selectedReq.requirement,
+            provider: reprocessUseModelMixture ? "moa" : reprocessModelProvider,
+            requirementId: selectedReq.id // Same ID for replacing the existing response
+          })
+        });
+        
+        if (!response.ok) {
+          throw new Error("Failed to reprocess response");
+        }
+        
+        const result = await response.json();
+        
+        if (result.error) {
+          throw new Error(result.error);
+        }
+        
+        // Update the response text and the local requirements array
+        setResponseText(result.generated_response);
+        setRequirements(prev => prev.map(req => 
+          req.id === selectedReq.id ? { ...req, finalResponse: result.generated_response } : req
+        ));
+        
+        // Close the modal
+        setShowReprocessModal(false);
+        
+        toast({
+          title: "Response reprocessed",
+          description: "The response has been regenerated using " + 
+            (reprocessUseModelMixture ? "Mixture of Agents" : reprocessModelProvider),
+          variant: "default"
+        });
+      }
+    } catch (error) {
+      console.error("Error reprocessing response:", error);
+      setErrorMessage(error instanceof Error ? error.message : "Unknown error occurred during reprocessing");
+      
+      toast({
+        title: "Reprocessing failed",
+        description: "An error occurred while regenerating the response.",
+        variant: "destructive"
+      });
+    } finally {
+      setReprocessing(false);
+    }
+  };
   
   const handleSaveResponse = async () => {
     if (!selectedRequirementId || !responseText) return;
@@ -321,6 +389,86 @@ export default function GenerateResponse() {
 
   return (
     <div className="h-full">
+      {/* Reprocess Modal */}
+      <Dialog open={showReprocessModal} onOpenChange={setShowReprocessModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Reprocess Response</DialogTitle>
+            <DialogDescription>
+              Regenerate this response using different AI models. The new response will replace the current one.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>AI Model Type</Label>
+              <RadioGroup 
+                value={reprocessUseModelMixture ? "moa" : "single"}
+                onValueChange={(val) => setReprocessUseModelMixture(val === "moa")}
+                className="flex space-x-4"
+              >
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="single" id="reprocess-single-model" />
+                  <Label htmlFor="reprocess-single-model" className="cursor-pointer">Single Model</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="moa" id="reprocess-moa-model" />
+                  <Label htmlFor="reprocess-moa-model" className="cursor-pointer">Mixture of Agents (MOA)</Label>
+                </div>
+              </RadioGroup>
+            </div>
+            
+            {!reprocessUseModelMixture && (
+              <div className="space-y-2 pl-4 border-l-2 border-slate-200">
+                <Label>Single Model Provider</Label>
+                <RadioGroup 
+                  value={reprocessModelProvider}
+                  onValueChange={setReprocessModelProvider}
+                  className="flex space-x-4"
+                  disabled={reprocessUseModelMixture}
+                >
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="openai" id="reprocess-openai" />
+                    <Label htmlFor="reprocess-openai" className="cursor-pointer">OpenAI</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="anthropic" id="reprocess-anthropic" />
+                    <Label htmlFor="reprocess-anthropic" className="cursor-pointer">Anthropic</Label>
+                  </div>
+                </RadioGroup>
+              </div>
+            )}
+            
+            {reprocessUseModelMixture && (
+              <div className="pl-4 border-l-2 border-slate-200 p-3 bg-slate-50 rounded-md">
+                <p className="text-sm text-slate-600">
+                  <span className="font-medium">Mixture of Agents:</span> Responses will be generated using 
+                  OpenAI, DeepSeek, and Anthropic/Claude models together, then synthesized into a single optimized response.
+                </p>
+              </div>
+            )}
+          </div>
+          
+          <DialogFooter className="sm:justify-between">
+            <Button
+              variant="outline"
+              onClick={() => setShowReprocessModal(false)}
+              disabled={reprocessing}
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleReprocess}
+              disabled={reprocessing}
+              className="flex items-center gap-2"
+            >
+              {reprocessing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCw className="h-4 w-4" />}
+              {reprocessing ? "Processing..." : "Reprocess"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
       <div className="p-6">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-2xl font-bold text-slate-800">Generate Response</h2>
@@ -577,16 +725,29 @@ export default function GenerateResponse() {
                     />
                     
                     <div className="flex justify-between space-x-3">
-                      {similarResponses.length > 0 && (
-                        <Button 
-                          onClick={toggleSimilarResponses}
-                          variant="outline"
-                          className="flex items-center gap-2"
-                        >
-                          <RefreshCw className="h-4 w-4" />
-                          {showSimilarResponses ? "Hide Similar Responses" : "Show Similar Responses"}
-                        </Button>
-                      )}
+                      <div className="flex gap-2">
+                        {similarResponses.length > 0 && (
+                          <Button 
+                            onClick={toggleSimilarResponses}
+                            variant="outline"
+                            className="flex items-center gap-2"
+                          >
+                            <RefreshCw className="h-4 w-4" />
+                            {showSimilarResponses ? "Hide Similar Responses" : "Show Similar Responses"}
+                          </Button>
+                        )}
+                        
+                        {selectedRequirementId && (
+                          <Button 
+                            onClick={() => setShowReprocessModal(true)}
+                            variant="outline"
+                            className="flex items-center gap-2"
+                          >
+                            <RotateCw className="h-4 w-4" />
+                            Reprocess
+                          </Button>
+                        )}
+                      </div>
                       
                       <Button 
                         onClick={handleSaveResponse}

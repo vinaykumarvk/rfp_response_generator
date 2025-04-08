@@ -20,8 +20,13 @@ import {
   Filter,
   Edit,
   Save,
-  X
+  X,
+  RotateCw,
+  Loader2
 } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
 import { format } from "date-fns";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
@@ -50,6 +55,10 @@ export default function GeneratedResponses() {
   const [uniqueCategories, setUniqueCategories] = useState<string[]>([]);
   const [editMode, setEditMode] = useState(false);
   const [editedResponse, setEditedResponse] = useState("");
+  const [showReprocessModal, setShowReprocessModal] = useState(false);
+  const [reprocessModelProvider, setReprocessModelProvider] = useState<string>("openai");
+  const [reprocessUseModelMixture, setReprocessUseModelMixture] = useState<boolean>(false);
+  const [reprocessing, setReprocessing] = useState(false);
   const { toast } = useToast();
 
   // Fetch generated responses
@@ -133,6 +142,75 @@ export default function GeneratedResponses() {
     setEditedResponse("");
   };
 
+  // Function to handle reprocessing a response with a different model
+  const handleReprocess = async () => {
+    if (!selectedResponse || !selectedResponseId) return;
+    
+    setReprocessing(true);
+    
+    try {
+      const response = await fetch("/api/generate-response", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          requirement: selectedResponse.requirement,
+          provider: reprocessUseModelMixture ? "moa" : reprocessModelProvider,
+          requirementId: selectedResponseId // Same ID for replacing the existing response
+        })
+      });
+      
+      if (!response.ok) {
+        throw new Error("Failed to reprocess response");
+      }
+      
+      const result = await response.json();
+      
+      if (result.error) {
+        throw new Error(result.error);
+      }
+      
+      // Update the selected response with the new generated response
+      setSelectedResponse({
+        ...selectedResponse,
+        finalResponse: result.generated_response,
+        modelProvider: reprocessUseModelMixture ? "Mixture of Agents (MOA)" : reprocessModelProvider
+      });
+      
+      // Update the response in the list
+      setResponses(prevResponses => prevResponses.map(response => 
+        response.id === selectedResponseId 
+          ? { 
+              ...response, 
+              finalResponse: result.generated_response,
+              modelProvider: reprocessUseModelMixture ? "Mixture of Agents (MOA)" : reprocessModelProvider
+            } 
+          : response
+      ));
+      
+      // Close the modal
+      setShowReprocessModal(false);
+      
+      toast({
+        title: "Response reprocessed",
+        description: "The response has been regenerated using " + 
+          (reprocessUseModelMixture ? "Mixture of Agents" : reprocessModelProvider),
+        variant: "default"
+      });
+    } catch (error) {
+      console.error("Error reprocessing response:", error);
+      
+      toast({
+        title: "Reprocessing failed",
+        description: error instanceof Error ? error.message : "An error occurred while regenerating the response.",
+        variant: "destructive"
+      });
+    } finally {
+      setReprocessing(false);
+    }
+  };
+  
   // Save the edited response
   const saveEditedResponse = async () => {
     if (!selectedResponse || !selectedResponseId) return;
@@ -352,15 +430,26 @@ export default function GeneratedResponses() {
                       <h3 className="text-sm font-medium text-slate-500">Generated Response:</h3>
                       <div className="flex space-x-2">
                         {!editMode ? (
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
-                            onClick={enableEditMode}
-                            className="flex items-center gap-1"
-                          >
-                            <Edit className="h-4 w-4" />
-                            <span>Edit</span>
-                          </Button>
+                          <>
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              onClick={() => setShowReprocessModal(true)}
+                              className="flex items-center gap-1"
+                            >
+                              <RotateCw className="h-4 w-4" />
+                              <span>Reprocess</span>
+                            </Button>
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              onClick={enableEditMode}
+                              className="flex items-center gap-1"
+                            >
+                              <Edit className="h-4 w-4" />
+                              <span>Edit</span>
+                            </Button>
+                          </>
                         ) : (
                           <>
                             <Button 
@@ -421,6 +510,81 @@ export default function GeneratedResponses() {
           )}
         </div>
       )}
+      
+      {/* Reprocess Dialog Modal */}
+      <Dialog open={showReprocessModal} onOpenChange={setShowReprocessModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Reprocess Response</DialogTitle>
+            <DialogDescription>
+              Regenerate this response using a different AI model. This will replace the current response.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="py-4 space-y-6">
+            <div className="space-y-4">
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="use-model-mixture"
+                  checked={reprocessUseModelMixture}
+                  onChange={(e) => setReprocessUseModelMixture(e.target.checked)}
+                  className="h-4 w-4 border-gray-300 rounded text-primary focus:ring-primary"
+                />
+                <label htmlFor="use-model-mixture" className="text-sm font-medium text-gray-900">
+                  Use Mixture of Agents (MOA)
+                </label>
+              </div>
+              
+              {!reprocessUseModelMixture && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Select Model:</label>
+                  <RadioGroup 
+                    value={reprocessModelProvider} 
+                    onValueChange={setReprocessModelProvider}
+                    className="space-y-2"
+                  >
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="openai" id="openai" />
+                      <Label htmlFor="openai">OpenAI</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="anthropic" id="anthropic" />
+                      <Label htmlFor="anthropic">Anthropic</Label>
+                    </div>
+                  </RadioGroup>
+                </div>
+              )}
+            </div>
+          </div>
+          
+          <DialogFooter className="flex space-x-2 justify-end">
+            <Button
+              variant="outline"
+              onClick={() => setShowReprocessModal(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleReprocess}
+              disabled={reprocessing}
+              className="flex items-center gap-2"
+            >
+              {reprocessing ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>Processing...</span>
+                </>
+              ) : (
+                <>
+                  <RotateCw className="h-4 w-4" />
+                  <span>Reprocess</span>
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
