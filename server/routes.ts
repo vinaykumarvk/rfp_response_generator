@@ -1,7 +1,7 @@
 import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertRfpResponseSchema } from "@shared/schema";
+import { insertRfpResponseSchema, insertExcelRequirementResponseSchema } from "@shared/schema";
 import { fromZodError } from "zod-validation-error";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -168,21 +168,140 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return res.json(templates);
   });
 
+  // Excel Requirement Responses API
+
+  // Get all Excel requirement responses
+  app.get("/api/excel-requirements", async (_req: Request, res: Response) => {
+    try {
+      const responses = await storage.getExcelRequirementResponses();
+      return res.json(responses);
+    } catch (error) {
+      console.error("Error fetching Excel requirement responses:", error);
+      return res.status(500).json({ message: "Failed to fetch Excel requirement responses" });
+    }
+  });
+
+  // Get a specific Excel requirement response by ID
+  app.get("/api/excel-requirements/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid ID format" });
+      }
+
+      const response = await storage.getExcelRequirementResponse(id);
+      if (!response) {
+        return res.status(404).json({ message: "Excel requirement response not found" });
+      }
+
+      return res.json(response);
+    } catch (error) {
+      console.error("Error fetching Excel requirement response:", error);
+      return res.status(500).json({ message: "Failed to fetch Excel requirement response" });
+    }
+  });
+
+  // Create a new Excel requirement response
+  app.post("/api/excel-requirements", async (req: Request, res: Response) => {
+    try {
+      // Check if we're receiving a single item or an array
+      if (Array.isArray(req.body)) {
+        const requirements = [];
+        for (const item of req.body) {
+          const result = insertExcelRequirementResponseSchema.safeParse(item);
+          if (!result.success) {
+            const validationError = fromZodError(result.error);
+            return res.status(400).json({ message: validationError.message });
+          }
+          requirements.push(result.data);
+        }
+        const newResponses = await storage.createExcelRequirementResponses(requirements);
+        return res.status(201).json(newResponses);
+      } else {
+        const result = insertExcelRequirementResponseSchema.safeParse(req.body);
+        if (!result.success) {
+          const validationError = fromZodError(result.error);
+          return res.status(400).json({ message: validationError.message });
+        }
+        const newResponse = await storage.createExcelRequirementResponse(result.data);
+        return res.status(201).json(newResponse);
+      }
+    } catch (error) {
+      console.error("Error creating Excel requirement response:", error);
+      return res.status(500).json({ message: "Failed to create Excel requirement response" });
+    }
+  });
+
+  // Update an Excel requirement response
+  app.patch("/api/excel-requirements/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid ID format" });
+      }
+
+      const result = insertExcelRequirementResponseSchema.partial().safeParse(req.body);
+      if (!result.success) {
+        const validationError = fromZodError(result.error);
+        return res.status(400).json({ message: validationError.message });
+      }
+
+      const updatedResponse = await storage.updateExcelRequirementResponse(id, result.data);
+      if (!updatedResponse) {
+        return res.status(404).json({ message: "Excel requirement response not found" });
+      }
+
+      return res.json(updatedResponse);
+    } catch (error) {
+      console.error("Error updating Excel requirement response:", error);
+      return res.status(500).json({ message: "Failed to update Excel requirement response" });
+    }
+  });
+
+  // Delete an Excel requirement response
+  app.delete("/api/excel-requirements/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid ID format" });
+      }
+
+      const deleted = await storage.deleteExcelRequirementResponse(id);
+      if (!deleted) {
+        return res.status(404).json({ message: "Excel requirement response not found" });
+      }
+
+      return res.status(204).end();
+    } catch (error) {
+      console.error("Error deleting Excel requirement response:", error);
+      return res.status(500).json({ message: "Failed to delete Excel requirement response" });
+    }
+  });
+
   // Handle Excel file upload for analysis
   app.post("/api/analyze-excel", async (req: Request, res: Response) => {
     try {
-      // This is a placeholder endpoint for now
-      // In the future, we'll implement file upload handling and processing with multer
-      // The real implementation will call the Python script for analysis
+      // Extract data from the uploaded Excel file
+      const excelData = req.body.data;
       
-      // For now, return a mock response
-      setTimeout(() => {
-        res.status(200).json({
-          message: "Excel file analyzed successfully",
-          analyzedRows: 25,
-          matchedRows: 18
-        });
-      }, 1000);
+      if (!excelData || !Array.isArray(excelData)) {
+        return res.status(400).json({ message: "Invalid Excel data format. Expected an array." });
+      }
+      
+      // Convert Excel data to our database format
+      const requirements = excelData.map(row => ({
+        category: row.category || "Uncategorized",
+        requirement: row.requirement || row.text || row.content || "",
+        finalResponse: ""  // Initially empty
+      }));
+      
+      // Save to database
+      const savedRequirements = await storage.createExcelRequirementResponses(requirements);
+      
+      return res.status(200).json({
+        message: "Excel data processed successfully",
+        data: savedRequirements
+      });
     } catch (error) {
       console.error("Error processing Excel file:", error);
       return res.status(500).json({ message: "Failed to process Excel file" });

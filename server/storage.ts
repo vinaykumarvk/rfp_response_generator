@@ -1,4 +1,14 @@
-import { rfpResponses, type RfpResponse, type InsertRfpResponse, users, type User, type InsertUser } from "@shared/schema";
+import { 
+  rfpResponses, 
+  type RfpResponse, 
+  type InsertRfpResponse, 
+  users, 
+  type User, 
+  type InsertUser,
+  excelRequirementResponses,
+  type ExcelRequirementResponse,
+  type InsertExcelRequirementResponse
+} from "@shared/schema";
 import { db } from "./db";
 import { eq } from "drizzle-orm";
 
@@ -15,6 +25,14 @@ export interface IStorage {
   createRfpResponse(rfpResponse: InsertRfpResponse): Promise<RfpResponse>;
   updateRfpResponse(id: number, rfpResponse: Partial<InsertRfpResponse>): Promise<RfpResponse | undefined>;
   deleteRfpResponse(id: number): Promise<boolean>;
+  
+  // Excel Requirement Response Operations
+  getExcelRequirementResponse(id: number): Promise<ExcelRequirementResponse | undefined>;
+  getExcelRequirementResponses(): Promise<ExcelRequirementResponse[]>;
+  createExcelRequirementResponse(response: InsertExcelRequirementResponse): Promise<ExcelRequirementResponse>;
+  createExcelRequirementResponses(responses: InsertExcelRequirementResponse[]): Promise<ExcelRequirementResponse[]>;
+  updateExcelRequirementResponse(id: number, response: Partial<InsertExcelRequirementResponse>): Promise<ExcelRequirementResponse | undefined>;
+  deleteExcelRequirementResponse(id: number): Promise<boolean>;
 }
 
 // Database storage implementation
@@ -78,6 +96,55 @@ export class DatabaseStorage implements IStorage {
     const result = await db
       .delete(rfpResponses)
       .where(eq(rfpResponses.id, id));
+    
+    // In PostgreSQL, the count is not directly returned, but we can infer success if no error
+    return true;
+  }
+
+  // Excel Requirement Response Operations
+  async getExcelRequirementResponse(id: number): Promise<ExcelRequirementResponse | undefined> {
+    const [response] = await db.select().from(excelRequirementResponses).where(eq(excelRequirementResponses.id, id));
+    return response || undefined;
+  }
+
+  async getExcelRequirementResponses(): Promise<ExcelRequirementResponse[]> {
+    return await db.select().from(excelRequirementResponses);
+  }
+
+  async createExcelRequirementResponse(response: InsertExcelRequirementResponse): Promise<ExcelRequirementResponse> {
+    const [createdResponse] = await db
+      .insert(excelRequirementResponses)
+      .values(response)
+      .returning();
+    return createdResponse;
+  }
+
+  async createExcelRequirementResponses(responses: InsertExcelRequirementResponse[]): Promise<ExcelRequirementResponse[]> {
+    if (responses.length === 0) {
+      return [];
+    }
+    
+    const createdResponses = await db
+      .insert(excelRequirementResponses)
+      .values(responses)
+      .returning();
+    return createdResponses;
+  }
+
+  async updateExcelRequirementResponse(id: number, response: Partial<InsertExcelRequirementResponse>): Promise<ExcelRequirementResponse | undefined> {
+    const [updatedResponse] = await db
+      .update(excelRequirementResponses)
+      .set(response)
+      .where(eq(excelRequirementResponses.id, id))
+      .returning();
+    
+    return updatedResponse || undefined;
+  }
+
+  async deleteExcelRequirementResponse(id: number): Promise<boolean> {
+    await db
+      .delete(excelRequirementResponses)
+      .where(eq(excelRequirementResponses.id, id));
     
     // In PostgreSQL, the count is not directly returned, but we can infer success if no error
     return true;

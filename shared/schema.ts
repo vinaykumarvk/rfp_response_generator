@@ -27,6 +27,15 @@ export const rfpResponses = pgTable("rfp_responses", {
   lastUpdated: timestamp("last_updated").defaultNow().notNull(),
 });
 
+export const excelRequirementResponses = pgTable("excel_requirement_responses", {
+  id: serial("id").primaryKey(),
+  category: text("category").notNull(),
+  requirement: text("requirement").notNull(),
+  finalResponse: text("final_response"),
+  timestamp: timestamp("timestamp").defaultNow().notNull(),
+  rating: integer("rating"),
+});
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
@@ -39,12 +48,20 @@ export const insertRfpResponseSchema = createInsertSchema(rfpResponses).omit({
   lastUpdated: true,
 });
 
+export const insertExcelRequirementResponseSchema = createInsertSchema(excelRequirementResponses).omit({
+  id: true,
+  timestamp: true,
+});
+
 // Types
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 
 export type InsertRfpResponse = z.infer<typeof insertRfpResponseSchema>;
 export type RfpResponse = typeof rfpResponses.$inferSelect;
+
+export type InsertExcelRequirementResponse = z.infer<typeof insertExcelRequirementResponseSchema>;
+export type ExcelRequirementResponse = typeof excelRequirementResponses.$inferSelect;
 
 // Template types for frontend
 export const templateSchema = z.object({
