@@ -35,7 +35,6 @@ interface SimilarResponse {
 export default function GenerateResponse() {
   const [requirements, setRequirements] = useState<ExcelRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedRequirement, setSelectedRequirement] = useState<string>("");
   const [responseText, setResponseText] = useState<string>("");
   const [generating, setGenerating] = useState(false);
   const [similarResponses, setSimilarResponses] = useState<SimilarResponse[]>([]);
@@ -45,8 +44,7 @@ export default function GenerateResponse() {
   const [activeTab, setActiveTab] = useState<string>("response");
   const [selectedRequirementId, setSelectedRequirementId] = useState<number | undefined>(undefined);
   
-  // Multi-select states
-  const [viewMode, setViewMode] = useState<'single' | 'multiple'>('single');
+  // States for requirement selection
   const [selectedRequirementIds, setSelectedRequirementIds] = useState<Set<number>>(new Set());
   const [batchGenerating, setBatchGenerating] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -88,98 +86,36 @@ export default function GenerateResponse() {
     fetchData();
   }, []);
 
-  const handleRequirementChange = (value: string) => {
-    setSelectedRequirement(value);
-    // When selecting a requirement, check if it already has a response
-    const selectedReq = requirements.find(r => r.id?.toString() === value);
+  // When selecting a requirement in the checkbox, we set the selected requirement ID
+  const handleSingleRequirementSelect = (id: number) => {
+    setSelectedRequirementId(id);
+    
+    // Check if it already has a response
+    const selectedReq = requirements.find(r => r.id === id);
     
     if (selectedReq) {
-      setSelectedRequirementId(selectedReq.id);
-      
       if (selectedReq.finalResponse) {
         setResponseText(selectedReq.finalResponse);
       } else {
         setResponseText("");
       }
-    } else {
-      setSelectedRequirementId(undefined);
-      setResponseText("");
+      
+      // Clear previous similar responses and errors
+      setSimilarResponses([]);
+      setErrorMessage(null);
+      
+      // Reset to response tab when changing requirements
+      setActiveTab("response");
     }
-    
-    // Clear previous similar responses and errors
-    setSimilarResponses([]);
-    setErrorMessage(null);
-    
-    // Reset to response tab when changing requirements
-    setActiveTab("response");
   };
 
-  const handleGenerateResponse = async () => {
-    if (!selectedRequirement) return;
-    
-    setGenerating(true);
-    setErrorMessage(null);
-    setSimilarResponses([]);
-    
-    try {
-      const selectedReq = requirements.find(r => r.id?.toString() === selectedRequirement);
-      
-      if (!selectedReq) {
-        throw new Error("Selected requirement not found");
-      }
-      
-      // Call our API to generate a response
-      const response = await fetch("/api/generate-response", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          requirement: selectedReq.requirement,
-          provider: modelProvider,
-          requirementId: selectedReq.id
-        })
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Failed to generate response");
-      }
-      
-      const result = await response.json();
-      
-      if (result.error) {
-        throw new Error(result.error);
-      }
-      
-      setResponseText(result.generated_response || "");
-      
-      // Set similar responses if available
-      if (result.similar_responses && Array.isArray(result.similar_responses)) {
-        setSimilarResponses(result.similar_responses);
-      }
-      
-      // If the response was automatically saved, update the local state
-      if (result.saved && result.updatedResponse) {
-        // Update the requirements list with the new response
-        setRequirements(prev => prev.map(req => 
-          req.id === selectedReq.id ? { ...req, finalResponse: result.generated_response } : req
-        ));
-      }
-      
-    } catch (error) {
-      console.error("Error generating response:", error);
-      setErrorMessage(error instanceof Error ? error.message : "Unknown error occurred");
-    } finally {
-      setGenerating(false);
-    }
-  };
+  // Single response generation is now handled through batch generation
   
   const handleSaveResponse = async () => {
-    if (!selectedRequirement || !responseText) return;
+    if (!selectedRequirementId || !responseText) return;
     
     try {
-      const selectedReq = requirements.find(r => r.id?.toString() === selectedRequirement);
+      const selectedReq = requirements.find(r => r.id === selectedRequirementId);
       
       if (selectedReq?.id) {
         const saveResponse = await fetch(`/api/excel-requirements/${selectedReq.id}`, {
@@ -214,12 +150,10 @@ export default function GenerateResponse() {
     setShowSimilarResponses(!showSimilarResponses);
   };
   
-  // Toggle between single and multiple selection modes
-  const toggleViewMode = () => {
-    setViewMode(viewMode === 'single' ? 'multiple' : 'single');
-    // Clear selections when switching modes
+  // Reset selections
+  const resetSelections = () => {
     setSelectedRequirementIds(new Set());
-    setSelectedRequirement("");
+    setSelectedRequirementId(undefined);
     setResponseText("");
     setSimilarResponses([]);
     setErrorMessage(null);
@@ -356,12 +290,12 @@ export default function GenerateResponse() {
           <h2 className="text-2xl font-bold text-slate-800">Generate Response</h2>
           <div className="flex items-center gap-2">
             <Button
-              onClick={toggleViewMode}
+              onClick={resetSelections}
               variant="outline"
               className="flex items-center gap-2"
             >
-              <History className="h-4 w-4" />
-              {viewMode === 'single' ? "Switch to Multiple" : "Switch to Single"}
+              <RefreshCw className="h-4 w-4" />
+              Reset Selections
             </Button>
           </div>
         </div>
@@ -369,13 +303,9 @@ export default function GenerateResponse() {
         <div className="grid grid-cols-1 gap-6">
           <Card>
             <div className="px-6 py-5 border-b border-slate-200">
-              <h3 className="text-lg font-medium text-slate-800">
-                {viewMode === 'single' ? "Select Requirement" : "Select Multiple Requirements"}
-              </h3>
+              <h3 className="text-lg font-medium text-slate-800">Select Requirements</h3>
               <p className="mt-1 text-sm text-slate-500">
-                {viewMode === 'single' 
-                  ? "Choose a requirement to generate a response."
-                  : "Select multiple requirements to generate responses in batch."}
+                Choose one or more requirements to generate responses.
               </p>
             </div>
             
@@ -385,212 +315,133 @@ export default function GenerateResponse() {
                   <Loader2 className="h-8 w-8 text-slate-400 animate-spin" />
                 </div>
               ) : requirements.length > 0 ? (
-                viewMode === 'single' ? (
-                  <div className="space-y-4">
+                <div className="space-y-4">
+                  {/* Filter controls */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="requirement-select">Requirement</Label>
-                      <Select value={selectedRequirement} onValueChange={handleRequirementChange}>
+                      <Label htmlFor="search-query">Search</Label>
+                      <div className="relative">
+                        <Search className="absolute left-2 top-2.5 h-4 w-4 text-slate-500" />
+                        <input
+                          id="search-query"
+                          type="text"
+                          placeholder="Search requirements..."
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
+                          className="pl-8 h-10 rounded-md border border-slate-200 w-full"
+                        />
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="category-filter">Category</Label>
+                      <Select 
+                        value={categoryFilter || "all"} 
+                        onValueChange={(val) => setCategoryFilter(val === "all" ? null : val)}
+                      >
                         <SelectTrigger>
-                          <SelectValue placeholder="Select a requirement" />
+                          <SelectValue placeholder="All categories" />
                         </SelectTrigger>
                         <SelectContent>
-                          {requirements.map((req) => (
-                            <SelectItem key={req.id} value={req.id?.toString() || ""}>
-                              <span className="truncate block max-w-[400px]">
-                                {req.category}: {req.requirement.length > 40 
-                                  ? `${req.requirement.substring(0, 40)}...` 
-                                  : req.requirement}
-                              </span>
+                          <SelectItem value="all">All categories</SelectItem>
+                          {uniqueCategories.map((category) => (
+                            <SelectItem key={category} value={category}>
+                              {category}
                             </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
                     </div>
-                    
-                    {selectedRequirement && (
-                      <div className="mt-4 p-4 bg-slate-50 rounded-md border border-slate-200">
-                        <h4 className="font-medium text-slate-700 mb-2">Selected Requirement:</h4>
-                        <p className="text-slate-600">
-                          {requirements.find(r => r.id?.toString() === selectedRequirement)?.requirement}
-                        </p>
-                      </div>
-                    )}
-                    
-                    {selectedRequirement && (
-                      <div className="space-y-2 mt-4">
-                        <Label>AI Model</Label>
-                        <RadioGroup 
-                          value={modelProvider}
-                          onValueChange={setModelProvider}
-                          className="flex space-x-4"
-                        >
-                          <div className="flex items-center space-x-2">
-                            <RadioGroupItem value="openai" id="openai" />
-                            <Label htmlFor="openai" className="cursor-pointer">OpenAI</Label>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <RadioGroupItem value="anthropic" id="anthropic" />
-                            <Label htmlFor="anthropic" className="cursor-pointer">Anthropic</Label>
-                          </div>
-                        </RadioGroup>
-                      </div>
-                    )}
-                    
-                    {errorMessage && (
-                      <Alert variant="destructive" className="mt-4">
-                        <AlertTitle>Error</AlertTitle>
-                        <AlertDescription>{errorMessage}</AlertDescription>
-                      </Alert>
-                    )}
-                    
-                    <Button 
-                      onClick={handleGenerateResponse}
-                      disabled={!selectedRequirement || generating}
-                      className="w-full"
-                    >
-                      {generating ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Generating...
-                        </>
-                      ) : (
-                        <>
-                          <MessageSquare className="mr-2 h-4 w-4" />
-                          Generate Response
-                        </>
-                      )}
-                    </Button>
                   </div>
-                ) : (
-                  // Multiple selection mode
-                  <div className="space-y-4">
-                    {/* Filter controls */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="search-query">Search</Label>
-                        <div className="relative">
-                          <Search className="absolute left-2 top-2.5 h-4 w-4 text-slate-500" />
-                          <input
-                            id="search-query"
-                            type="text"
-                            placeholder="Search requirements..."
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="pl-8 h-10 rounded-md border border-slate-200 w-full"
-                          />
-                        </div>
+                  
+                  {/* AI Model selection */}
+                  <div className="space-y-2">
+                    <Label>AI Model</Label>
+                    <RadioGroup 
+                      value={modelProvider}
+                      onValueChange={setModelProvider}
+                      className="flex space-x-4"
+                    >
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="openai" id="openai" />
+                        <Label htmlFor="openai" className="cursor-pointer">OpenAI</Label>
                       </div>
-                      
-                      <div className="space-y-2">
-                        <Label htmlFor="category-filter">Category</Label>
-                        <Select 
-                          value={categoryFilter || ""} 
-                          onValueChange={(val) => setCategoryFilter(val === "" ? null : val)}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="All categories" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="">All categories</SelectItem>
-                            {uniqueCategories.map((category) => (
-                              <SelectItem key={category} value={category}>
-                                {category}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="anthropic" id="anthropic" />
+                        <Label htmlFor="anthropic" className="cursor-pointer">Anthropic</Label>
+                      </div>
+                    </RadioGroup>
+                  </div>
+                  
+                  {/* Requirements selection */}
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <Label>Requirements without Responses</Label>
+                      <div className="text-sm text-slate-500">
+                        Selected: {selectedRequirementIds.size} / {getRequirementsWithoutResponses().length}
                       </div>
                     </div>
                     
-                    {/* AI Model selection */}
-                    <div className="space-y-2">
-                      <Label>AI Model</Label>
-                      <RadioGroup 
-                        value={modelProvider}
-                        onValueChange={setModelProvider}
-                        className="flex space-x-4"
-                      >
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="openai" id="openai-multi" />
-                          <Label htmlFor="openai-multi" className="cursor-pointer">OpenAI</Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="anthropic" id="anthropic-multi" />
-                          <Label htmlFor="anthropic-multi" className="cursor-pointer">Anthropic</Label>
-                        </div>
-                      </RadioGroup>
-                    </div>
-                    
-                    {/* Multiple requirements selection */}
-                    <div className="space-y-2">
-                      <div className="flex justify-between items-center">
-                        <Label>Requirements without Responses</Label>
-                        <div className="text-sm text-slate-500">
-                          Selected: {selectedRequirementIds.size} / {getRequirementsWithoutResponses().length}
-                        </div>
-                      </div>
-                      
-                      <div className="border border-slate-200 rounded-md max-h-[300px] overflow-y-auto">
-                        {getRequirementsWithoutResponses().length > 0 ? (
-                          <div className="divide-y divide-slate-200">
-                            {getRequirementsWithoutResponses().map((req) => (
-                              <div 
-                                key={req.id} 
-                                className="p-3 hover:bg-slate-50 flex items-start gap-3"
-                              >
-                                <div className="pt-0.5">
-                                  <Checkbox 
-                                    id={`req-${req.id}`}
-                                    checked={req.id ? selectedRequirementIds.has(req.id) : false}
-                                    onCheckedChange={() => req.id && handleCheckboxChange(req.id)}
-                                  />
-                                </div>
-                                <div className="flex-1">
-                                  <label 
-                                    htmlFor={`req-${req.id}`} 
-                                    className="block cursor-pointer"
-                                  >
-                                    <div className="font-medium text-slate-700">{req.category}</div>
-                                    <div className="text-sm text-slate-600 mt-1">{req.requirement}</div>
-                                  </label>
-                                </div>
+                    <div className="border border-slate-200 rounded-md max-h-[300px] overflow-y-auto">
+                      {getRequirementsWithoutResponses().length > 0 ? (
+                        <div className="divide-y divide-slate-200">
+                          {getRequirementsWithoutResponses().map((req) => (
+                            <div 
+                              key={req.id} 
+                              className="p-3 hover:bg-slate-50 flex items-start gap-3"
+                            >
+                              <div className="pt-0.5">
+                                <Checkbox 
+                                  id={`req-${req.id}`}
+                                  checked={req.id ? selectedRequirementIds.has(req.id) : false}
+                                  onCheckedChange={() => req.id && handleCheckboxChange(req.id)}
+                                />
                               </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <div className="p-4 text-center text-slate-500">
-                            No requirements without responses found. Try changing the filters.
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    
-                    {errorMessage && (
-                      <Alert variant="destructive" className="mt-4">
-                        <AlertTitle>Error</AlertTitle>
-                        <AlertDescription>{errorMessage}</AlertDescription>
-                      </Alert>
-                    )}
-                    
-                    <Button 
-                      onClick={handleBatchGenerate}
-                      disabled={selectedRequirementIds.size === 0 || batchGenerating}
-                      className="w-full"
-                    >
-                      {batchGenerating ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Generating {selectedRequirementIds.size} Responses...
-                        </>
+                              <div className="flex-1">
+                                <label 
+                                  htmlFor={`req-${req.id}`} 
+                                  className="block cursor-pointer"
+                                >
+                                  <div className="font-medium text-slate-700">{req.category}</div>
+                                  <div className="text-sm text-slate-600 mt-1">{req.requirement}</div>
+                                </label>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
                       ) : (
-                        <>
-                          <MessageSquare className="mr-2 h-4 w-4" />
-                          Generate {selectedRequirementIds.size} Responses
-                        </>
+                        <div className="p-4 text-center text-slate-500">
+                          No requirements without responses found. Try changing the filters.
+                        </div>
                       )}
-                    </Button>
+                    </div>
                   </div>
-                )
+                  
+                  {errorMessage && (
+                    <Alert variant="destructive" className="mt-4">
+                      <AlertTitle>Error</AlertTitle>
+                      <AlertDescription>{errorMessage}</AlertDescription>
+                    </Alert>
+                  )}
+                  
+                  <Button 
+                    onClick={handleBatchGenerate}
+                    disabled={selectedRequirementIds.size === 0 || batchGenerating}
+                    className="w-full"
+                  >
+                    {batchGenerating ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Generating {selectedRequirementIds.size} Responses...
+                      </>
+                    ) : (
+                      <>
+                        <MessageSquare className="mr-2 h-4 w-4" />
+                        Generate {selectedRequirementIds.size} {selectedRequirementIds.size === 1 ? 'Response' : 'Responses'}
+                      </>
+                    )}
+                  </Button>
+                </div>
               ) : (
                 <div className="text-center py-4">
                   <p className="text-slate-500">No requirements available. Please upload Excel files first.</p>
