@@ -30,6 +30,7 @@ import { Label } from "@/components/ui/label";
 import { format } from "date-fns";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
+import { useIsMobile } from "@/hooks/use-mobile";
 import ReferencePanel from "@/components/ReferencePanel";
 
 interface ExcelRow {
@@ -279,6 +280,8 @@ export default function GeneratedResponses() {
     return matchesSearch && matchesCategory;
   });
 
+  const isMobile = useIsMobile();
+
   return (
     <div className="h-full overflow-auto">
       {!showDetailView ? (
@@ -294,7 +297,7 @@ export default function GeneratedResponses() {
               className="flex items-center gap-1"
             >
               <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-              <span>{loading ? 'Refreshing...' : 'Refresh'}</span>
+              <span className={isMobile ? "sr-only" : ""}>{loading ? 'Refreshing...' : 'Refresh'}</span>
             </Button>
           </div>
           
@@ -305,7 +308,7 @@ export default function GeneratedResponses() {
                   <Search className="absolute left-2 top-2.5 h-4 w-4 text-slate-400" />
                   <input
                     type="text"
-                    placeholder="Search by requirement or content..."
+                    placeholder={isMobile ? "Search..." : "Search by requirement or content..."}
                     className="w-full pl-8 pr-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
@@ -438,7 +441,7 @@ export default function GeneratedResponses() {
                               className="flex items-center gap-1"
                             >
                               <RotateCw className="h-4 w-4" />
-                              <span>Reprocess</span>
+                              <span className={isMobile ? "sr-only" : ""}>Reprocess</span>
                             </Button>
                             <Button 
                               variant="outline" 
@@ -447,7 +450,7 @@ export default function GeneratedResponses() {
                               className="flex items-center gap-1"
                             >
                               <Edit className="h-4 w-4" />
-                              <span>Edit</span>
+                              <span className={isMobile ? "sr-only" : ""}>Edit</span>
                             </Button>
                           </>
                         ) : (
@@ -459,7 +462,7 @@ export default function GeneratedResponses() {
                               className="flex items-center gap-1"
                             >
                               <X className="h-4 w-4" />
-                              <span>Cancel</span>
+                              <span className={isMobile ? "sr-only" : ""}>Cancel</span>
                             </Button>
                             <Button 
                               variant="default" 
@@ -469,7 +472,7 @@ export default function GeneratedResponses() {
                               className="flex items-center gap-1"
                             >
                               <Save className="h-4 w-4" />
-                              <span>{saving ? 'Saving...' : 'Save'}</span>
+                              <span className={isMobile ? "sr-only" : ""}>{saving ? 'Saving...' : 'Save'}</span>
                             </Button>
                           </>
                         )}
@@ -601,19 +604,128 @@ function ResponsesTable({
   onViewDetail: (response: ExcelRow) => void,
   onEditResponse: (response: ExcelRow) => void
 }) {
+  const isMobile = useIsMobile();
+  
+  // Format date in a consistent way
+  const formatDate = (dateString: string) => {
+    try {
+      return format(new Date(dateString), 'MMM d, yyyy HH:mm');
+    } catch (e) {
+      return dateString;
+    }
+  };
+
+  // Empty state component for no responses
+  const EmptyState = () => (
+    <div className="p-8 text-center">
+      <div className="flex flex-col items-center justify-center">
+        <MessageSquare className="h-10 w-10 text-slate-300 mb-3" />
+        <p className="text-slate-500">No generated responses found.</p>
+        <p className="text-slate-400 text-xs mt-1">
+          Go to the Generate Response page to create new responses.
+        </p>
+      </div>
+    </div>
+  );
+
+  // Loading state component
+  const LoadingState = () => (
+    <div className="p-6">
+      <div className="space-y-3">
+        {isMobile ? (
+          // Mobile loading skeletons (cards)
+          <>
+            <Skeleton className="h-40 w-full rounded-lg" />
+            <Skeleton className="h-40 w-full rounded-lg" />
+            <Skeleton className="h-40 w-full rounded-lg" />
+          </>
+        ) : (
+          // Desktop loading skeletons (table rows)
+          <>
+            <Skeleton className="h-8 w-full" />
+            <Skeleton className="h-8 w-full" />
+            <Skeleton className="h-8 w-full" />
+            <Skeleton className="h-8 w-full" />
+            <Skeleton className="h-8 w-full" />
+          </>
+        )}
+      </div>
+    </div>
+  );
+
+  // Mobile card view
+  if (isMobile) {
+    return (
+      <div className="space-y-4 pb-6">
+        {loading ? (
+          <LoadingState />
+        ) : responses.length > 0 ? (
+          responses.map((response, index) => (
+            <Card key={response.id || index} className="overflow-hidden">
+              <CardContent className="p-4">
+                <div className="flex justify-between items-start mb-2">
+                  <div className="font-medium text-primary">{response.category}</div>
+                  {response.modelProvider && (
+                    <div className="text-xs px-2 py-1 bg-slate-100 rounded-full">
+                      {response.modelProvider.includes("MOA") 
+                        ? "MOA" 
+                        : response.modelProvider.split(' ')[0]}
+                    </div>
+                  )}
+                </div>
+                
+                <div className="text-sm font-medium mb-2 line-clamp-2">
+                  {response.requirement}
+                </div>
+                
+                {response.finalResponse && (
+                  <div className="text-sm text-slate-600 mb-3 line-clamp-2 border-l-2 border-slate-200 pl-2">
+                    {response.finalResponse}
+                  </div>
+                )}
+                
+                <div className="flex justify-between items-center mt-2">
+                  <div className="text-xs text-slate-500">
+                    {response.timestamp ? formatDate(response.timestamp) : "—"}
+                  </div>
+                  
+                  <div className="flex space-x-2">
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={() => onViewDetail(response)}
+                      className="h-8 px-2 py-1"
+                    >
+                      <Eye className="h-4 w-4 mr-1" />
+                      View
+                    </Button>
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={() => onEditResponse(response)}
+                      className="h-8 px-2 py-1"
+                    >
+                      <Edit className="h-4 w-4 mr-1" />
+                      Edit
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))
+        ) : (
+          <EmptyState />
+        )}
+      </div>
+    );
+  }
+  
+  // Desktop table view
   return (
     <Card>
       <CardContent className="p-0 overflow-auto">
         {loading ? (
-          <div className="p-6">
-            <div className="space-y-2">
-              <Skeleton className="h-8 w-full" />
-              <Skeleton className="h-8 w-full" />
-              <Skeleton className="h-8 w-full" />
-              <Skeleton className="h-8 w-full" />
-              <Skeleton className="h-8 w-full" />
-            </div>
-          </div>
+          <LoadingState />
         ) : responses.length > 0 ? (
           <Table>
             <TableHeader>
@@ -641,17 +753,7 @@ function ResponsesTable({
                   </TableCell>
                   <TableCell>
                     {response.timestamp ? (
-                      <span title={response.timestamp}>
-                        {
-                          (() => {
-                            try {
-                              return format(new Date(response.timestamp), 'MMM d, yyyy HH:mm');
-                            } catch (e) {
-                              return response.timestamp;
-                            }
-                          })()
-                        }
-                      </span>
+                      <span title={response.timestamp}>{formatDate(response.timestamp)}</span>
                     ) : "—"}
                   </TableCell>
                   <TableCell className="text-right">
@@ -683,15 +785,7 @@ function ResponsesTable({
             </TableBody>
           </Table>
         ) : (
-          <div className="p-12 text-center">
-            <div className="flex flex-col items-center justify-center">
-              <MessageSquare className="h-12 w-12 text-slate-300 mb-4" />
-              <p className="text-slate-500">No generated responses found.</p>
-              <p className="text-slate-400 text-sm mt-2">
-                Go to the Generate Response page to create new responses.
-              </p>
-            </div>
-          </div>
+          <EmptyState />
         )}
       </CardContent>
     </Card>
