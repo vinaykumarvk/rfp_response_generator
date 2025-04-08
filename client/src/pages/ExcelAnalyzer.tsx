@@ -6,7 +6,6 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Upload, FileText, AlertTriangle, Check } from "lucide-react";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
-import StepIndicator from "@/components/StepIndicator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 // Define the structure of our parsed Excel data
@@ -107,7 +106,7 @@ export default function ExcelAnalyzer() {
       
       <main className="flex-grow bg-slate-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <StepIndicator title="Excel Requirements Analyzer" />
+          <h2 className="text-2xl font-bold text-slate-800 mb-6">Excel Requirements Analyzer</h2>
           
           <div className="grid grid-cols-1 gap-8">
             <Card>
