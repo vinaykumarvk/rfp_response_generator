@@ -8,7 +8,6 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import StepIndicator from "@/components/StepIndicator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { apiRequest } from "@/lib/queryClient";
 
 // Define the structure of our parsed Excel data
 interface ExcelRow {
@@ -75,10 +74,12 @@ export default function ExcelAnalyzer() {
       setExcelData(sampleData);
       
       // Send the data to the backend to store in the database
-      const response = await apiRequest({
-        url: "/api/analyze-excel",
+      const response = await fetch("/api/analyze-excel", {
         method: "POST",
-        body: { data: sampleData }
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ data: sampleData })
       });
       
       if (response.ok) {
