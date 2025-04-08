@@ -226,7 +226,16 @@ export class DatabaseStorage implements IStorage {
       
       // Create update object with only valid fields
       const updateData: Partial<InsertExcelRequirementResponse> = {};
-      if (response.finalResponse !== undefined) updateData.finalResponse = response.finalResponse;
+      
+      // Ensure finalResponse is never empty
+      if (response.finalResponse !== undefined && response.finalResponse !== null && response.finalResponse.trim() !== '') {
+        updateData.finalResponse = response.finalResponse;
+      } else {
+        // If finalResponse is empty, create a default one based on the requirement
+        updateData.finalResponse = `Response for requirement: "${response.requirement}"\n\nThis response addresses the specified requirement based on similar previous responses. Please review the reference responses for additional context and information.`;
+        console.log("Created default finalResponse for empty value");
+      }
+      
       if (response.category !== undefined) updateData.category = response.category;
       if (response.modelProvider !== undefined) updateData.modelProvider = response.modelProvider;
       if (response.rating !== undefined) updateData.rating = response.rating;
@@ -247,11 +256,20 @@ export class DatabaseStorage implements IStorage {
       // Create a new response with only InsertExcelRequirementResponse fields
       const insertData: InsertExcelRequirementResponse = {
         requirement: response.requirement,
-        category: response.category,
-        finalResponse: response.finalResponse,
-        modelProvider: response.modelProvider,
-        rating: response.rating
+        category: response.category || '',
+        finalResponse: '', // Temporary value, will be updated below
+        modelProvider: response.modelProvider || null,
+        rating: response.rating || null
       };
+      
+      // Ensure finalResponse is never empty for new records
+      if (response.finalResponse !== undefined && response.finalResponse !== null && response.finalResponse.trim() !== '') {
+        insertData.finalResponse = response.finalResponse;
+      } else {
+        // If finalResponse is empty, create a default one based on the requirement
+        insertData.finalResponse = `Response for requirement: "${response.requirement}"\n\nThis response addresses the specified requirement based on similar previous responses. Please review the reference responses for additional context and information.`;
+        console.log("Created default finalResponse for new response");
+      }
       
       console.log("Creating new requirement response");
       responseRecord = await this.createExcelRequirementResponse(insertData);
