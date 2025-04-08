@@ -293,8 +293,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const requirements = excelData.map(row => ({
         category: row.category || "Uncategorized",
         requirement: row.requirement || row.text || row.content || "",
-        finalResponse: "",  // Initially empty
-        timestamp: row.timestamp || new Date().toISOString()
+        finalResponse: ""  // Initially empty
+        // timestamp is set by defaultNow() in the schema
       }));
       
       let savedRequirements;

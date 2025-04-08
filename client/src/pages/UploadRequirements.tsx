@@ -27,8 +27,8 @@ interface ExcelRow {
   category: string;
   requirement: string;
   finalResponse?: string;
-  timestamp?: string;
   rating?: number;
+  // timestamp is set by the database
 }
 
 export default function UploadRequirements() {
@@ -114,13 +114,12 @@ export default function UploadRequirements() {
               const jsonData = XLSX.utils.sheet_to_json(worksheet) as Record<string, any>[];
               
               // Map to our expected format
-              const currentTime = new Date().toISOString();
               const parsedData: ExcelRow[] = jsonData.map(row => ({
                 category: row.Category || row.category || "Uncategorized",
                 requirement: row.Requirement || row.requirement || row.text || row.Text || row.content || row.Content || "",
                 finalResponse: row.Response || row.response || row.finalResponse || "",
-                timestamp: currentTime,
                 rating: row.Rating || row.rating || undefined
+                // timestamp will be set automatically by the database
               }));
               
               resolve(parsedData);
