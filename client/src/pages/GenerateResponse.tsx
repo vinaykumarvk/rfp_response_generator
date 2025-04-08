@@ -9,6 +9,7 @@ import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Progress } from "@/components/ui/progress";
 import ReferencePanel from "@/components/ReferencePanel";
 import { useToast } from "@/hooks/use-toast";
 
@@ -50,6 +51,9 @@ export default function GenerateResponse() {
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   const [uniqueCategories, setUniqueCategories] = useState<string[]>([]);
+  const [progressValue, setProgressValue] = useState(0);
+  const [processedCount, setProcessedCount] = useState(0);
+  const [totalToProcess, setTotalToProcess] = useState(0);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -186,15 +190,27 @@ export default function GenerateResponse() {
     setBatchGenerating(true);
     setErrorMessage(null);
     
+    // Initialize progress tracking
+    const selectedIds = Array.from(selectedRequirementIds);
+    setTotalToProcess(selectedIds.length);
+    setProcessedCount(0);
+    setProgressValue(0);
+    
     try {
-      const selectedIds = Array.from(selectedRequirementIds);
       let successCount = 0;
       let failCount = 0;
       
-      for (const id of selectedIds) {
+      for (let i = 0; i < selectedIds.length; i++) {
+        const id = selectedIds[i];
         const requirement = requirements.find(r => r.id === id);
         
-        if (!requirement) continue;
+        if (!requirement) {
+          // Update progress even for skipped items
+          const newProcessedCount = i + 1;
+          setProcessedCount(newProcessedCount);
+          setProgressValue(Math.round((newProcessedCount / selectedIds.length) * 100));
+          continue;
+        }
         
         try {
           const response = await fetch("/api/generate-response", {
@@ -211,26 +227,29 @@ export default function GenerateResponse() {
           
           if (!response.ok) {
             failCount++;
-            continue;
+          } else {
+            const result = await response.json();
+            
+            if (result.error) {
+              failCount++;
+            } else {
+              // Update the requirements list with the new response
+              setRequirements(prev => prev.map(req => 
+                req.id === requirement.id ? { ...req, finalResponse: result.generated_response } : req
+              ));
+              
+              successCount++;
+            }
           }
-          
-          const result = await response.json();
-          
-          if (result.error) {
-            failCount++;
-            continue;
-          }
-          
-          // Update the requirements list with the new response
-          setRequirements(prev => prev.map(req => 
-            req.id === requirement.id ? { ...req, finalResponse: result.generated_response } : req
-          ));
-          
-          successCount++;
         } catch (error) {
           console.error(`Error generating response for requirement ${id}:`, error);
           failCount++;
         }
+        
+        // Update progress after each item is processed
+        const newProcessedCount = i + 1;
+        setProcessedCount(newProcessedCount);
+        setProgressValue(Math.round((newProcessedCount / selectedIds.length) * 100));
       }
       
       // Show summary toast
@@ -441,6 +460,17 @@ export default function GenerateResponse() {
                       </>
                     )}
                   </Button>
+                  
+                  {/* Progress bar for batch generation */}
+                  {batchGenerating && (
+                    <div className="space-y-2 mt-4">
+                      <div className="flex justify-between text-sm text-slate-500">
+                        <span>Processing: {processedCount} of {totalToProcess}</span>
+                        <span>{progressValue}%</span>
+                      </div>
+                      <Progress value={progressValue} className="h-2" />
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="text-center py-4">
