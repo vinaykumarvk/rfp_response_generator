@@ -733,6 +733,7 @@ function ResponsesTable({
                 <TableHead>Category</TableHead>
                 <TableHead>Requirement</TableHead>
                 <TableHead>Response Preview</TableHead>
+                <TableHead>Model</TableHead>
                 <TableHead>Date Generated</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -750,6 +751,15 @@ function ResponsesTable({
                           : response.finalResponse}
                       </div>
                     )}
+                  </TableCell>
+                  <TableCell>
+                    {response.modelProvider ? (
+                      <div className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-800">
+                        {response.modelProvider.includes("MOA") 
+                          ? "MOA" 
+                          : response.modelProvider.split(' ')[0]}
+                      </div>
+                    ) : "—"}
                   </TableCell>
                   <TableCell>
                     {response.timestamp ? (
