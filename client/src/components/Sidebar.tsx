@@ -6,7 +6,9 @@ import {
   Table, 
   MessageSquare,
   ChevronRight,
-  ChevronLeft
+  ChevronLeft,
+  Archive,
+  BookOpen
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -32,6 +34,12 @@ export default function Sidebar() {
       icon: <MessageSquare className="h-5 w-5" />,
       path: '/generate-response',
       active: location === '/generate-response'
+    },
+    {
+      title: 'Generated Responses',
+      icon: <BookOpen className="h-5 w-5" />,
+      path: '/generated-responses',
+      active: location === '/generated-responses'
     }
   ];
 

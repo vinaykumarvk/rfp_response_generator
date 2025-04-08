@@ -1,0 +1,372 @@
+import { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { 
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
+} from "@/components/ui/table";
+import { Skeleton } from "@/components/ui/skeleton";
+import { 
+  Eye, 
+  RefreshCw, 
+  Search,
+  BookOpen,
+  MessageSquare,
+  Filter
+} from "lucide-react";
+import { format } from "date-fns";
+import ReferencePanel from "@/components/ReferencePanel";
+
+interface ExcelRow {
+  id?: number;
+  category: string;
+  requirement: string;
+  finalResponse?: string;
+  timestamp?: string;
+  rating?: number;
+  modelProvider?: string;
+}
+
+export default function GeneratedResponses() {
+  const [loading, setLoading] = useState(true);
+  const [responses, setResponses] = useState<ExcelRow[]>([]);
+  const [selectedResponse, setSelectedResponse] = useState<ExcelRow | null>(null);
+  const [selectedResponseId, setSelectedResponseId] = useState<number | null>(null);
+  const [showDetailView, setShowDetailView] = useState(false);
+  const [activeTab, setActiveTab] = useState<string>("all");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
+  const [uniqueCategories, setUniqueCategories] = useState<string[]>([]);
+
+  // Fetch generated responses
+  const fetchResponses = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch("/api/excel-requirements");
+      if (response.ok) {
+        const data: ExcelRow[] = await response.json();
+        // Filter to only show responses that have finalResponse
+        const generatedData = data.filter(item => item.finalResponse);
+        setResponses(generatedData);
+        
+        // Extract unique categories for filtering
+        const categoriesSet = new Set<string>();
+        generatedData.forEach(item => {
+          if (item.category) categoriesSet.add(item.category);
+        });
+        setUniqueCategories(Array.from(categoriesSet));
+      } else {
+        console.error("Failed to fetch responses");
+      }
+    } catch (error) {
+      console.error("Error fetching responses:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fetch data on component mount
+  useEffect(() => {
+    fetchResponses();
+  }, []);
+
+  // Handle viewing a response detail
+  const handleViewDetail = (response: ExcelRow) => {
+    if (!response.id) return;
+    setSelectedResponse(response);
+    setSelectedResponseId(response.id);
+    setShowDetailView(true);
+  };
+
+  // Handle going back to the list view
+  const handleBackToList = () => {
+    setShowDetailView(false);
+    setSelectedResponse(null);
+    setSelectedResponseId(null);
+  };
+
+  // Filter responses based on search query and category
+  const filteredResponses = responses.filter(response => {
+    const matchesSearch = searchQuery === "" || 
+      response.requirement.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      response.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (response.finalResponse && response.finalResponse.toLowerCase().includes(searchQuery.toLowerCase()));
+    
+    const matchesCategory = categoryFilter === null || response.category === categoryFilter;
+    
+    return matchesSearch && matchesCategory;
+  });
+
+  return (
+    <div className="h-full overflow-auto">
+      {!showDetailView ? (
+        // List View
+        <div className="p-6">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-2xl font-bold text-slate-800">Generated Responses</h2>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={fetchResponses} 
+              disabled={loading}
+              className="flex items-center gap-1"
+            >
+              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+              <span>{loading ? 'Refreshing...' : 'Refresh'}</span>
+            </Button>
+          </div>
+          
+          <Card className="mb-6">
+            <CardContent className="p-4">
+              <div className="flex flex-col md:flex-row gap-4 items-start md:items-center">
+                <div className="relative w-full md:w-2/3">
+                  <Search className="absolute left-2 top-2.5 h-4 w-4 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="Search by requirement or content..."
+                    className="w-full pl-8 pr-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                </div>
+                <div className="flex items-center gap-2 w-full md:w-1/3">
+                  <Filter className="h-4 w-4 text-slate-500" />
+                  <select
+                    className="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                    value={categoryFilter || ""}
+                    onChange={(e) => setCategoryFilter(e.target.value === "" ? null : e.target.value)}
+                  >
+                    <option value="">All Categories</option>
+                    {uniqueCategories.map((category, index) => (
+                      <option key={index} value={category}>{category}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="mb-6">
+              <TabsTrigger value="all">All Responses</TabsTrigger>
+              <TabsTrigger value="openai">OpenAI Generated</TabsTrigger>
+              <TabsTrigger value="anthropic">Anthropic Generated</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="all" className="mt-0">
+              <ResponsesTable 
+                responses={filteredResponses} 
+                loading={loading} 
+                onViewDetail={handleViewDetail} 
+              />
+            </TabsContent>
+            
+            <TabsContent value="openai" className="mt-0">
+              <ResponsesTable 
+                responses={filteredResponses.filter(r => r.modelProvider?.toLowerCase()?.includes('openai'))} 
+                loading={loading} 
+                onViewDetail={handleViewDetail} 
+              />
+            </TabsContent>
+            
+            <TabsContent value="anthropic" className="mt-0">
+              <ResponsesTable 
+                responses={filteredResponses.filter(r => r.modelProvider?.toLowerCase()?.includes('anthropic'))} 
+                loading={loading} 
+                onViewDetail={handleViewDetail} 
+              />
+            </TabsContent>
+          </Tabs>
+        </div>
+      ) : (
+        // Detail View
+        <div className="p-6">
+          <div className="flex items-center mb-6">
+            <Button 
+              variant="ghost" 
+              onClick={handleBackToList} 
+              className="mr-4"
+            >
+              ← Back to List
+            </Button>
+            <h2 className="text-2xl font-bold text-slate-800">Response Details</h2>
+          </div>
+          
+          {selectedResponse && (
+            <div className="space-y-6">
+              <Card>
+                <CardContent className="p-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                    <div>
+                      <h3 className="text-sm font-medium text-slate-500 mb-1">Category:</h3>
+                      <p className="text-slate-800 text-lg">{selectedResponse.category}</p>
+                    </div>
+                    {selectedResponse.modelProvider && (
+                      <div>
+                        <h3 className="text-sm font-medium text-slate-500 mb-1">Generated with:</h3>
+                        <p className="text-slate-800 text-lg">{selectedResponse.modelProvider}</p>
+                      </div>
+                    )}
+                    <div>
+                      <h3 className="text-sm font-medium text-slate-500 mb-1">Date Generated:</h3>
+                      <p className="text-slate-800">
+                        {selectedResponse.timestamp ? (
+                          <span title={selectedResponse.timestamp}>
+                            {
+                              (() => {
+                                try {
+                                  return format(new Date(selectedResponse.timestamp), 'MMM d, yyyy HH:mm');
+                                } catch (e) {
+                                  return selectedResponse.timestamp;
+                                }
+                              })()
+                            }
+                          </span>
+                        ) : "—"}
+                      </p>
+                    </div>
+                    {selectedResponse.rating !== undefined && (
+                      <div>
+                        <h3 className="text-sm font-medium text-slate-500 mb-1">Rating:</h3>
+                        <p className="text-slate-800 text-lg">{selectedResponse.rating}/5</p>
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="mb-6">
+                    <h3 className="text-sm font-medium text-slate-500 mb-1">Requirement:</h3>
+                    <div className="p-4 bg-slate-50 rounded-md">
+                      <p className="text-slate-800">{selectedResponse.requirement}</p>
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <h3 className="text-sm font-medium text-slate-500 mb-1">Generated Response:</h3>
+                    <div className="p-4 bg-slate-50 rounded-md">
+                      <p className="text-slate-800 whitespace-pre-wrap">{selectedResponse.finalResponse}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <div className="px-6 py-4 border-b border-slate-200">
+                  <div className="flex items-center">
+                    <BookOpen className="h-5 w-5 mr-2 text-slate-500" />
+                    <h3 className="text-lg font-medium text-slate-800">Reference Information</h3>
+                  </div>
+                  <p className="mt-1 text-sm text-slate-500">
+                    Similar responses that were used to generate this response.
+                  </p>
+                </div>
+                <CardContent className="p-6">
+                  <ReferencePanel responseId={selectedResponseId || undefined} showTitle={false} />
+                </CardContent>
+              </Card>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Table component for responses
+function ResponsesTable({ 
+  responses, 
+  loading, 
+  onViewDetail 
+}: { 
+  responses: ExcelRow[], 
+  loading: boolean, 
+  onViewDetail: (response: ExcelRow) => void 
+}) {
+  return (
+    <Card>
+      <CardContent className="p-0 overflow-auto">
+        {loading ? (
+          <div className="p-6">
+            <div className="space-y-2">
+              <Skeleton className="h-8 w-full" />
+              <Skeleton className="h-8 w-full" />
+              <Skeleton className="h-8 w-full" />
+              <Skeleton className="h-8 w-full" />
+              <Skeleton className="h-8 w-full" />
+            </div>
+          </div>
+        ) : responses.length > 0 ? (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Category</TableHead>
+                <TableHead>Requirement</TableHead>
+                <TableHead>Response Preview</TableHead>
+                <TableHead>Date Generated</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {responses.map((response, index) => (
+                <TableRow key={response.id || index}>
+                  <TableCell>{response.category}</TableCell>
+                  <TableCell className="max-w-md truncate">{response.requirement}</TableCell>
+                  <TableCell>
+                    {response.finalResponse && (
+                      <div className="max-w-md truncate">
+                        {response.finalResponse.length > 80 
+                          ? `${response.finalResponse.substring(0, 80)}...` 
+                          : response.finalResponse}
+                      </div>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {response.timestamp ? (
+                      <span title={response.timestamp}>
+                        {
+                          (() => {
+                            try {
+                              return format(new Date(response.timestamp), 'MMM d, yyyy HH:mm');
+                            } catch (e) {
+                              return response.timestamp;
+                            }
+                          })()
+                        }
+                      </span>
+                    ) : "—"}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={() => onViewDetail(response)}
+                      className="px-2 h-8"
+                    >
+                      <Eye className="h-4 w-4 mr-1" />
+                      <span className="sr-only">View</span>
+                      View Details
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        ) : (
+          <div className="p-12 text-center">
+            <div className="flex flex-col items-center justify-center">
+              <MessageSquare className="h-12 w-12 text-slate-300 mb-4" />
+              <p className="text-slate-500">No generated responses found.</p>
+              <p className="text-slate-400 text-sm mt-2">
+                Go to the Generate Response page to create new responses.
+              </p>
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
