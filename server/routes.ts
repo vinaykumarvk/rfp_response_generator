@@ -414,7 +414,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                       referenceData.push({
                         category: similarResponse.category || 'Uncategorized',
                         requirement: similarResponse.requirement || requirement,
-                        response: similarResponse.text || '',
+                        response: similarResponse.response || similarResponse.text || '',
                         reference: similarResponse.reference,
                         score: similarResponse.score || 0
                       });
