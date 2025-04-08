@@ -343,7 +343,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Use Python script to generate response
-      const scriptPath = path.resolve(__dirname, 'rfp_response_generator.py');
+      const scriptPath = path.resolve(process.cwd(), 'server/rfp_response_generator.py');
       
       return new Promise<void>((resolve, reject) => {
         // Spawn Python process
