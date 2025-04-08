@@ -176,6 +176,22 @@ export default function GenerateResponse() {
     });
   };
   
+  // Handle select all checkbox
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      // Add all filtered requirements without responses to selection
+      const requirementsWithoutResponses = getRequirementsWithoutResponses();
+      const idsToAdd = requirementsWithoutResponses
+        .filter(req => req.id !== undefined)
+        .map(req => req.id as number);
+      
+      setSelectedRequirementIds(new Set(idsToAdd));
+    } else {
+      // Clear all selections
+      setSelectedRequirementIds(new Set());
+    }
+  };
+  
   // Generate responses for multiple selected requirements
   const handleBatchGenerate = async () => {
     if (selectedRequirementIds.size === 0) {
@@ -399,6 +415,24 @@ export default function GenerateResponse() {
                       <div className="text-sm text-slate-500">
                         Selected: {selectedRequirementIds.size} / {getRequirementsWithoutResponses().length}
                       </div>
+                    </div>
+                    
+                    {/* Select All option */}
+                    <div className="flex items-center gap-2 px-3 py-2 border-b border-slate-200">
+                      <Checkbox 
+                        id="select-all"
+                        checked={
+                          getRequirementsWithoutResponses().length > 0 && 
+                          selectedRequirementIds.size === getRequirementsWithoutResponses().length
+                        }
+                        onCheckedChange={(checked) => handleSelectAll(checked === true)}
+                      />
+                      <label 
+                        htmlFor="select-all" 
+                        className="text-sm font-medium text-slate-700 cursor-pointer"
+                      >
+                        Select All
+                      </label>
                     </div>
                     
                     <div className="border border-slate-200 rounded-md max-h-[300px] overflow-y-auto">
