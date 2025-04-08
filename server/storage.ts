@@ -7,10 +7,13 @@ import {
   type InsertUser,
   excelRequirementResponses,
   type ExcelRequirementResponse,
-  type InsertExcelRequirementResponse
+  type InsertExcelRequirementResponse,
+  referenceResponses,
+  type ReferenceResponse,
+  type InsertReferenceResponse
 } from "@shared/schema";
 import { db } from "./db";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 
 // Define the storage interface with CRUD operations
 export interface IStorage {
@@ -33,6 +36,21 @@ export interface IStorage {
   createExcelRequirementResponses(responses: InsertExcelRequirementResponse[]): Promise<ExcelRequirementResponse[]>;
   updateExcelRequirementResponse(id: number, response: Partial<InsertExcelRequirementResponse>): Promise<ExcelRequirementResponse | undefined>;
   deleteExcelRequirementResponse(id: number): Promise<boolean>;
+
+  // Reference Response Operations
+  getReferenceResponses(responseId: number): Promise<ReferenceResponse[]>;
+  createReferenceResponse(response: InsertReferenceResponse): Promise<ReferenceResponse>;
+  createReferenceResponses(responses: InsertReferenceResponse[]): Promise<ReferenceResponse[]>;
+  deleteReferenceResponsesByResponseId(responseId: number): Promise<boolean>;
+  
+  // Combined Operations
+  createResponseWithReferences(
+    response: InsertExcelRequirementResponse, 
+    references: Omit<InsertReferenceResponse, 'responseId'>[]
+  ): Promise<{
+    response: ExcelRequirementResponse;
+    references: ReferenceResponse[];
+  }>;
 }
 
 // Database storage implementation
@@ -148,6 +166,68 @@ export class DatabaseStorage implements IStorage {
     
     // In PostgreSQL, the count is not directly returned, but we can infer success if no error
     return true;
+  }
+
+  // Reference Response Operations
+  async getReferenceResponses(responseId: number): Promise<ReferenceResponse[]> {
+    return await db
+      .select()
+      .from(referenceResponses)
+      .where(eq(referenceResponses.responseId, responseId));
+  }
+
+  async createReferenceResponse(response: InsertReferenceResponse): Promise<ReferenceResponse> {
+    const [createdResponse] = await db
+      .insert(referenceResponses)
+      .values(response)
+      .returning();
+    return createdResponse;
+  }
+
+  async createReferenceResponses(responses: InsertReferenceResponse[]): Promise<ReferenceResponse[]> {
+    if (responses.length === 0) {
+      return [];
+    }
+    
+    const createdResponses = await db
+      .insert(referenceResponses)
+      .values(responses)
+      .returning();
+    return createdResponses;
+  }
+
+  async deleteReferenceResponsesByResponseId(responseId: number): Promise<boolean> {
+    await db
+      .delete(referenceResponses)
+      .where(eq(referenceResponses.responseId, responseId));
+    
+    // In PostgreSQL, the count is not directly returned, but we can infer success if no error
+    return true;
+  }
+
+  // Combined Operations
+  async createResponseWithReferences(
+    response: InsertExcelRequirementResponse,
+    references: Omit<InsertReferenceResponse, 'responseId'>[]
+  ): Promise<{
+    response: ExcelRequirementResponse;
+    references: ReferenceResponse[];
+  }> {
+    // First create the main response
+    const createdResponse = await this.createExcelRequirementResponse(response);
+    
+    // Then create all reference responses with the correct responseId
+    const referenceResponses = await this.createReferenceResponses(
+      references.map(ref => ({
+        ...ref,
+        responseId: createdResponse.id
+      }))
+    );
+    
+    return {
+      response: createdResponse,
+      references: referenceResponses
+    };
   }
 }
 

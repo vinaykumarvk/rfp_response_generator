@@ -1,7 +1,12 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertRfpResponseSchema, insertExcelRequirementResponseSchema } from "@shared/schema";
+import { 
+  insertRfpResponseSchema, 
+  insertExcelRequirementResponseSchema, 
+  insertReferenceResponseSchema, 
+  InsertReferenceResponse 
+} from "@shared/schema";
 import { fromZodError } from "zod-validation-error";
 import { spawn } from "child_process";
 import * as path from "path";
@@ -180,6 +185,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching Excel requirement responses:", error);
       return res.status(500).json({ message: "Failed to fetch Excel requirement responses" });
+    }
+  });
+  
+  // Get reference responses for a specific Excel requirement
+  app.get("/api/excel-requirements/:id/references", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid ID format" });
+      }
+
+      const references = await storage.getReferenceResponses(id);
+      return res.json(references);
+    } catch (error) {
+      console.error("Error fetching reference responses:", error);
+      return res.status(500).json({ message: "Failed to fetch reference responses" });
     }
   });
 
@@ -383,13 +404,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
             if (requirementId) {
               const id = parseInt(requirementId);
               if (!isNaN(id)) {
-                const updatedResponse = await storage.updateExcelRequirementResponse(id, { 
-                  finalResponse: result.generated_response 
-                });
+                // Prepare references to store if they exist in the result
+                const referenceData: Omit<InsertReferenceResponse, 'responseId'>[] = [];
                 
-                if (updatedResponse) {
+                // If similar_responses exists and has items, extract reference information
+                if (result.similar_responses && Array.isArray(result.similar_responses)) {
+                  result.similar_responses.forEach((similarResponse: any, index: number) => {
+                    if (similarResponse.reference) {
+                      referenceData.push({
+                        category: similarResponse.category || 'Uncategorized',
+                        requirement: similarResponse.requirement || requirement,
+                        response: similarResponse.text || '',
+                        reference: similarResponse.reference,
+                        score: similarResponse.score || 0
+                      });
+                    }
+                  });
+                }
+                
+                // Use the combined operation to store both the response and its references
+                const savedData = await storage.createResponseWithReferences(
+                  {
+                    requirement: requirement,
+                    finalResponse: result.generated_response,
+                    category: result.category || '',
+                    timestamp: new Date().toISOString(),
+                    // If there was an existing requirement, update it instead of creating a new one
+                    ...(await storage.getExcelRequirementResponse(id))
+                  },
+                  referenceData
+                );
+                
+                if (savedData.response) {
                   result.saved = true;
-                  result.updatedResponse = updatedResponse;
+                  result.updatedResponse = savedData.response;
+                  result.savedReferences = savedData.references;
                 }
               }
             }

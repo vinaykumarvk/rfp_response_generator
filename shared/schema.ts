@@ -1,6 +1,7 @@
-import { pgTable, text, serial, integer, boolean, date, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, date, timestamp, foreignKey, real, pgEnum } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+import { relations } from "drizzle-orm";
 
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
@@ -34,7 +35,34 @@ export const excelRequirementResponses = pgTable("excel_requirement_responses", 
   finalResponse: text("final_response"),
   timestamp: timestamp("timestamp").defaultNow().notNull(),
   rating: integer("rating"),
+  modelProvider: text("model_provider"),
 });
+
+// Table for storing reference information
+export const referenceResponses = pgTable("reference_responses", {
+  id: serial("id").primaryKey(),
+  // Link to the parent response
+  responseId: integer("response_id").notNull().references(() => excelRequirementResponses.id, { onDelete: 'cascade' }),
+  // Reference information
+  category: text("category").notNull(),
+  requirement: text("requirement").notNull(),
+  response: text("response").notNull(),
+  reference: text("reference"),
+  score: real("score").notNull(),
+  timestamp: timestamp("timestamp").defaultNow().notNull(),
+});
+
+// Relations definition
+export const excelRequirementResponsesRelations = relations(excelRequirementResponses, ({ many }) => ({
+  references: many(referenceResponses),
+}));
+
+export const referenceResponsesRelations = relations(referenceResponses, ({ one }) => ({
+  parentResponse: one(excelRequirementResponses, {
+    fields: [referenceResponses.responseId],
+    references: [excelRequirementResponses.id],
+  }),
+}));
 
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).pick({
@@ -53,6 +81,11 @@ export const insertExcelRequirementResponseSchema = createInsertSchema(excelRequ
   timestamp: true,
 });
 
+export const insertReferenceResponseSchema = createInsertSchema(referenceResponses).omit({
+  id: true,
+  timestamp: true,
+});
+
 // Types
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
@@ -62,6 +95,9 @@ export type RfpResponse = typeof rfpResponses.$inferSelect;
 
 export type InsertExcelRequirementResponse = z.infer<typeof insertExcelRequirementResponseSchema>;
 export type ExcelRequirementResponse = typeof excelRequirementResponses.$inferSelect;
+
+export type InsertReferenceResponse = z.infer<typeof insertReferenceResponseSchema>;
+export type ReferenceResponse = typeof referenceResponses.$inferSelect;
 
 // Template types for frontend
 export const templateSchema = z.object({
