@@ -4,9 +4,11 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { MessageSquare, Loader2, Save, RefreshCw } from "lucide-react";
+import { MessageSquare, Loader2, Save, RefreshCw, BookOpen, History } from "lucide-react";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import ReferencePanel from "@/components/ReferencePanel";
 
 // Define the structure of our parsed Excel data
 interface ExcelRow {
@@ -38,6 +40,8 @@ export default function GenerateResponse() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [modelProvider, setModelProvider] = useState<string>("openai");
   const [showSimilarResponses, setShowSimilarResponses] = useState(false);
+  const [activeTab, setActiveTab] = useState<string>("response");
+  const [selectedRequirementId, setSelectedRequirementId] = useState<number | undefined>(undefined);
 
   useEffect(() => {
     // Fetch the data from the API
@@ -67,14 +71,26 @@ export default function GenerateResponse() {
     setSelectedRequirement(value);
     // When selecting a requirement, check if it already has a response
     const selectedReq = requirements.find(r => r.id?.toString() === value);
-    if (selectedReq?.finalResponse) {
-      setResponseText(selectedReq.finalResponse);
+    
+    if (selectedReq) {
+      setSelectedRequirementId(selectedReq.id);
+      
+      if (selectedReq.finalResponse) {
+        setResponseText(selectedReq.finalResponse);
+      } else {
+        setResponseText("");
+      }
     } else {
+      setSelectedRequirementId(undefined);
       setResponseText("");
     }
+    
     // Clear previous similar responses and errors
     setSimilarResponses([]);
     setErrorMessage(null);
+    
+    // Reset to response tab when changing requirements
+    setActiveTab("response");
   };
 
   const handleGenerateResponse = async () => {
@@ -283,42 +299,59 @@ export default function GenerateResponse() {
           {responseText && (
             <Card>
               <div className="px-6 py-5 border-b border-slate-200">
-                <h3 className="text-lg font-medium text-slate-800">Generated Response</h3>
+                <h3 className="text-lg font-medium text-slate-800">Response & References</h3>
                 <p className="mt-1 text-sm text-slate-500">
-                  Edit the response if needed, then save it.
+                  View and edit your response and reference information.
                 </p>
               </div>
               
-              <CardContent className="p-6">
-                <div className="space-y-4">
-                  <Textarea 
-                    value={responseText}
-                    onChange={(e) => setResponseText(e.target.value)}
-                    className="min-h-[200px]"
-                  />
+              <CardContent className="px-6 py-4">
+                <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                  <TabsList className="grid w-full grid-cols-2 mb-6">
+                    <TabsTrigger value="response" className="flex items-center gap-2">
+                      <MessageSquare className="h-4 w-4" />
+                      Response
+                    </TabsTrigger>
+                    <TabsTrigger value="references" className="flex items-center gap-2">
+                      <BookOpen className="h-4 w-4" />
+                      References
+                    </TabsTrigger>
+                  </TabsList>
                   
-                  <div className="flex justify-between space-x-3">
-                    {similarResponses.length > 0 && (
+                  <TabsContent value="response" className="space-y-4">
+                    <Textarea 
+                      value={responseText}
+                      onChange={(e) => setResponseText(e.target.value)}
+                      className="min-h-[250px]"
+                    />
+                    
+                    <div className="flex justify-between space-x-3">
+                      {similarResponses.length > 0 && (
+                        <Button 
+                          onClick={toggleSimilarResponses}
+                          variant="outline"
+                          className="flex items-center gap-2"
+                        >
+                          <RefreshCw className="h-4 w-4" />
+                          {showSimilarResponses ? "Hide Similar Responses" : "Show Similar Responses"}
+                        </Button>
+                      )}
+                      
                       <Button 
-                        onClick={toggleSimilarResponses}
-                        variant="outline"
+                        onClick={handleSaveResponse}
+                        disabled={!responseText}
                         className="flex items-center gap-2"
                       >
-                        <RefreshCw className="h-4 w-4" />
-                        {showSimilarResponses ? "Hide Similar Responses" : "Show Similar Responses"}
+                        <Save className="h-4 w-4" />
+                        Save Response
                       </Button>
-                    )}
-                    
-                    <Button 
-                      onClick={handleSaveResponse}
-                      disabled={!responseText}
-                      className="flex items-center gap-2"
-                    >
-                      <Save className="h-4 w-4" />
-                      Save Response
-                    </Button>
-                  </div>
-                </div>
+                    </div>
+                  </TabsContent>
+                  
+                  <TabsContent value="references" className="min-h-[300px]">
+                    <ReferencePanel responseId={selectedRequirementId} showTitle={false} />
+                  </TabsContent>
+                </Tabs>
               </CardContent>
             </Card>
           )}
