@@ -409,17 +409,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 
                 // If similar_responses exists and has items, extract reference information
                 if (result.similar_responses && Array.isArray(result.similar_responses)) {
+                  console.log("Similar responses data:", JSON.stringify(result.similar_responses, null, 2));
+                  
                   result.similar_responses.forEach((similarResponse: any, index: number) => {
-                    if (similarResponse.reference) {
-                      referenceData.push({
-                        category: similarResponse.category || 'Uncategorized',
-                        requirement: similarResponse.requirement || requirement,
-                        response: similarResponse.response || similarResponse.text || '',
-                        reference: similarResponse.reference,
-                        score: similarResponse.score || 0
-                      });
-                    }
+                    // Include all responses regardless of whether they have a reference field
+                    referenceData.push({
+                      category: similarResponse.category || 'Uncategorized',
+                      requirement: similarResponse.requirement || requirement,
+                      response: similarResponse.response || similarResponse.text || '',
+                      reference: similarResponse.reference || `Reference ${index + 1}`,
+                      score: similarResponse.score || 0
+                    });
+                    
+                    console.log(`Added reference ${index}:`, {
+                      category: similarResponse.category,
+                      requirement: similarResponse.requirement,
+                      has_response: !!similarResponse.response, 
+                      has_text: !!similarResponse.text,
+                      reference: similarResponse.reference,
+                      score: similarResponse.score
+                    });
                   });
+                  
+                  console.log(`Total references added: ${referenceData.length}`);
                 }
                 
                 // Use the combined operation to store both the response and its references
