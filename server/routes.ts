@@ -397,6 +397,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
           
           try {
+            console.log("===== RAW OUTPUT FROM PYTHON =====");
+            console.log(stdout);
+            console.log("===== END RAW OUTPUT =====");
+            
             // Parse the output as JSON
             const result = JSON.parse(stdout);
             
@@ -411,46 +415,76 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 if (result.similar_responses && Array.isArray(result.similar_responses)) {
                   console.log("Similar responses data:", JSON.stringify(result.similar_responses, null, 2));
                   
+                  // Normalize the reference data
                   result.similar_responses.forEach((similarResponse: any, index: number) => {
-                    // Include all responses regardless of whether they have a reference field
-                    referenceData.push({
+                    const responseText = 
+                      similarResponse.response || 
+                      similarResponse.text || 
+                      'No response text available';
+                    
+                    const referenceId = 
+                      similarResponse.reference || 
+                      similarResponse.id || 
+                      `Reference ${index + 1}`;
+                    
+                    // Create valid reference data object
+                    const refData = {
                       category: similarResponse.category || 'Uncategorized',
                       requirement: similarResponse.requirement || requirement,
-                      response: similarResponse.response || similarResponse.text || '',
-                      reference: similarResponse.reference || `Reference ${index + 1}`,
-                      score: similarResponse.score || 0
-                    });
+                      response: responseText,
+                      reference: referenceId,
+                      score: typeof similarResponse.score === 'number' ? similarResponse.score : 0.5
+                    };
+                    
+                    referenceData.push(refData);
                     
                     console.log(`Added reference ${index}:`, {
-                      category: similarResponse.category,
-                      requirement: similarResponse.requirement,
-                      has_response: !!similarResponse.response, 
-                      has_text: !!similarResponse.text,
-                      reference: similarResponse.reference,
-                      score: similarResponse.score
+                      category: refData.category,
+                      requirement: refData.requirement.substring(0, 30) + '...',
+                      response: refData.response.substring(0, 30) + '...',
+                      reference: refData.reference,
+                      score: refData.score
                     });
                   });
                   
                   console.log(`Total references added: ${referenceData.length}`);
                 }
                 
-                // Use the combined operation to store both the response and its references
-                const savedData = await storage.createResponseWithReferences(
-                  {
-                    requirement: requirement,
-                    finalResponse: result.generated_response,
-                    category: result.category || '',
-                    timestamp: new Date().toISOString(),
-                    // If there was an existing requirement, update it instead of creating a new one
-                    ...(await storage.getExcelRequirementResponse(id))
-                  },
-                  referenceData
-                );
+                console.log("=== PREPARING TO SAVE REFERENCES ===");
+                console.log("Reference data to save:", JSON.stringify(referenceData, null, 2));
                 
-                if (savedData.response) {
-                  result.saved = true;
-                  result.updatedResponse = savedData.response;
-                  result.savedReferences = savedData.references;
+                // Store the original requirement from the database
+                const existingRequirement = await storage.getExcelRequirementResponse(id);
+                console.log("Existing requirement:", JSON.stringify(existingRequirement, null, 2));
+                
+                try {
+                  // Use the combined operation to store both the response and its references
+                  const savedData = await storage.createResponseWithReferences(
+                    {
+                      requirement: requirement,
+                      finalResponse: result.generated_response,
+                      category: result.category || '',
+                      timestamp: new Date().toISOString(),
+                      // If there was an existing requirement, update it instead of creating a new one
+                      ...(existingRequirement || {})
+                    },
+                    referenceData
+                  );
+                  
+                  console.log("=== REFERENCES SAVED SUCCESSFULLY ===");
+                  console.log("Saved response:", JSON.stringify(savedData.response, null, 2));
+                  console.log("Saved references count:", savedData.references.length);
+                  
+                  if (savedData.response) {
+                    result.saved = true;
+                    result.updatedResponse = savedData.response;
+                    result.savedReferences = savedData.references;
+                  }
+                } catch (error) {
+                  console.error("Failed to save references:", error);
+                  result.saveError = error instanceof Error 
+                    ? error.message 
+                    : "Unknown error saving references";
                 }
               }
             }

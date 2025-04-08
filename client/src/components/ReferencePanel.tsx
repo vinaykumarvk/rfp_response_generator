@@ -29,8 +29,12 @@ export default function ReferencePanel({ responseId, showTitle = true }: Referen
 
   useEffect(() => {
     const fetchReferences = async () => {
-      if (!responseId) return;
+      if (!responseId) {
+        console.log("ReferencePanel: No responseId provided, skipping fetch");
+        return;
+      }
       
+      console.log(`ReferencePanel: Fetching references for responseId=${responseId}`);
       setLoading(true);
       setError(null);
       
@@ -42,6 +46,7 @@ export default function ReferencePanel({ responseId, showTitle = true }: Referen
         }
         
         const data = await response.json();
+        console.log(`ReferencePanel: Received ${data.length} references:`, data);
         setReferences(data);
       } catch (error) {
         console.error("Error fetching references:", error);
@@ -129,6 +134,13 @@ export default function ReferencePanel({ responseId, showTitle = true }: Referen
       ))}
     </div>
   );
+
+  // Debug the references data
+  useEffect(() => {
+    if (references && references.length > 0) {
+      console.log("ReferencePanel: Reference data structure sample:", references[0]);
+    }
+  }, [references]);
 
   return (
     <Card className="mt-6">

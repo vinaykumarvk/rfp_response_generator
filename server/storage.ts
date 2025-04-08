@@ -207,26 +207,75 @@ export class DatabaseStorage implements IStorage {
 
   // Combined Operations
   async createResponseWithReferences(
-    response: InsertExcelRequirementResponse,
+    response: InsertExcelRequirementResponse & { id?: number },
     references: Omit<InsertReferenceResponse, 'responseId'>[]
   ): Promise<{
     response: ExcelRequirementResponse;
     references: ReferenceResponse[];
   }> {
-    // First create the main response
-    const createdResponse = await this.createExcelRequirementResponse(response);
+    console.log("Starting createResponseWithReferences...");
+    console.log("Response to save:", JSON.stringify(response, null, 2));
+    console.log("References count:", references.length);
+    
+    let responseRecord: ExcelRequirementResponse;
+    
+    // Check if this is an update to an existing response (has an id)
+    if (response.id !== undefined && response.id !== null) {
+      const id = response.id;
+      console.log(`Updating existing requirement response with id ${id}`);
+      
+      // Create update object with only valid fields
+      const updateData: Partial<InsertExcelRequirementResponse> = {};
+      if (response.finalResponse !== undefined) updateData.finalResponse = response.finalResponse;
+      if (response.category !== undefined) updateData.category = response.category;
+      if (response.modelProvider !== undefined) updateData.modelProvider = response.modelProvider;
+      if (response.rating !== undefined) updateData.rating = response.rating;
+      
+      // Update the existing response
+      const updatedResponse = await this.updateExcelRequirementResponse(id, updateData);
+      
+      if (!updatedResponse) {
+        throw new Error(`Failed to update requirement response with id ${id}`);
+      }
+      
+      responseRecord = updatedResponse;
+      
+      // Delete any existing references for this response
+      console.log(`Deleting existing references for responseId ${responseRecord.id}`);
+      await this.deleteReferenceResponsesByResponseId(responseRecord.id);
+    } else {
+      // Create a new response with only InsertExcelRequirementResponse fields
+      const insertData: InsertExcelRequirementResponse = {
+        requirement: response.requirement,
+        category: response.category,
+        finalResponse: response.finalResponse,
+        modelProvider: response.modelProvider,
+        rating: response.rating
+      };
+      
+      console.log("Creating new requirement response");
+      responseRecord = await this.createExcelRequirementResponse(insertData);
+    }
     
     // Then create all reference responses with the correct responseId
-    const referenceResponses = await this.createReferenceResponses(
-      references.map(ref => ({
-        ...ref,
-        responseId: createdResponse.id
-      }))
-    );
+    let referenceRecords: ReferenceResponse[] = [];
+    
+    if (references.length > 0) {
+      console.log(`Creating ${references.length} references for responseId ${responseRecord.id}`);
+      referenceRecords = await this.createReferenceResponses(
+        references.map(ref => ({
+          ...ref,
+          responseId: responseRecord.id
+        }))
+      );
+      console.log(`Created ${referenceRecords.length} reference records`);
+    } else {
+      console.log("No references to create");
+    }
     
     return {
-      response: createdResponse,
-      references: referenceResponses
+      response: responseRecord,
+      references: referenceRecords
     };
   }
 }
