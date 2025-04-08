@@ -25,6 +25,7 @@ interface SimilarResponse {
   category: string;
   requirement: string;
   response: string;
+  reference?: string;
 }
 
 export default function GenerateResponse() {
@@ -349,6 +350,13 @@ export default function GenerateResponse() {
                         <span className="block text-xs text-slate-500 mb-1">Response:</span>
                         <p className="text-sm text-slate-700 whitespace-pre-wrap">{item.response}</p>
                       </div>
+                      
+                      {item.reference && (
+                        <div className="p-3 bg-slate-50 rounded-md mt-3">
+                          <span className="block text-xs text-slate-500 mb-1">Reference:</span>
+                          <p className="text-sm text-slate-700">{item.reference}</p>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
