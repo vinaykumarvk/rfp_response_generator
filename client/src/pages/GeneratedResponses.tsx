@@ -392,7 +392,13 @@ export default function GeneratedResponses() {
                     {selectedResponse.modelProvider && (
                       <div>
                         <h3 className="text-sm font-medium text-slate-500 mb-1">Generated with:</h3>
-                        <p className="text-slate-800 text-lg">{selectedResponse.modelProvider}</p>
+                        <div className="inline-flex items-center px-3 py-1.5 rounded-md text-sm font-medium bg-gradient-to-r from-blue-100 to-blue-50 text-blue-800 border border-blue-200 shadow-sm">
+                          <span className="font-bold">
+                            {selectedResponse.modelProvider.toLowerCase().includes("moa") 
+                              ? "Mixture of Agents (MOA)" 
+                              : selectedResponse.modelProvider}
+                          </span>
+                        </div>
                       </div>
                     )}
                     <div>
@@ -684,10 +690,13 @@ function ResponsesTable({
                     </div>
                     
                     {response.modelProvider && (
-                      <div className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">
-                        Model: {response.modelProvider.includes("MOA") 
-                          ? "MOA" 
-                          : response.modelProvider.split(' ')[0]}
+                      <div className="inline-flex items-center px-3 py-1.5 rounded-md text-xs font-medium bg-gradient-to-r from-blue-100 to-blue-50 text-blue-800 border border-blue-200 shadow-sm">
+                        <span className="font-semibold">Model:</span>&nbsp;
+                        <span className="font-bold">
+                          {response.modelProvider.toLowerCase().includes("moa") 
+                            ? "MOA" 
+                            : response.modelProvider.split(' ')[0]}
+                        </span>
                       </div>
                     )}
                   </div>
@@ -757,10 +766,12 @@ function ResponsesTable({
                   </TableCell>
                   <TableCell>
                     {response.modelProvider ? (
-                      <div className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-800">
-                        {response.modelProvider.includes("MOA") 
-                          ? "MOA" 
-                          : response.modelProvider.split(' ')[0]}
+                      <div className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gradient-to-r from-blue-100 to-blue-50 text-blue-800 border border-blue-200 shadow-sm">
+                        <span className="font-bold">
+                          {response.modelProvider.toLowerCase().includes("moa") 
+                            ? "MOA" 
+                            : response.modelProvider.split(' ')[0]}
+                        </span>
                       </div>
                     ) : "—"}
                   </TableCell>
