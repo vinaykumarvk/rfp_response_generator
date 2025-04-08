@@ -17,9 +17,14 @@ import {
   Search,
   BookOpen,
   MessageSquare,
-  Filter
+  Filter,
+  Edit,
+  Save,
+  X
 } from "lucide-react";
 import { format } from "date-fns";
+import { Textarea } from "@/components/ui/textarea";
+import { useToast } from "@/hooks/use-toast";
 import ReferencePanel from "@/components/ReferencePanel";
 
 interface ExcelRow {
@@ -34,6 +39,7 @@ interface ExcelRow {
 
 export default function GeneratedResponses() {
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [responses, setResponses] = useState<ExcelRow[]>([]);
   const [selectedResponse, setSelectedResponse] = useState<ExcelRow | null>(null);
   const [selectedResponseId, setSelectedResponseId] = useState<number | null>(null);
@@ -42,6 +48,9 @@ export default function GeneratedResponses() {
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   const [uniqueCategories, setUniqueCategories] = useState<string[]>([]);
+  const [editMode, setEditMode] = useState(false);
+  const [editedResponse, setEditedResponse] = useState("");
+  const { toast } = useToast();
 
   // Fetch generated responses
   const fetchResponses = async () => {
@@ -82,12 +91,102 @@ export default function GeneratedResponses() {
     setSelectedResponseId(response.id);
     setShowDetailView(true);
   };
+  
+  // Handle direct editing from table
+  const handleDirectEdit = (response: ExcelRow) => {
+    if (!response.id) return;
+    
+    // First view the detail
+    setSelectedResponse(response);
+    setSelectedResponseId(response.id);
+    setShowDetailView(true);
+    
+    // Then enable edit mode (need to use a timeout to ensure the state is updated properly)
+    setTimeout(() => {
+      if (response.finalResponse) {
+        setEditedResponse(response.finalResponse);
+        setEditMode(true);
+      }
+    }, 100);
+  };
 
   // Handle going back to the list view
   const handleBackToList = () => {
     setShowDetailView(false);
     setSelectedResponse(null);
     setSelectedResponseId(null);
+    setEditMode(false);
+    setEditedResponse("");
+  };
+
+  // Enable edit mode
+  const enableEditMode = () => {
+    if (selectedResponse && selectedResponse.finalResponse) {
+      setEditedResponse(selectedResponse.finalResponse);
+      setEditMode(true);
+    }
+  };
+
+  // Cancel edit mode
+  const cancelEditMode = () => {
+    setEditMode(false);
+    setEditedResponse("");
+  };
+
+  // Save the edited response
+  const saveEditedResponse = async () => {
+    if (!selectedResponse || !selectedResponseId) return;
+    
+    setSaving(true);
+    try {
+      const response = await fetch(`/api/excel-requirements/${selectedResponseId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          finalResponse: editedResponse
+        }),
+      });
+      
+      if (response.ok) {
+        const updatedResponse = await response.json();
+        
+        // Update the selected response with the new data
+        setSelectedResponse({
+          ...selectedResponse,
+          finalResponse: updatedResponse.finalResponse
+        });
+        
+        // Update the response in the list
+        setResponses(prevResponses => prevResponses.map(response => 
+          response.id === selectedResponseId 
+            ? { ...response, finalResponse: updatedResponse.finalResponse } 
+            : response
+        ));
+        
+        // Exit edit mode
+        setEditMode(false);
+        
+        // Show success toast
+        toast({
+          title: "Response updated",
+          description: "Your changes have been saved successfully.",
+        });
+      } else {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to update response');
+      }
+    } catch (error) {
+      console.error('Error updating response:', error);
+      toast({
+        title: "Update failed",
+        description: error instanceof Error ? error.message : "An error occurred while saving changes.",
+        variant: "destructive",
+      });
+    } finally {
+      setSaving(false);
+    }
   };
 
   // Filter responses based on search query and category
@@ -162,7 +261,8 @@ export default function GeneratedResponses() {
               <ResponsesTable 
                 responses={filteredResponses} 
                 loading={loading} 
-                onViewDetail={handleViewDetail} 
+                onViewDetail={handleViewDetail}
+                onEditResponse={handleDirectEdit}
               />
             </TabsContent>
             
@@ -170,7 +270,8 @@ export default function GeneratedResponses() {
               <ResponsesTable 
                 responses={filteredResponses.filter(r => r.modelProvider?.toLowerCase()?.includes('openai'))} 
                 loading={loading} 
-                onViewDetail={handleViewDetail} 
+                onViewDetail={handleViewDetail}
+                onEditResponse={handleDirectEdit}
               />
             </TabsContent>
             
@@ -178,7 +279,8 @@ export default function GeneratedResponses() {
               <ResponsesTable 
                 responses={filteredResponses.filter(r => r.modelProvider?.toLowerCase()?.includes('anthropic'))} 
                 loading={loading} 
-                onViewDetail={handleViewDetail} 
+                onViewDetail={handleViewDetail}
+                onEditResponse={handleDirectEdit}
               />
             </TabsContent>
           </Tabs>
@@ -246,10 +348,57 @@ export default function GeneratedResponses() {
                   </div>
                   
                   <div>
-                    <h3 className="text-sm font-medium text-slate-500 mb-1">Generated Response:</h3>
-                    <div className="p-4 bg-slate-50 rounded-md">
-                      <p className="text-slate-800 whitespace-pre-wrap">{selectedResponse.finalResponse}</p>
+                    <div className="flex justify-between items-center mb-1">
+                      <h3 className="text-sm font-medium text-slate-500">Generated Response:</h3>
+                      <div className="flex space-x-2">
+                        {!editMode ? (
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={enableEditMode}
+                            className="flex items-center gap-1"
+                          >
+                            <Edit className="h-4 w-4" />
+                            <span>Edit</span>
+                          </Button>
+                        ) : (
+                          <>
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              onClick={cancelEditMode}
+                              className="flex items-center gap-1"
+                            >
+                              <X className="h-4 w-4" />
+                              <span>Cancel</span>
+                            </Button>
+                            <Button 
+                              variant="default" 
+                              size="sm" 
+                              onClick={saveEditedResponse}
+                              disabled={saving}
+                              className="flex items-center gap-1"
+                            >
+                              <Save className="h-4 w-4" />
+                              <span>{saving ? 'Saving...' : 'Save'}</span>
+                            </Button>
+                          </>
+                        )}
+                      </div>
                     </div>
+                    
+                    {editMode ? (
+                      <Textarea
+                        className="w-full h-64 p-4 bg-slate-50 rounded-md font-mono text-sm"
+                        value={editedResponse}
+                        onChange={(e) => setEditedResponse(e.target.value)}
+                        placeholder="Edit the generated response..."
+                      />
+                    ) : (
+                      <div className="p-4 bg-slate-50 rounded-md">
+                        <p className="text-slate-800 whitespace-pre-wrap">{selectedResponse.finalResponse}</p>
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -280,11 +429,13 @@ export default function GeneratedResponses() {
 function ResponsesTable({ 
   responses, 
   loading, 
-  onViewDetail 
+  onViewDetail,
+  onEditResponse
 }: { 
   responses: ExcelRow[], 
   loading: boolean, 
-  onViewDetail: (response: ExcelRow) => void 
+  onViewDetail: (response: ExcelRow) => void,
+  onEditResponse: (response: ExcelRow) => void
 }) {
   return (
     <Card>
@@ -340,16 +491,28 @@ function ResponsesTable({
                     ) : "—"}
                   </TableCell>
                   <TableCell className="text-right">
-                    <Button 
-                      variant="ghost" 
-                      size="sm"
-                      onClick={() => onViewDetail(response)}
-                      className="px-2 h-8"
-                    >
-                      <Eye className="h-4 w-4 mr-1" />
-                      <span className="sr-only">View</span>
-                      View Details
-                    </Button>
+                    <div className="flex justify-end gap-2">
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => onViewDetail(response)}
+                        className="px-2 h-8"
+                      >
+                        <Eye className="h-4 w-4 mr-1" />
+                        <span className="sr-only">View</span>
+                        View
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => onEditResponse(response)}
+                        className="px-2 h-8"
+                      >
+                        <Edit className="h-4 w-4 mr-1" />
+                        <span className="sr-only">Edit</span>
+                        Edit
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
