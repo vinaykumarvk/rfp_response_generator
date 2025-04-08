@@ -3,8 +3,24 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Upload, FileText, AlertTriangle, Check } from "lucide-react";
+import { 
+  Upload, 
+  FileText, 
+  AlertTriangle, 
+  Check, 
+  Plus, 
+  RefreshCw 
+} from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import * as XLSX from 'xlsx';
 
 // Define the structure of our parsed Excel data
 interface ExcelRow {
@@ -23,6 +39,18 @@ export default function UploadRequirements() {
     message: string;
   }>({ type: null, message: "" });
   const [excelData, setExcelData] = useState<ExcelRow[]>([]);
+  const [showDialog, setShowDialog] = useState(false);
+  const [recordsAdded, setRecordsAdded] = useState<number | null>(null);
+  
+  // Reset the form when file upload is successful
+  const resetForm = () => {
+    setFile(null);
+    setExcelData([]);
+    const fileInput = document.getElementById('file-upload') as HTMLInputElement;
+    if (fileInput) {
+      fileInput.value = '';
+    }
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -34,10 +62,12 @@ export default function UploadRequirements() {
         type: "success",
         message: `File "${selectedFile.name}" selected successfully.`,
       });
+      // Reset records added when a new file is selected
+      setRecordsAdded(null);
     }
   };
 
-  const handleUpload = async () => {
+  const handleUpload = () => {
     if (!file) {
       setUploadStatus({
         type: "error",
@@ -46,29 +76,79 @@ export default function UploadRequirements() {
       return;
     }
 
+    // Show dialog to confirm append or replace
+    setShowDialog(true);
+  };
+  
+  const processFile = async (replaceExisting: boolean) => {
+    setShowDialog(false);
     setIsUploading(true);
     
-    // Since we can't directly parse Excel files in the browser without additional libraries,
-    // we'll simulate parsing for the demo by creating sample data
+    // Make sure we have a file
+    if (!file) {
+      setUploadStatus({
+        type: "error",
+        message: "No file selected. Please select a file first.",
+      });
+      setIsUploading(false);
+      return;
+    }
+    
     try {
-      // Read the file content as text (this is a simplified approach for demo purposes)
-      const fileContent = await file.text();
+      // Use FileReader to read the file as an ArrayBuffer
+      const reader = new FileReader();
       
-      // For demonstration, we'll create some mock data
-      // In a real implementation, we'd use a library like SheetJS (xlsx) to parse Excel
-      // or send the file to the backend for processing
+      // Process the file once it's loaded
+      const parseExcel = () => {
+        return new Promise<ExcelRow[]>((resolve, reject) => {
+          reader.onload = (e) => {
+            try {
+              const data = new Uint8Array(e.target?.result as ArrayBuffer);
+              const workbook = XLSX.read(data, { type: 'array' });
+              
+              // Get the first worksheet
+              const firstSheetName = workbook.SheetNames[0];
+              const worksheet = workbook.Sheets[firstSheetName];
+              
+              // Convert to JSON
+              const jsonData = XLSX.utils.sheet_to_json(worksheet) as Record<string, any>[];
+              
+              // Map to our expected format
+              const currentTime = new Date().toISOString();
+              const parsedData: ExcelRow[] = jsonData.map(row => ({
+                category: row.Category || row.category || "Uncategorized",
+                requirement: row.Requirement || row.requirement || row.text || row.Text || row.content || row.Content || "",
+                finalResponse: row.Response || row.response || row.finalResponse || "",
+                timestamp: currentTime,
+                rating: row.Rating || row.rating || undefined
+              }));
+              
+              resolve(parsedData);
+            } catch (error) {
+              console.error("Error parsing Excel file:", error);
+              reject(new Error("Failed to parse Excel file. Make sure the file is in a valid Excel format."));
+            }
+          };
+          
+          reader.onerror = () => {
+            reject(new Error("Error reading the file."));
+          };
+        });
+      };
       
-      // Create sample data
-      const sampleData: ExcelRow[] = [
-        { category: "Technical", requirement: "The system must support API integration" },
-        { category: "Security", requirement: "User data must be encrypted at rest" },
-        { category: "Performance", requirement: "System should handle 1000+ concurrent users" },
-        { category: "Usability", requirement: "The interface must be accessible to all users" },
-        { category: "Compliance", requirement: "Solution must be GDPR compliant" }
-      ];
+      // Start reading the file
+      reader.readAsArrayBuffer(file);
       
-      // Set the Excel data
-      setExcelData(sampleData);
+      // Wait for the file to be parsed
+      const parsedData = await parseExcel();
+      
+      // Check if we have any data
+      if (parsedData.length === 0) {
+        throw new Error("No data found in the Excel file or required columns are missing.");
+      }
+      
+      // Set the Excel data to display in the UI
+      setExcelData(parsedData);
       
       // Send the data to the backend to store in the database
       const response = await fetch("/api/analyze-excel", {
@@ -76,22 +156,32 @@ export default function UploadRequirements() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ data: sampleData })
+        body: JSON.stringify({ 
+          data: parsedData,
+          replaceExisting: replaceExisting 
+        })
       });
       
       if (response.ok) {
+        const result = await response.json();
+        setRecordsAdded(result.recordsAdded || parsedData.length);
+        
         setUploadStatus({
           type: "success",
-          message: "File uploaded and parsed successfully.",
+          message: `File processed successfully. ${result.recordsAdded || parsedData.length} records ${replaceExisting ? 'replaced existing data' : 'added to the database'}.`,
         });
+        
+        // Reset form on successful upload if desired
+        // resetForm();
       } else {
-        throw new Error("Failed to process file on the server");
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Failed to process file on the server");
       }
     } catch (error) {
       console.error("Error processing file:", error);
       setUploadStatus({
         type: "error",
-        message: "Failed to process file. Please try again.",
+        message: error instanceof Error ? error.message : "Failed to process file. Please try again.",
       });
     } finally {
       setIsUploading(false);
@@ -102,6 +192,44 @@ export default function UploadRequirements() {
     <div className="h-full">
       <div className="p-6">
         <h2 className="text-2xl font-bold text-slate-800 mb-6">Upload Requirements</h2>
+        
+        {/* Dialog for append/replace confirmation */}
+        <Dialog open={showDialog} onOpenChange={setShowDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Upload Options</DialogTitle>
+              <DialogDescription>
+                Would you like to append this data to the existing requirements or replace all existing data?
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid grid-cols-2 gap-4 py-4">
+              <Button 
+                onClick={() => processFile(false)} 
+                className="flex items-center justify-center"
+                variant="outline"
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Append Data
+              </Button>
+              <Button 
+                onClick={() => processFile(true)}
+                className="flex items-center justify-center"
+                variant="default"
+              >
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Replace All
+              </Button>
+            </div>
+            <DialogFooter>
+              <Button 
+                variant="ghost" 
+                onClick={() => setShowDialog(false)}
+              >
+                Cancel
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
         
         <div className="grid grid-cols-1 gap-8">
           <Card>
@@ -129,6 +257,7 @@ export default function UploadRequirements() {
                       <Input
                         id="file-upload"
                         type="file"
+                        accept=".xlsx,.xls"
                         onChange={handleFileChange}
                         className="hidden"
                       />
@@ -170,6 +299,13 @@ export default function UploadRequirements() {
                       {uploadStatus.type === "error" ? "Error" : "Success"}
                     </AlertTitle>
                     <AlertDescription>{uploadStatus.message}</AlertDescription>
+                    {recordsAdded !== null && uploadStatus.type === "success" && (
+                      <div className="mt-2 p-2 bg-slate-50 rounded-md border border-slate-200">
+                        <p className="text-sm font-medium text-slate-700">
+                          Records processed: {recordsAdded}
+                        </p>
+                      </div>
+                    )}
                   </Alert>
                 )}
               </div>

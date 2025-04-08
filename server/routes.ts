@@ -283,6 +283,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       // Extract data from the uploaded Excel file
       const excelData = req.body.data;
+      const replaceExisting = req.body.replaceExisting === true;
       
       if (!excelData || !Array.isArray(excelData)) {
         return res.status(400).json({ message: "Invalid Excel data format. Expected an array." });
@@ -292,15 +293,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const requirements = excelData.map(row => ({
         category: row.category || "Uncategorized",
         requirement: row.requirement || row.text || row.content || "",
-        finalResponse: ""  // Initially empty
+        finalResponse: "",  // Initially empty
+        timestamp: row.timestamp || new Date().toISOString()
       }));
       
-      // Save to database
-      const savedRequirements = await storage.createExcelRequirementResponses(requirements);
+      let savedRequirements;
+      
+      // If replaceExisting is true, clear the existing data first
+      if (replaceExisting) {
+        // In a real implementation, we would use transactions to ensure data integrity
+        
+        // Get all existing requirements
+        const existingRequirements = await storage.getExcelRequirementResponses();
+        
+        // Delete all existing requirements
+        for (const req of existingRequirements) {
+          if (req.id) {
+            await storage.deleteExcelRequirementResponse(req.id);
+          }
+        }
+        
+        // Save the new requirements
+        savedRequirements = await storage.createExcelRequirementResponses(requirements);
+      } else {
+        // Just append the new requirements
+        savedRequirements = await storage.createExcelRequirementResponses(requirements);
+      }
       
       return res.status(200).json({
         message: "Excel data processed successfully",
-        data: savedRequirements
+        data: savedRequirements,
+        recordsAdded: savedRequirements.length
       });
     } catch (error) {
       console.error("Error processing Excel file:", error);
