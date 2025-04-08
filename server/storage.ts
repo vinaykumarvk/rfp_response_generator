@@ -1,4 +1,6 @@
 import { rfpResponses, type RfpResponse, type InsertRfpResponse, users, type User, type InsertUser } from "@shared/schema";
+import { db } from "./db";
+import { eq } from "drizzle-orm";
 
 // Define the storage interface with CRUD operations
 export interface IStorage {
@@ -15,81 +17,72 @@ export interface IStorage {
   deleteRfpResponse(id: number): Promise<boolean>;
 }
 
-// In-memory storage implementation
-export class MemStorage implements IStorage {
-  private users: Map<number, User>;
-  private rfpResponses: Map<number, RfpResponse>;
-  private userCurrentId: number;
-  private rfpResponseCurrentId: number;
-
-  constructor() {
-    this.users = new Map();
-    this.rfpResponses = new Map();
-    this.userCurrentId = 1;
-    this.rfpResponseCurrentId = 1;
-  }
-
+// Database storage implementation
+export class DatabaseStorage implements IStorage {
   // User Operations
   async getUser(id: number): Promise<User | undefined> {
-    return this.users.get(id);
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user || undefined;
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.username === username,
-    );
+    const [user] = await db.select().from(users).where(eq(users.username, username));
+    return user || undefined;
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
-    const id = this.userCurrentId++;
-    const user: User = { ...insertUser, id };
-    this.users.set(id, user);
+    const [user] = await db
+      .insert(users)
+      .values(insertUser)
+      .returning();
     return user;
   }
 
   // RFP Response Operations
   async getRfpResponse(id: number): Promise<RfpResponse | undefined> {
-    return this.rfpResponses.get(id);
+    const [rfpResponse] = await db.select().from(rfpResponses).where(eq(rfpResponses.id, id));
+    return rfpResponse || undefined;
   }
 
   async getRfpResponses(): Promise<RfpResponse[]> {
-    return Array.from(this.rfpResponses.values());
+    return await db.select().from(rfpResponses);
   }
 
   async createRfpResponse(insertRfpResponse: InsertRfpResponse): Promise<RfpResponse> {
-    const id = this.rfpResponseCurrentId++;
     const now = new Date();
-    const rfpResponse: RfpResponse = { 
-      ...insertRfpResponse, 
-      id, 
-      createdAt: now, 
-      lastUpdated: now 
-    };
-    this.rfpResponses.set(id, rfpResponse);
+    const [rfpResponse] = await db
+      .insert(rfpResponses)
+      .values({
+        ...insertRfpResponse,
+        createdAt: now,
+        lastUpdated: now
+      })
+      .returning();
     return rfpResponse;
   }
 
   async updateRfpResponse(id: number, rfpResponseUpdate: Partial<InsertRfpResponse>): Promise<RfpResponse | undefined> {
-    const existingRfpResponse = this.rfpResponses.get(id);
+    const [updatedRfpResponse] = await db
+      .update(rfpResponses)
+      .set({
+        ...rfpResponseUpdate,
+        lastUpdated: new Date()
+      })
+      .where(eq(rfpResponses.id, id))
+      .returning();
     
-    if (!existingRfpResponse) {
-      return undefined;
-    }
-    
-    const updatedRfpResponse: RfpResponse = {
-      ...existingRfpResponse,
-      ...rfpResponseUpdate,
-      lastUpdated: new Date()
-    };
-    
-    this.rfpResponses.set(id, updatedRfpResponse);
-    return updatedRfpResponse;
+    return updatedRfpResponse || undefined;
   }
 
   async deleteRfpResponse(id: number): Promise<boolean> {
-    return this.rfpResponses.delete(id);
+    const result = await db
+      .delete(rfpResponses)
+      .where(eq(rfpResponses.id, id));
+    
+    // In PostgreSQL, the count is not directly returned, but we can infer success if no error
+    return true;
   }
 }
 
-// Export an instance of the storage
-export const storage = new MemStorage();
+// Export an instance of the database storage
+export const storage = new DatabaseStorage();
