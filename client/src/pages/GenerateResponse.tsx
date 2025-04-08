@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -23,7 +22,6 @@ interface ExcelRow {
   finalResponse?: string;
   timestamp?: string;
   rating?: number;
-  modelProvider?: string;
 }
 
 // Define the structure for similar responses returned by the AI
@@ -48,7 +46,6 @@ export default function GenerateResponse() {
   const [showSimilarResponses, setShowSimilarResponses] = useState(false);
   const [activeTab, setActiveTab] = useState<string>("response");
   const [selectedRequirementId, setSelectedRequirementId] = useState<number | undefined>(undefined);
-  const [selectedRequirement, setSelectedRequirement] = useState<ExcelRow | undefined>(undefined);
   
   // States for requirement selection
   const [selectedRequirementIds, setSelectedRequirementIds] = useState<Set<number>>(new Set());
@@ -107,9 +104,6 @@ export default function GenerateResponse() {
     const selectedReq = requirements.find(r => r.id === id);
     
     if (selectedReq) {
-      // Set the full selected requirement object
-      setSelectedRequirement(selectedReq);
-      
       if (selectedReq.finalResponse) {
         setResponseText(selectedReq.finalResponse);
       } else {
@@ -160,25 +154,11 @@ export default function GenerateResponse() {
           throw new Error(result.error);
         }
         
-        // Get the model provider that was used
-        const usedModelProvider = reprocessUseModelMixture ? "moa" : reprocessModelProvider;
-        
         // Update the response text and the local requirements array
         setResponseText(result.generated_response);
         setRequirements(prev => prev.map(req => 
-          req.id === selectedReq.id ? { 
-            ...req, 
-            finalResponse: result.generated_response,
-            modelProvider: usedModelProvider 
-          } : req
+          req.id === selectedReq.id ? { ...req, finalResponse: result.generated_response } : req
         ));
-        
-        // Update selected requirement
-        setSelectedRequirement(prev => prev && prev.id === selectedReq.id ? {
-          ...prev,
-          finalResponse: result.generated_response,
-          modelProvider: usedModelProvider
-        } : prev);
         
         // Close the modal
         setShowReprocessModal(false);
@@ -247,7 +227,6 @@ export default function GenerateResponse() {
   const resetSelections = () => {
     setSelectedRequirementIds(new Set());
     setSelectedRequirementId(undefined);
-    setSelectedRequirement(undefined);
     setResponseText("");
     setSimilarResponses([]);
     setErrorMessage(null);
@@ -339,16 +318,9 @@ export default function GenerateResponse() {
             if (result.error) {
               failCount++;
             } else {
-              // Get the model provider that was used
-              const usedModelProvider = useModelMixture ? "moa" : modelProvider;
-              
               // Update the requirements list with the new response
               setRequirements(prev => prev.map(req => 
-                req.id === requirement.id ? { 
-                  ...req, 
-                  finalResponse: result.generated_response,
-                  modelProvider: usedModelProvider 
-                } : req
+                req.id === requirement.id ? { ...req, finalResponse: result.generated_response } : req
               ));
               
               successCount++;
@@ -462,10 +434,6 @@ export default function GenerateResponse() {
                   <div className="flex items-center space-x-2">
                     <RadioGroupItem value="anthropic" id="reprocess-anthropic" />
                     <Label htmlFor="reprocess-anthropic" className="cursor-pointer">Anthropic</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="deepseek" id="reprocess-deepseek" />
-                    <Label htmlFor="reprocess-deepseek" className="cursor-pointer">Deepseek</Label>
                   </div>
                 </RadioGroup>
               </div>
@@ -606,10 +574,6 @@ export default function GenerateResponse() {
                           <div className="flex items-center space-x-2">
                             <RadioGroupItem value="anthropic" id="anthropic" />
                             <Label htmlFor="anthropic" className="cursor-pointer">Anthropic</Label>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <RadioGroupItem value="deepseek" id="deepseek" />
-                            <Label htmlFor="deepseek" className="cursor-pointer">Deepseek</Label>
                           </div>
                         </RadioGroup>
                       </div>
@@ -754,16 +718,6 @@ export default function GenerateResponse() {
                   </TabsList>
                   
                   <TabsContent value="response" className="space-y-4">
-                    {selectedRequirement?.modelProvider && (
-                      <div className="flex items-center mb-2">
-                        <span className="text-sm font-medium text-slate-500 mr-2">Generated by:</span>
-                        <Badge variant="outline" className="font-medium text-xs">
-                          {selectedRequirement.modelProvider === 'moa' 
-                            ? 'Mixture of Agents (MOA)' 
-                            : selectedRequirement.modelProvider.charAt(0).toUpperCase() + selectedRequirement.modelProvider.slice(1)}
-                        </Badge>
-                      </div>
-                    )}
                     <Textarea 
                       value={responseText}
                       onChange={(e) => setResponseText(e.target.value)}
