@@ -71,9 +71,9 @@ export default function Sidebar() {
   if (isMobile && mobileMenuOpen) {
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex">
-        <div className="bg-white w-[250px] h-full">
-          <div className="p-4 border-b border-slate-200 flex justify-between items-center">
-            <h2 className="font-semibold text-slate-800">Excel Analyzer</h2>
+        <div className="bg-white dark:bg-slate-800 w-[250px] h-full">
+          <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
+            <h2 className="font-semibold text-slate-800 dark:text-slate-100">Excel Analyzer</h2>
             <Button 
               variant="ghost" 
               size="sm" 
@@ -90,8 +90,10 @@ export default function Sidebar() {
                     <span 
                       onClick={handleLinkClick}
                       className={cn(
-                        "flex items-center rounded-md px-3 py-2 text-sm hover:bg-slate-100 cursor-pointer",
-                        item.active ? "bg-slate-100 text-primary font-medium" : "text-slate-700"
+                        "flex items-center rounded-md px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer",
+                        item.active 
+                          ? "bg-slate-100 dark:bg-slate-700 text-primary font-medium" 
+                          : "text-slate-700 dark:text-slate-200"
                       )}
                     >
                       <span className="flex-shrink-0 mr-3">
@@ -127,14 +129,14 @@ export default function Sidebar() {
   return (
     <div 
       className={cn(
-        "border-r border-slate-200 bg-white transition-all duration-300 h-full",
+        "border-r border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 transition-all duration-300 h-full",
         collapsed ? "w-[70px]" : "w-[250px]"
       )}
     >
       <div className="flex flex-col h-full">
-        <div className="p-4 border-b border-slate-200 flex justify-between items-center">
+        <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
           {!collapsed && (
-            <h2 className="font-semibold text-slate-800">Excel Analyzer</h2>
+            <h2 className="font-semibold text-slate-800 dark:text-slate-100">Excel Analyzer</h2>
           )}
           <Button 
             variant="ghost" 
@@ -156,8 +158,10 @@ export default function Sidebar() {
                 <Link href={item.path}>
                   <span 
                     className={cn(
-                      "flex items-center rounded-md px-3 py-2 text-sm hover:bg-slate-100 cursor-pointer",
-                      item.active ? "bg-slate-100 text-primary font-medium" : "text-slate-700",
+                      "flex items-center rounded-md px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer",
+                      item.active 
+                        ? "bg-slate-100 dark:bg-slate-700 text-primary font-medium" 
+                        : "text-slate-700 dark:text-slate-200",
                       collapsed && "justify-center"
                     )}
                   >
