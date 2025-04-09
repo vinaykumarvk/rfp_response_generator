@@ -30,6 +30,7 @@ import { Label } from "@/components/ui/label";
 import { format } from "date-fns";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
+import { useIsMobile } from "@/hooks/use-mobile";
 import ReferencePanel from "@/components/ReferencePanel";
 import ReactMarkdown from 'react-markdown';
 
@@ -610,7 +611,7 @@ export default function GeneratedResponses() {
   );
 }
 
-// Table component for responses
+// Responsive cards/table component for responses
 function ResponsesTable({ 
   responses, 
   loading, 
@@ -622,6 +623,94 @@ function ResponsesTable({
   onViewDetail: (response: ExcelRow) => void,
   onEditResponse: (response: ExcelRow) => void
 }) {
+  const isMobile = useIsMobile();
+  
+  // Format date helper function
+  const formatDate = (timestamp: string) => {
+    try {
+      const utcDate = new Date(timestamp);
+      // Adjust to IST by adding 5 hours and 30 minutes
+      const istDate = new Date(utcDate.getTime() + (5 * 60 + 30) * 60 * 1000);
+      return format(istDate, 'MMM d, yyyy HH:mm') + ' IST';
+    } catch (e) {
+      return timestamp;
+    }
+  };
+  
+  // Mobile card view
+  if (isMobile) {
+    return (
+      <div className="space-y-4">
+        {loading ? (
+          <div className="space-y-4">
+            <Skeleton className="h-40 w-full" />
+            <Skeleton className="h-40 w-full" />
+            <Skeleton className="h-40 w-full" />
+          </div>
+        ) : responses.length > 0 ? (
+          responses.map((response, index) => (
+            <Card key={response.id || index} className="overflow-hidden">
+              <CardContent className="p-0">
+                <div className="p-4 bg-slate-50 border-b">
+                  <div className="flex justify-between items-start mb-2">
+                    <div className="font-medium">{response.category}</div>
+                    {response.timestamp && (
+                      <div className="text-xs text-slate-500">
+                        {formatDate(response.timestamp)}
+                      </div>
+                    )}
+                  </div>
+                  <div className="text-sm line-clamp-2">{response.requirement}</div>
+                </div>
+                
+                <div className="p-4">
+                  <h4 className="text-xs font-medium text-slate-500 mb-1">Response:</h4>
+                  <div className="text-sm line-clamp-3 mb-4">
+                    {response.finalResponse || "No response generated"}
+                  </div>
+                  
+                  <div className="flex justify-end gap-2 mt-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => onViewDetail(response)}
+                      className="h-8"
+                    >
+                      <Eye className="h-4 w-4 mr-1" />
+                      View
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => onEditResponse(response)}
+                      className="h-8"
+                    >
+                      <Edit className="h-4 w-4 mr-1" />
+                      Edit
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))
+        ) : (
+          <Card>
+            <CardContent className="p-8 text-center">
+              <div className="flex flex-col items-center justify-center">
+                <MessageSquare className="h-12 w-12 text-slate-300 mb-4" />
+                <p className="text-slate-500">No generated responses found.</p>
+                <p className="text-slate-400 text-sm mt-2">
+                  Go to the Generate Response page to create new responses.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+    );
+  }
+  
+  // Desktop table view
   return (
     <Card>
       <CardContent className="p-0 overflow-auto">
@@ -663,19 +752,7 @@ function ResponsesTable({
                   <TableCell>
                     {response.timestamp ? (
                       <span title={response.timestamp}>
-                        {
-                          (() => {
-                            try {
-                              // Format date in IST timezone (UTC+5:30)
-                              const utcDate = new Date(response.timestamp);
-                              // Adjust to IST by adding 5 hours and 30 minutes
-                              const istDate = new Date(utcDate.getTime() + (5 * 60 + 30) * 60 * 1000);
-                              return format(istDate, 'MMM d, yyyy HH:mm') + ' IST';
-                            } catch (e) {
-                              return response.timestamp;
-                            }
-                          })()
-                        }
+                        {formatDate(response.timestamp)}
                       </span>
                     ) : "—"}
                   </TableCell>
