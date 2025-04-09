@@ -504,6 +504,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     {
                       requirement: requirement,
                       finalResponse: result.generated_response || "Response could not be generated. Please try again.",
+                      openaiResponse: result.openai_response || null,
+                      anthropicResponse: result.anthropic_response || null,
+                      deepseekResponse: result.deepseek_response || null,
                       category: result.category || '',
                       timestamp: new Date().toISOString(),
                       modelProvider: provider,

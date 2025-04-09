@@ -21,6 +21,9 @@ interface ExcelRow {
   category: string;
   requirement: string;
   finalResponse?: string;
+  openaiResponse?: string;
+  anthropicResponse?: string;
+  deepseekResponse?: string;
   timestamp?: string;
   rating?: number;
 }
@@ -39,6 +42,9 @@ export default function GenerateResponse() {
   const [requirements, setRequirements] = useState<ExcelRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [responseText, setResponseText] = useState<string>("");
+  const [openaiResponseText, setOpenaiResponseText] = useState<string>("");
+  const [anthropicResponseText, setAnthropicResponseText] = useState<string>("");
+  const [deepseekResponseText, setDeepseekResponseText] = useState<string>("");
   const [generating, setGenerating] = useState(false);
   const [similarResponses, setSimilarResponses] = useState<SimilarResponse[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -105,11 +111,17 @@ export default function GenerateResponse() {
     const selectedReq = requirements.find(r => r.id === id);
     
     if (selectedReq) {
+      // Set the main response
       if (selectedReq.finalResponse) {
         setResponseText(selectedReq.finalResponse);
       } else {
         setResponseText("");
       }
+      
+      // Set individual model responses
+      setOpenaiResponseText(selectedReq.openaiResponse || "");
+      setAnthropicResponseText(selectedReq.anthropicResponse || "");
+      setDeepseekResponseText(selectedReq.deepseekResponse || "");
       
       // Clear previous similar responses and errors
       setSimilarResponses([]);
@@ -157,8 +169,18 @@ export default function GenerateResponse() {
         
         // Update the response text and the local requirements array
         setResponseText(result.generated_response);
+        setOpenaiResponseText(result.openai_response || "");
+        setAnthropicResponseText(result.anthropic_response || "");
+        setDeepseekResponseText(result.deepseek_response || "");
+        
         setRequirements(prev => prev.map(req => 
-          req.id === selectedReq.id ? { ...req, finalResponse: result.generated_response } : req
+          req.id === selectedReq.id ? { 
+            ...req, 
+            finalResponse: result.generated_response,
+            openaiResponse: result.openai_response || req.openaiResponse,
+            anthropicResponse: result.anthropic_response || req.anthropicResponse,
+            deepseekResponse: result.deepseek_response || req.deepseekResponse
+          } : req
         ));
         
         // Close the modal
@@ -229,6 +251,9 @@ export default function GenerateResponse() {
     setSelectedRequirementIds(new Set());
     setSelectedRequirementId(undefined);
     setResponseText("");
+    setOpenaiResponseText("");
+    setAnthropicResponseText("");
+    setDeepseekResponseText("");
     setSimilarResponses([]);
     setErrorMessage(null);
   };
@@ -321,7 +346,13 @@ export default function GenerateResponse() {
             } else {
               // Update the requirements list with the new response
               setRequirements(prev => prev.map(req => 
-                req.id === requirement.id ? { ...req, finalResponse: result.generated_response } : req
+                req.id === requirement.id ? { 
+                  ...req, 
+                  finalResponse: result.generated_response,
+                  openaiResponse: result.openai_response || req.openaiResponse,
+                  anthropicResponse: result.anthropic_response || req.anthropicResponse,
+                  deepseekResponse: result.deepseek_response || req.deepseekResponse
+                } : req
               ));
               
               successCount++;
@@ -715,14 +746,26 @@ export default function GenerateResponse() {
               
               <CardContent className="px-6 py-4">
                 <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                  <TabsList className="grid w-full grid-cols-3 mb-6">
+                  <TabsList className="grid w-full grid-cols-6 mb-6">
                     <TabsTrigger value="response" className="flex items-center gap-2">
                       <MessageSquare className="h-4 w-4" />
-                      Edit
+                      Final
                     </TabsTrigger>
                     <TabsTrigger value="preview" className="flex items-center gap-2">
                       <Eye className="h-4 w-4" />
                       Preview
+                    </TabsTrigger>
+                    <TabsTrigger value="openai" className="flex items-center gap-2">
+                      <MessageSquare className="h-4 w-4" />
+                      OpenAI
+                    </TabsTrigger>
+                    <TabsTrigger value="anthropic" className="flex items-center gap-2">
+                      <MessageSquare className="h-4 w-4" />
+                      Anthropic
+                    </TabsTrigger>
+                    <TabsTrigger value="deepseek" className="flex items-center gap-2">
+                      <MessageSquare className="h-4 w-4" />
+                      Deepseek
                     </TabsTrigger>
                     <TabsTrigger value="references" className="flex items-center gap-2">
                       <BookOpen className="h-4 w-4" />
@@ -806,6 +849,45 @@ export default function GenerateResponse() {
                         <Save className="h-4 w-4" />
                         Save Response
                       </Button>
+                    </div>
+                  </TabsContent>
+                  
+                  {/* OpenAI Response Tab */}
+                  <TabsContent value="openai" className="min-h-[300px]">
+                    <div className="border rounded-md p-4 bg-white min-h-[250px]">
+                      <div className="prose max-w-none">
+                        {openaiResponseText ? (
+                          <ReactMarkdown>{openaiResponseText}</ReactMarkdown>
+                        ) : (
+                          <div className="text-slate-400 italic">No OpenAI response available</div>
+                        )}
+                      </div>
+                    </div>
+                  </TabsContent>
+                  
+                  {/* Anthropic Response Tab */}
+                  <TabsContent value="anthropic" className="min-h-[300px]">
+                    <div className="border rounded-md p-4 bg-white min-h-[250px]">
+                      <div className="prose max-w-none">
+                        {anthropicResponseText ? (
+                          <ReactMarkdown>{anthropicResponseText}</ReactMarkdown>
+                        ) : (
+                          <div className="text-slate-400 italic">No Anthropic/Claude response available</div>
+                        )}
+                      </div>
+                    </div>
+                  </TabsContent>
+                  
+                  {/* Deepseek Response Tab */}
+                  <TabsContent value="deepseek" className="min-h-[300px]">
+                    <div className="border rounded-md p-4 bg-white min-h-[250px]">
+                      <div className="prose max-w-none">
+                        {deepseekResponseText ? (
+                          <ReactMarkdown>{deepseekResponseText}</ReactMarkdown>
+                        ) : (
+                          <div className="text-slate-400 italic">No Deepseek response available</div>
+                        )}
+                      </div>
                     </div>
                   </TabsContent>
                   
