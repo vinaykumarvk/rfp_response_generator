@@ -18,7 +18,7 @@ export default function ViewData() {
   const [activeTab, setActiveTab] = useState('response');
   const isMobile = useIsMobile();
   
-  const { data: excelData = [], isLoading: loading, refetch } = useQuery({
+  const { data: excelData = [], isLoading: loading, refetch } = useQuery<ExcelRequirementResponse[]>({
     queryKey: ['/api/excel-requirements'],
   });
   
