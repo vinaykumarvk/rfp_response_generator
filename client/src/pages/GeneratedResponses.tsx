@@ -334,6 +334,7 @@ export default function GeneratedResponses() {
               <TabsTrigger value="all">All Responses</TabsTrigger>
               <TabsTrigger value="openai">OpenAI Generated</TabsTrigger>
               <TabsTrigger value="anthropic">Anthropic Generated</TabsTrigger>
+              <TabsTrigger value="deepseek">Deepseek Generated</TabsTrigger>
             </TabsList>
             
             <TabsContent value="all" className="mt-0">
@@ -357,6 +358,15 @@ export default function GeneratedResponses() {
             <TabsContent value="anthropic" className="mt-0">
               <ResponsesTable 
                 responses={filteredResponses.filter(r => r.modelProvider?.toLowerCase()?.includes('anthropic'))} 
+                loading={loading} 
+                onViewDetail={handleViewDetail}
+                onEditResponse={handleDirectEdit}
+              />
+            </TabsContent>
+            
+            <TabsContent value="deepseek" className="mt-0">
+              <ResponsesTable 
+                responses={filteredResponses.filter(r => r.modelProvider?.toLowerCase()?.includes('deepseek'))} 
                 loading={loading} 
                 onViewDetail={handleViewDetail}
                 onEditResponse={handleDirectEdit}
