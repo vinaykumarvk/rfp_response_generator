@@ -499,12 +499,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 console.log("Existing requirement:", JSON.stringify(existingRequirement, null, 2));
                 
                 try {
-                  // Log available model responses for debugging
-                  console.log("Model responses in result:", {
-                    openai_response: result.openai_response ? "Present" : "Not present",
-                    anthropic_response: result.anthropic_response ? "Present" : "Not present",
-                    deepseek_response: result.deepseek_response ? "Present" : "Not present",
+                  // Log all available model responses for detailed debugging
+                  console.log("DEBUGGING - Full result object keys:", Object.keys(result));
+                  console.log("DEBUGGING - Model responses in result:", {
+                    openai_response: result.openai_response ? `Present (${result.openai_response.substring(0, 30)}...)` : "Not present",
+                    anthropic_response: result.anthropic_response ? `Present (${result.anthropic_response.substring(0, 30)}...)` : "Not present",
+                    deepseek_response: result.deepseek_response ? `Present (${result.deepseek_response.substring(0, 30)}...)` : "Not present",
                   });
+                  
+                  // Also check for other possible property names
+                  if (result.openaiResponse) console.log("Found alternate property: openaiResponse");
+                  if (result.anthropicResponse) console.log("Found alternate property: anthropicResponse");
+                  if (result.deepseekResponse) console.log("Found alternate property: deepseekResponse");
                   
                   // For OpenAI-only responses, copy to openaiResponse
                   if (provider === "openai" && !result.openai_response && result.generated_response) {
