@@ -39,6 +39,7 @@ export const excelRequirementResponses = pgTable("excel_requirement_responses", 
   timestamp: timestamp("timestamp").defaultNow().notNull(),
   rating: integer("rating"),
   modelProvider: text("model_provider"),
+  username: text("username"),
 });
 
 // Table for storing reference information
