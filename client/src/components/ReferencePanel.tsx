@@ -4,6 +4,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { FileText, BookOpen, Database, ExternalLink } from "lucide-react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import ReactMarkdown from 'react-markdown';
 
 // Define the structure of reference data
 interface Reference {
@@ -118,7 +119,9 @@ export default function ReferencePanel({ responseId, showTitle = true }: Referen
                   </div>
                   <div className="p-3 bg-slate-50 rounded-md">
                     <span className="block text-xs font-medium text-slate-500 mb-1">Response Text:</span>
-                    <p className="text-sm text-slate-700 whitespace-pre-wrap">{reference.response}</p>
+                    <div className="prose prose-sm max-w-none text-slate-700">
+                      <ReactMarkdown>{reference.response}</ReactMarkdown>
+                    </div>
                   </div>
                   {reference.reference && (
                     <div className="flex items-center gap-2 text-sm text-blue-600">

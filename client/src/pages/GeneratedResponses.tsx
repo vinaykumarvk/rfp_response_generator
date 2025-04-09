@@ -31,6 +31,7 @@ import { format } from "date-fns";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import ReferencePanel from "@/components/ReferencePanel";
+import ReactMarkdown from 'react-markdown';
 
 interface ExcelRow {
   id?: number;
@@ -485,7 +486,9 @@ export default function GeneratedResponses() {
                       />
                     ) : (
                       <div className="p-4 bg-slate-50 rounded-md">
-                        <p className="text-slate-800 whitespace-pre-wrap">{selectedResponse.finalResponse}</p>
+                        <div className="prose max-w-none text-slate-800">
+                          <ReactMarkdown>{selectedResponse.finalResponse}</ReactMarkdown>
+                        </div>
                       </div>
                     )}
                   </div>

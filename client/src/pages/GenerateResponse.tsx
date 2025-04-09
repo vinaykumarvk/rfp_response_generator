@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { MessageSquare, Loader2, Save, RefreshCw, BookOpen, History, Check, Filter, Search, ChevronRight, RotateCw } from "lucide-react";
+import { MessageSquare, Loader2, Save, RefreshCw, BookOpen, History, Check, Filter, Search, ChevronRight, RotateCw, Eye } from "lucide-react";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -13,6 +13,7 @@ import { Progress } from "@/components/ui/progress";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import ReferencePanel from "@/components/ReferencePanel";
 import { useToast } from "@/hooks/use-toast";
+import ReactMarkdown from 'react-markdown';
 
 // Define the structure of our parsed Excel data
 interface ExcelRow {
@@ -714,10 +715,14 @@ export default function GenerateResponse() {
               
               <CardContent className="px-6 py-4">
                 <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                  <TabsList className="grid w-full grid-cols-2 mb-6">
+                  <TabsList className="grid w-full grid-cols-3 mb-6">
                     <TabsTrigger value="response" className="flex items-center gap-2">
                       <MessageSquare className="h-4 w-4" />
-                      Response
+                      Edit
+                    </TabsTrigger>
+                    <TabsTrigger value="preview" className="flex items-center gap-2">
+                      <Eye className="h-4 w-4" />
+                      Preview
                     </TabsTrigger>
                     <TabsTrigger value="references" className="flex items-center gap-2">
                       <BookOpen className="h-4 w-4" />
@@ -753,6 +758,42 @@ export default function GenerateResponse() {
                           >
                             <RotateCw className="h-4 w-4" />
                             Reprocess
+                          </Button>
+                        )}
+                      </div>
+                      
+                      <Button 
+                        onClick={handleSaveResponse}
+                        disabled={!responseText}
+                        className="flex items-center gap-2"
+                      >
+                        <Save className="h-4 w-4" />
+                        Save Response
+                      </Button>
+                    </div>
+                  </TabsContent>
+                  
+                  <TabsContent value="preview" className="min-h-[300px]">
+                    <div className="border rounded-md p-4 bg-white min-h-[250px]">
+                      <div className="prose max-w-none">
+                        {responseText ? (
+                          <ReactMarkdown>{responseText}</ReactMarkdown>
+                        ) : (
+                          <div className="text-slate-400 italic">No content to preview</div>
+                        )}
+                      </div>
+                    </div>
+                    
+                    <div className="flex justify-between space-x-3 mt-4">
+                      <div className="flex gap-2">
+                        {similarResponses.length > 0 && (
+                          <Button 
+                            onClick={toggleSimilarResponses}
+                            variant="outline"
+                            className="flex items-center gap-2"
+                          >
+                            <RefreshCw className="h-4 w-4" />
+                            {showSimilarResponses ? "Hide Similar Responses" : "Show Similar Responses"}
                           </Button>
                         )}
                       </div>
