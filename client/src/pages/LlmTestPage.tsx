@@ -70,7 +70,31 @@ export default function LlmTestPage() {
         body: JSON.stringify({ requirement: reqPayload, provider }),
       });
       
-      const data = await res.json();
+      // Handle JSON parsing issues separately
+      let data;
+      try {
+        const text = await res.text();
+        // Check if it's an HTML response (common error case)
+        if (text.trim().startsWith('<!DOCTYPE') || text.trim().startsWith('<html')) {
+          console.error("Received HTML instead of JSON", text.substring(0, 100));
+          setError("Server returned HTML instead of JSON. This usually means a server error occurred.");
+          // Create a fallback response object with the error
+          setResponse({
+            error: "Server returned HTML instead of JSON",
+            stdout: "Error: HTML response received",
+            stderr: text.substring(0, 500) // Include part of the HTML for debugging
+          });
+          return;
+        }
+        
+        // Parse JSON
+        data = JSON.parse(text);
+      } catch (parseError) {
+        console.error("JSON Parse error:", parseError);
+        // We can't read the response text twice - it's already been consumed
+        setError(`Failed to parse response: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
+        return;
+      }
       
       if (!res.ok) {
         throw new Error(data.message || "Failed to test LLM connectivity");

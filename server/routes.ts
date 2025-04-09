@@ -615,8 +615,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log(`Testing LLM connectivity with requirement: "${requirement}" and provider: ${provider}`);
       
+      // Special fast-path for test_connection_only mode
+      if (requirement === "test_connection_only") {
+        console.log("Using fast-path test_connection_only mode");
+      }
+      
       // Use Python script to test connectivity
       const scriptPath = path.resolve(process.cwd(), 'server/rfp_response_generator.py');
+      console.log(`Using Python script at: ${scriptPath}`);
+      
+      if (!fs.existsSync(scriptPath)) {
+        console.error(`Python script not found at: ${scriptPath}`);
+        return res.status(500).json({
+          error: `Python script not found at: ${scriptPath}`,
+          message: "Script file not found"
+        });
+      }
+      
+      console.log(`Spawning Python process with args: [${scriptPath}, ${requirement}, ${provider}]`);
       
       return new Promise<void>((resolve, reject) => {
         // Spawn Python process with the correct parameters
@@ -645,8 +661,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             console.error(`Error output: ${stderr}`);
             res.status(500).json({ 
               message: "Failed to test LLM connectivity", 
-              error: stderr,
-              stdout: stdout
+              error: stderr || "Python process exited with non-zero code",
+              stdout: stdout,
+              stderr: stderr
             });
             resolve();
             return;
@@ -678,10 +695,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
             } catch (jsonError) {
               // If parsing fails, return a fallback response
               console.error("Failed to parse JSON from Python output:", jsonError);
+              console.error("Attempted to parse:", jsonStr);
               
               const errorDetails = stderr || stdout;
               res.status(200).json({
-                error: "Failed to parse response from Python script",
+                error: "Failed to parse response from Python script: " + jsonError.message,
                 generated_response: "Error: The Python script did not return valid JSON. See logs for details.",
                 pythonLogs: errorDetails,
                 stdout: stdout,
@@ -696,6 +714,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               console.error("Error from Python:", result.error);
             }
             
+            // Successful response
             res.json({
               ...result,
               pythonLogs: stderr
@@ -725,6 +744,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
             error: String(error)
           });
           resolve();
+        });
+        
+        // Set a timeout to kill the process if it takes too long
+        const timeoutMs = 30000; // 30 seconds
+        const timeout = setTimeout(() => {
+          console.error(`Python process timed out after ${timeoutMs}ms`);
+          pythonProcess.kill();
+          res.status(500).json({
+            message: "Python process timed out",
+            error: `Process did not complete within ${timeoutMs}ms`,
+            stdout: stdout,
+            stderr: stderr
+          });
+          resolve();
+        }, timeoutMs);
+        
+        // Clear the timeout when the process completes
+        pythonProcess.on('close', () => {
+          clearTimeout(timeout);
         });
       });
     } catch (error) {
