@@ -499,6 +499,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 console.log("Existing requirement:", JSON.stringify(existingRequirement, null, 2));
                 
                 try {
+                  // Log available model responses for debugging
+                  console.log("Model responses in result:", {
+                    openai_response: result.openai_response ? "Present" : "Not present",
+                    anthropic_response: result.anthropic_response ? "Present" : "Not present",
+                    deepseek_response: result.deepseek_response ? "Present" : "Not present",
+                  });
+                  
+                  // For OpenAI-only responses, copy to openaiResponse
+                  if (provider === "openai" && !result.openai_response && result.generated_response) {
+                    console.log("Using generated_response as openai_response");
+                    result.openai_response = result.generated_response;
+                  }
+                  
+                  // For Anthropic-only responses, copy to anthropicResponse
+                  if (provider === "anthropic" && !result.anthropic_response && result.generated_response) {
+                    console.log("Using generated_response as anthropic_response");
+                    result.anthropic_response = result.generated_response;
+                  }
+                  
+                  // For Deepseek-only responses, copy to deepseekResponse
+                  if (provider === "deepseek" && !result.deepseek_response && result.generated_response) {
+                    console.log("Using generated_response as deepseek_response");
+                    result.deepseek_response = result.generated_response;
+                  }
+                  
                   // Use the combined operation to store both the response and its references
                   const savedData = await storage.createResponseWithReferences(
                     {
@@ -507,7 +532,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                       openaiResponse: result.openai_response || null,
                       anthropicResponse: result.anthropic_response || null,
                       deepseekResponse: result.deepseek_response || null,
-                      category: result.category || '',
+                      category: existingRequirement?.category || '',
                       timestamp: new Date().toISOString(),
                       modelProvider: provider,
                       // If there was an existing requirement, update it instead of creating a new one
@@ -534,7 +559,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
               }
             }
             
-            res.json(result);
+            // Return back the model responses specifically
+            res.json({
+              ...result,
+              // Ensure these fields are explicitly included in the response
+              generated_response: result.generated_response || "",
+              openai_response: result.openai_response || null,
+              anthropic_response: result.anthropic_response || null,
+              deepseek_response: result.deepseek_response || null,
+              similar_responses: result.similar_responses || []
+            });
           } catch (error) {
             console.error("Failed to parse Python output:", error);
             res.status(500).json({ 
