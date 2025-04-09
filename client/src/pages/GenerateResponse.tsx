@@ -435,6 +435,10 @@ export default function GenerateResponse() {
                     <RadioGroupItem value="anthropic" id="reprocess-anthropic" />
                     <Label htmlFor="reprocess-anthropic" className="cursor-pointer">Anthropic</Label>
                   </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="deepseek" id="reprocess-deepseek" />
+                    <Label htmlFor="reprocess-deepseek" className="cursor-pointer">Deepseek</Label>
+                  </div>
                 </RadioGroup>
               </div>
             )}
@@ -443,7 +447,7 @@ export default function GenerateResponse() {
               <div className="pl-4 border-l-2 border-slate-200 p-3 bg-slate-50 rounded-md">
                 <p className="text-sm text-slate-600">
                   <span className="font-medium">Mixture of Agents:</span> Responses will be generated using 
-                  OpenAI, DeepSeek, and Anthropic/Claude models together, then synthesized into a single optimized response.
+                  OpenAI, Deepseek, and Anthropic/Claude models together, then synthesized into a single optimized response.
                 </p>
               </div>
             )}
@@ -575,6 +579,10 @@ export default function GenerateResponse() {
                             <RadioGroupItem value="anthropic" id="anthropic" />
                             <Label htmlFor="anthropic" className="cursor-pointer">Anthropic</Label>
                           </div>
+                          <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="deepseek" id="deepseek" />
+                            <Label htmlFor="deepseek" className="cursor-pointer">Deepseek</Label>
+                          </div>
                         </RadioGroup>
                       </div>
                     )}
@@ -583,7 +591,7 @@ export default function GenerateResponse() {
                       <div className="pl-4 border-l-2 border-slate-200 p-3 bg-slate-50 rounded-md">
                         <p className="text-sm text-slate-600">
                           <span className="font-medium">Mixture of Agents:</span> Responses will be generated using 
-                          OpenAI, DeepSeek, and Anthropic/Claude models together, then synthesized into a single optimized response.
+                          OpenAI, Deepseek, and Anthropic/Claude models together, then synthesized into a single optimized response.
                         </p>
                       </div>
                     )}

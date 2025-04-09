@@ -552,6 +552,10 @@ export default function GeneratedResponses() {
                       <RadioGroupItem value="anthropic" id="anthropic" />
                       <Label htmlFor="anthropic">Anthropic</Label>
                     </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="deepseek" id="deepseek" />
+                      <Label htmlFor="deepseek">Deepseek</Label>
+                    </div>
                   </RadioGroup>
                 </div>
               )}
