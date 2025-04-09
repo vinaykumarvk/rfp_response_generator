@@ -613,30 +613,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Requirement text is required" });
       }
       
+      console.log(`Testing LLM connectivity with requirement: "${requirement}" and provider: ${provider}`);
+      
       // Use Python script to test connectivity
       const scriptPath = path.resolve(process.cwd(), 'server/rfp_response_generator.py');
       
       return new Promise<void>((resolve, reject) => {
-        // Spawn Python process
-        const process = spawn('python3', [scriptPath, requirement, provider]);
+        // Spawn Python process with the correct parameters
+        const pythonProcess = spawn('python3', [scriptPath, requirement, provider]);
         
         let stdout = '';
         let stderr = '';
         
         // Collect stdout data
-        process.stdout.on('data', (data) => {
+        pythonProcess.stdout.on('data', (data) => {
           stdout += data.toString();
+          console.log(`Python stdout chunk: ${data.toString().substring(0, 100)}...`);
         });
         
         // Collect stderr data
-        process.stderr.on('data', (data) => {
+        pythonProcess.stderr.on('data', (data) => {
           stderr += data.toString();
+          console.log(`Python stderr: ${data.toString()}`);
         });
         
         // Handle process close
-        process.on('close', async (code) => {
+        pythonProcess.on('close', async (code) => {
+          console.log(`Python process exited with code ${code}`);
+          
           if (code !== 0) {
-            console.error(`Python process exited with code ${code}`);
             console.error(`Error output: ${stderr}`);
             res.status(500).json({ 
               message: "Failed to test LLM connectivity", 
@@ -647,13 +652,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
             return;
           }
           
+          // Try to find valid JSON in the output
           try {
             console.log("===== TEST LLM RAW OUTPUT FROM PYTHON =====");
             console.log(stdout);
             console.log("===== END RAW OUTPUT =====");
             
-            // Parse the output as JSON
-            const result = JSON.parse(stdout);
+            // Check if the output contains any JSON
+            let jsonStr = stdout.trim();
+            
+            // Handle Python print statements before the JSON
+            const lastOpenBrace = jsonStr.lastIndexOf('{');
+            const lastCloseBrace = jsonStr.lastIndexOf('}');
+            
+            if (lastOpenBrace !== -1 && lastCloseBrace !== -1 && lastOpenBrace < lastCloseBrace) {
+              // Extract what looks like JSON
+              jsonStr = jsonStr.substring(lastOpenBrace, lastCloseBrace + 1);
+              console.log("Extracted potential JSON:", jsonStr);
+            }
+            
+            // Try to parse the JSON
+            let result;
+            try {
+              result = JSON.parse(jsonStr);
+            } catch (jsonError) {
+              // If parsing fails, return a fallback response
+              console.error("Failed to parse JSON from Python output:", jsonError);
+              
+              const errorDetails = stderr || stdout;
+              res.status(200).json({
+                error: "Failed to parse response from Python script",
+                generated_response: "Error: The Python script did not return valid JSON. See logs for details.",
+                pythonLogs: errorDetails,
+                stdout: stdout,
+                stderr: stderr
+              });
+              resolve();
+              return;
+            }
             
             // Add logs to help with debugging
             if (result.error) {
@@ -667,23 +703,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
             
             resolve();
           } catch (error) {
-            console.error("Error parsing Python output:", error);
+            console.error("Error handling Python output:", error);
             console.error("Raw stdout:", stdout);
             console.error("Raw stderr:", stderr);
             
             res.status(500).json({ 
-              message: "Failed to parse Python output", 
+              message: "Failed to process Python output", 
               error: String(error),
-              stdout: stdout,
-              stderr: stderr
+              pythonLogs: stderr,
+              stdout: stdout
             });
             resolve();
           }
         });
+        
+        // Handle process error
+        pythonProcess.on('error', (error) => {
+          console.error(`Failed to start Python process: ${error}`);
+          res.status(500).json({ 
+            message: "Failed to start Python process", 
+            error: String(error)
+          });
+          resolve();
+        });
       });
     } catch (error) {
       console.error("Error in test-llm endpoint:", error);
-      return res.status(500).json({ message: "Failed to test LLM connectivity", error: String(error) });
+      return res.status(500).json({ 
+        message: "Failed to test LLM connectivity", 
+        error: String(error)
+      });
     }
   });
 
