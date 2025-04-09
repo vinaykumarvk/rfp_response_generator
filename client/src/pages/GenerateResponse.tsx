@@ -483,56 +483,40 @@ export default function GenerateResponse() {
           
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label>AI Model Type</Label>
-              <RadioGroup 
-                value={reprocessUseModelMixture ? "moa" : "single"}
-                onValueChange={(val) => setReprocessUseModelMixture(val === "moa")}
-                className="flex space-x-4"
+              <Label>AI Model</Label>
+              <Select 
+                defaultValue="moa" 
+                onValueChange={(value) => {
+                  if (value === "moa") {
+                    setReprocessUseModelMixture(true);
+                  } else {
+                    setReprocessUseModelMixture(false);
+                    setReprocessModelProvider(value);
+                  }
+                }}
               >
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="single" id="reprocess-single-model" />
-                  <Label htmlFor="reprocess-single-model" className="cursor-pointer">Single Model</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="moa" id="reprocess-moa-model" />
-                  <Label htmlFor="reprocess-moa-model" className="cursor-pointer">Mixture of Agents (MOA)</Label>
-                </div>
-              </RadioGroup>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select AI model" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="moa">Mixture of Agents (MOA)</SelectItem>
+                  <SelectItem value="openai">OpenAI</SelectItem>
+                  <SelectItem value="anthropic">Anthropic</SelectItem>
+                  <SelectItem value="deepseek">Deepseek</SelectItem>
+                </SelectContent>
+              </Select>
+              
+              {/* Simple explanation for selected model */}
+              <div className="text-xs text-slate-500 mt-1">
+                {reprocessUseModelMixture ? (
+                  <p>Combines responses from multiple AI models for optimal results</p>
+                ) : (
+                  <p>Using {reprocessModelProvider === "openai" ? "OpenAI" : 
+                           reprocessModelProvider === "anthropic" ? "Anthropic/Claude" : 
+                           reprocessModelProvider === "deepseek" ? "Deepseek" : ""} model only</p>
+                )}
+              </div>
             </div>
-            
-            {!reprocessUseModelMixture && (
-              <div className="space-y-2 pl-4 border-l-2 border-slate-200">
-                <Label>Single Model Provider</Label>
-                <RadioGroup 
-                  value={reprocessModelProvider}
-                  onValueChange={setReprocessModelProvider}
-                  className="flex space-x-4"
-                  disabled={reprocessUseModelMixture}
-                >
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="openai" id="reprocess-openai" />
-                    <Label htmlFor="reprocess-openai" className="cursor-pointer">OpenAI</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="anthropic" id="reprocess-anthropic" />
-                    <Label htmlFor="reprocess-anthropic" className="cursor-pointer">Anthropic</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="deepseek" id="reprocess-deepseek" />
-                    <Label htmlFor="reprocess-deepseek" className="cursor-pointer">Deepseek</Label>
-                  </div>
-                </RadioGroup>
-              </div>
-            )}
-            
-            {reprocessUseModelMixture && (
-              <div className="pl-4 border-l-2 border-slate-200 p-3 bg-slate-50 rounded-md">
-                <p className="text-sm text-slate-600">
-                  <span className="font-medium">Mixture of Agents:</span> Responses will be generated using 
-                  OpenAI, Deepseek, and Anthropic/Claude models together, then synthesized into a single optimized response.
-                </p>
-              </div>
-            )}
           </div>
           
           <DialogFooter className="sm:justify-between">
@@ -624,59 +608,43 @@ export default function GenerateResponse() {
                     </div>
                   </div>
                   
-                  {/* AI Model selection */}
+                  {/* AI Model selection - Simplified dropdown */}
                   <div className="space-y-4">
                     <div className="space-y-2">
-                      <Label>AI Model Type</Label>
-                      <RadioGroup 
-                        value={useModelMixture ? "moa" : "single"}
-                        onValueChange={(val) => setUseModelMixture(val === "moa")}
-                        className="flex space-x-4"
+                      <Label>AI Model</Label>
+                      <Select 
+                        defaultValue="moa" 
+                        onValueChange={(value) => {
+                          if (value === "moa") {
+                            setUseModelMixture(true);
+                          } else {
+                            setUseModelMixture(false);
+                            setModelProvider(value);
+                          }
+                        }}
                       >
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="single" id="single-model" />
-                          <Label htmlFor="single-model" className="cursor-pointer">Single Model</Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="moa" id="moa-model" />
-                          <Label htmlFor="moa-model" className="cursor-pointer">Mixture of Agents (MOA)</Label>
-                        </div>
-                      </RadioGroup>
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Select AI model" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="moa">Mixture of Agents (MOA)</SelectItem>
+                          <SelectItem value="openai">OpenAI</SelectItem>
+                          <SelectItem value="anthropic">Anthropic</SelectItem>
+                          <SelectItem value="deepseek">Deepseek</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      
+                      {/* Simple explanation for selected model */}
+                      <div className="text-xs text-slate-500 mt-1">
+                        {useModelMixture ? (
+                          <p>Combines responses from multiple AI models for optimal results</p>
+                        ) : (
+                          <p>Using {modelProvider === "openai" ? "OpenAI" : 
+                                   modelProvider === "anthropic" ? "Anthropic/Claude" : 
+                                   modelProvider === "deepseek" ? "Deepseek" : ""} model only</p>
+                        )}
+                      </div>
                     </div>
-                    
-                    {!useModelMixture && (
-                      <div className="space-y-2 pl-4 border-l-2 border-slate-200">
-                        <Label>Single Model Provider</Label>
-                        <RadioGroup 
-                          value={modelProvider}
-                          onValueChange={setModelProvider}
-                          className="flex space-x-4"
-                          disabled={useModelMixture}
-                        >
-                          <div className="flex items-center space-x-2">
-                            <RadioGroupItem value="openai" id="openai" />
-                            <Label htmlFor="openai" className="cursor-pointer">OpenAI</Label>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <RadioGroupItem value="anthropic" id="anthropic" />
-                            <Label htmlFor="anthropic" className="cursor-pointer">Anthropic</Label>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <RadioGroupItem value="deepseek" id="deepseek" />
-                            <Label htmlFor="deepseek" className="cursor-pointer">Deepseek</Label>
-                          </div>
-                        </RadioGroup>
-                      </div>
-                    )}
-                    
-                    {useModelMixture && (
-                      <div className="pl-4 border-l-2 border-slate-200 p-3 bg-slate-50 rounded-md">
-                        <p className="text-sm text-slate-600">
-                          <span className="font-medium">Mixture of Agents:</span> Responses will be generated using 
-                          OpenAI, Deepseek, and Anthropic/Claude models together, then synthesized into a single optimized response.
-                        </p>
-                      </div>
-                    )}
                   </div>
                   
                   {/* Requirements selection */}
