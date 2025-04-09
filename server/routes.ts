@@ -891,8 +891,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             let result;
             try {
               result = JSON.parse(jsonStr);
-            } catch (jsonError) {
+            } catch (e) {
               // If parsing fails, return a fallback response
+              const jsonError = e as Error;
               console.error("Failed to parse JSON from Python output:", jsonError);
               console.error("Attempted to parse:", jsonStr);
               

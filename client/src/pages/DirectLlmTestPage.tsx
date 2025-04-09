@@ -53,7 +53,7 @@ const testOpenAiApi = async () => {
     const tempFilename = `test_openai_${Date.now()}.py`;
     
     // Use the fetch API to ask the server to create and run this file
-    const fileCreateResponse = await fetch('http://localhost:5000/api/echo', {
+    const fileCreateResponse = await fetch('/api/echo', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -71,7 +71,7 @@ const testOpenAiApi = async () => {
     }
     
     // Run the command to execute the Python script
-    const executeResponse = await fetch('http://localhost:5000/api/echo', {
+    const executeResponse = await fetch('/api/echo', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -86,7 +86,7 @@ const testOpenAiApi = async () => {
     const result = await executeResponse.json();
     
     // Clean up the temp file
-    await fetch('http://localhost:5000/api/echo', {
+    await fetch('/api/echo', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -151,7 +151,7 @@ const testAnthropicApi = async () => {
     const tempFilename = `test_anthropic_${Date.now()}.py`;
     
     // Use the fetch API to ask the server to create and run this file
-    const fileCreateResponse = await fetch('http://localhost:5000/api/echo', {
+    const fileCreateResponse = await fetch('/api/echo', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -169,7 +169,7 @@ const testAnthropicApi = async () => {
     }
     
     // Run the command to execute the Python script
-    const executeResponse = await fetch('http://localhost:5000/api/echo', {
+    const executeResponse = await fetch('/api/echo', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -184,7 +184,7 @@ const testAnthropicApi = async () => {
     const result = await executeResponse.json();
     
     // Clean up the temp file
-    await fetch('http://localhost:5000/api/echo', {
+    await fetch('/api/echo', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
