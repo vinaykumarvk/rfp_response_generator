@@ -192,6 +192,17 @@ export default function GenerateResponse() {
             (reprocessUseModelMixture ? "Mixture of Agents" : reprocessModelProvider),
           variant: "default"
         });
+        
+        // Add toast with View Generated Responses link
+        toast({
+          title: "View All Responses",
+          description: "Click here to view all your generated responses",
+          action: (
+            <Button variant="outline" size="sm" onClick={() => window.location.href = "/generated-responses"}>
+              View All
+            </Button>
+          )
+        });
       }
     } catch (error) {
       console.error("Error reprocessing response:", error);
@@ -230,7 +241,23 @@ export default function GenerateResponse() {
             req.id === selectedReq.id ? { ...req, finalResponse: responseText } : req
           ));
           
-          alert("Response saved successfully!");
+          // Use toast instead of alert
+          toast({
+            title: "Response saved successfully!",
+            description: "Your response has been saved to the database.",
+            variant: "default"
+          });
+          
+          // Add toast with View Generated Responses link
+          toast({
+            title: "View All Responses",
+            description: "Click here to view all your generated responses",
+            action: (
+              <Button variant="outline" size="sm" onClick={() => window.location.href = "/generated-responses"}>
+                View All
+              </Button>
+            )
+          });
         } else {
           console.error("Failed to save response");
           setErrorMessage("Failed to save response to the database");
@@ -378,6 +405,19 @@ export default function GenerateResponse() {
       
       // Clear selections after batch processing
       setSelectedRequirementIds(new Set());
+      
+      // Add toast with View Generated Responses link
+      if (successCount > 0) {
+        toast({
+          title: "View Generated Responses",
+          description: "Click here to view all your generated responses",
+          action: (
+            <Button variant="outline" size="sm" onClick={() => window.location.href = "/generated-responses"}>
+              View All
+            </Button>
+          )
+        });
+      }
       
     } catch (error) {
       console.error("Error in batch generation:", error);

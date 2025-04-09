@@ -411,7 +411,11 @@ export default function GeneratedResponses() {
                             {
                               (() => {
                                 try {
-                                  return format(new Date(selectedResponse.timestamp), 'MMM d, yyyy HH:mm');
+                                  // Format date in IST timezone (UTC+5:30)
+                                  const utcDate = new Date(selectedResponse.timestamp);
+                                  // Adjust to IST by adding 5 hours and 30 minutes
+                                  const istDate = new Date(utcDate.getTime() + (5 * 60 + 30) * 60 * 1000);
+                                  return format(istDate, 'MMM d, yyyy HH:mm') + ' IST';
                                 } catch (e) {
                                   return selectedResponse.timestamp;
                                 }
@@ -662,7 +666,11 @@ function ResponsesTable({
                         {
                           (() => {
                             try {
-                              return format(new Date(response.timestamp), 'MMM d, yyyy HH:mm');
+                              // Format date in IST timezone (UTC+5:30)
+                              const utcDate = new Date(response.timestamp);
+                              // Adjust to IST by adding 5 hours and 30 minutes
+                              const istDate = new Date(utcDate.getTime() + (5 * 60 + 30) * 60 * 1000);
+                              return format(istDate, 'MMM d, yyyy HH:mm') + ' IST';
                             } catch (e) {
                               return response.timestamp;
                             }
