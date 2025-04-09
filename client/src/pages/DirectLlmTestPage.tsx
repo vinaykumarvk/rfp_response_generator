@@ -31,10 +31,10 @@ const testOpenAiApi = async () => {
           response = client.chat.completions.create(
               model="gpt-4o",
               messages=[
-                  {"role": "system", "content": "You are a helpful assistant."},
-                  {"role": "user", "content": "Please respond with a short test message."}
+                  {"role": "system", "content": "You are a helpful assistant. Respond only with 'OpenAI connection successful' and nothing else."},
+                  {"role": "user", "content": "Confirm the connection is working"}
               ],
-              max_tokens=50
+              max_tokens=10
           )
           
           print(json.dumps({
@@ -129,9 +129,9 @@ const testAnthropicApi = async () => {
           client = Anthropic(api_key=api_key)
           response = client.messages.create(
               model="claude-3-7-sonnet-20250219", 
-              max_tokens=50,
+              max_tokens=10,
               messages=[
-                  {"role": "user", "content": "Please respond with a short test message."}
+                  {"role": "user", "content": "Respond only with 'Anthropic connection successful' and nothing else."}
               ]
           )
           
