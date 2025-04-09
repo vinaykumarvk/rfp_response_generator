@@ -714,7 +714,87 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Add a simple API test endpoint
+  // Add direct test endpoint as a cleaner alternative
+  app.post("/api/direct-test", async (req: Request, res: Response) => {
+    try {
+      const { provider = "openai" } = req.body;
+      
+      // Use the direct test Python module
+      const scriptPath = path.resolve(process.cwd(), 'server/direct_test.py');
+      
+      if (!fs.existsSync(scriptPath)) {
+        return res.status(500).json({
+          success: false,
+          error: `Test script not found at: ${scriptPath}`
+        });
+      }
+      
+      // Spawn a process with a timeout
+      const pythonProcess = spawn('python3', [scriptPath, provider]);
+      
+      let stdout = '';
+      
+      // Collect only stdout for clean JSON
+      pythonProcess.stdout.on('data', (data) => {
+        stdout += data.toString();
+      });
+      
+      // Set a timeout
+      const timeoutMs = 15000; // 15 seconds
+      const timeout = setTimeout(() => {
+        console.error(`API test timed out after ${timeoutMs}ms`);
+        pythonProcess.kill();
+      }, timeoutMs);
+      
+      // Return a promise that resolves when the process completes
+      return new Promise<void>((resolve) => {
+        pythonProcess.on('close', (code) => {
+          clearTimeout(timeout);
+          
+          if (code !== 0) {
+            return res.status(500).json({
+              success: false,
+              error: `Python process exited with code ${code}`
+            });
+          }
+          
+          try {
+            // Parse JSON output - should be clean with no extra text
+            const result = JSON.parse(stdout);
+            res.json(result);
+          } catch (e) {
+            // If parsing fails, send raw output
+            console.error("Failed to parse direct test output:", e);
+            res.status(500).json({
+              success: false,
+              error: `Failed to parse script output: ${e instanceof Error ? e.message : String(e)}`,
+              raw_output: stdout
+            });
+          }
+          
+          resolve();
+        });
+        
+        // Handle process errors
+        pythonProcess.on('error', (error) => {
+          clearTimeout(timeout);
+          console.error(`Failed to start API test process: ${error}`);
+          res.status(500).json({
+            success: false,
+            error: `Failed to start Python process: ${error.message}`
+          });
+          resolve();
+        });
+      });
+    } catch (error) {
+      console.error("Error in direct-test endpoint:", error);
+      return res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
+
   app.post("/api/simple-test", async (req: Request, res: Response) => {
     try {
       const { provider = "openai" } = req.body;

@@ -1,27 +1,33 @@
 import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Loader2, CheckCircle, AlertCircle } from "lucide-react";
+import { Loader2 } from "lucide-react";
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
+import { AlertCircle, CheckCircle } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+interface TestResult {
+  success: boolean;
+  message?: string;
+  error?: string;
+  response?: string;
+  response_time_ms?: number;
+  pythonLogs?: string;
+  stdout?: string;
+  stderr?: string;
+}
 
 export default function SimpleApiTest() {
   const [provider, setProvider] = useState("openai");
   const [isLoading, setIsLoading] = useState(false);
-  const [results, setResults] = useState<{
-    success?: boolean;
-    message?: string;
-    error?: string;
-    response?: string;
-    response_time_ms?: number;
-  } | null>(null);
-
+  const [results, setResults] = useState<TestResult | null>(null);
+  
   const runTest = async () => {
     setIsLoading(true);
     setResults(null);
     
     try {
-      const response = await fetch('/api/simple-test', {
+      const response = await fetch('/api/direct-test', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
