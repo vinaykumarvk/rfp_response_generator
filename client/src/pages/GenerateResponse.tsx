@@ -60,6 +60,7 @@ export default function GenerateResponse() {
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   const [uniqueCategories, setUniqueCategories] = useState<string[]>([]);
+  const [viewFilter, setViewFilter] = useState<"all" | "pending">("pending");
   const [progressValue, setProgressValue] = useState(0);
   const [processedCount, setProcessedCount] = useState(0);
   const [totalToProcess, setTotalToProcess] = useState(0);
@@ -302,8 +303,10 @@ export default function GenerateResponse() {
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
       // Add all filtered requirements without responses to selection
-      const requirementsWithoutResponses = getRequirementsWithoutResponses();
-      const idsToAdd = requirementsWithoutResponses
+      const requirementsToSelect = getRequirementsForDisplay()
+        .filter(req => !req.finalResponse); // Only select requirements without responses
+      
+      const idsToAdd = requirementsToSelect
         .filter(req => req.id !== undefined)
         .map(req => req.id as number);
       
@@ -457,6 +460,13 @@ export default function GenerateResponse() {
   // Get requirements that don't have responses yet
   const getRequirementsWithoutResponses = () => {
     return getFilteredRequirements().filter(req => !req.finalResponse);
+  };
+  
+  // Get requirements based on view filter
+  const getRequirementsForDisplay = () => {
+    return viewFilter === "pending" 
+      ? getRequirementsWithoutResponses() 
+      : getFilteredRequirements();
   };
 
   return (
@@ -672,9 +682,25 @@ export default function GenerateResponse() {
                   {/* Requirements selection */}
                   <div className="space-y-2">
                     <div className="flex justify-between items-center">
-                      <Label>Requirements without Responses</Label>
+                      <div className="flex items-center space-x-4">
+                        <Label>Requirements</Label>
+                        <div className="flex items-center border rounded-md overflow-hidden">
+                          <button 
+                            className={`px-3 py-1 text-sm ${viewFilter === 'pending' ? 'bg-primary text-white' : 'bg-transparent text-slate-700'}`}
+                            onClick={() => setViewFilter("pending")}
+                          >
+                            Pending
+                          </button>
+                          <button 
+                            className={`px-3 py-1 text-sm ${viewFilter === 'all' ? 'bg-primary text-white' : 'bg-transparent text-slate-700'}`}
+                            onClick={() => setViewFilter("all")}
+                          >
+                            All
+                          </button>
+                        </div>
+                      </div>
                       <div className="text-sm text-slate-500">
-                        Selected: {selectedRequirementIds.size} / {getRequirementsWithoutResponses().length}
+                        Selected: {selectedRequirementIds.size} / {getRequirementsForDisplay().length}
                       </div>
                     </div>
                     
@@ -683,8 +709,8 @@ export default function GenerateResponse() {
                       <Checkbox 
                         id="select-all"
                         checked={
-                          getRequirementsWithoutResponses().length > 0 && 
-                          selectedRequirementIds.size === getRequirementsWithoutResponses().length
+                          getRequirementsForDisplay().filter(req => !req.finalResponse).length > 0 && 
+                          selectedRequirementIds.size === getRequirementsForDisplay().filter(req => !req.finalResponse).length
                         }
                         onCheckedChange={(checked) => handleSelectAll(checked === true)}
                       />
@@ -692,40 +718,62 @@ export default function GenerateResponse() {
                         htmlFor="select-all" 
                         className="text-sm font-medium text-slate-700 cursor-pointer"
                       >
-                        Select All
+                        Select All Pending Requirements
                       </label>
                     </div>
                     
                     <div className="border border-slate-200 rounded-md max-h-[300px] overflow-y-auto">
-                      {getRequirementsWithoutResponses().length > 0 ? (
+                      {getRequirementsForDisplay().length > 0 ? (
                         <div className="divide-y divide-slate-200">
-                          {getRequirementsWithoutResponses().map((req) => (
+                          {getRequirementsForDisplay().map((req) => (
                             <div 
                               key={req.id} 
                               className="p-3 hover:bg-slate-50 flex items-start gap-3"
                             >
                               <div className="pt-0.5">
-                                <Checkbox 
-                                  id={`req-${req.id}`}
-                                  checked={req.id ? selectedRequirementIds.has(req.id) : false}
-                                  onCheckedChange={() => req.id && handleCheckboxChange(req.id)}
-                                />
+                                {!req.finalResponse ? (
+                                  <Checkbox 
+                                    id={`req-${req.id}`}
+                                    checked={req.id ? selectedRequirementIds.has(req.id) : false}
+                                    onCheckedChange={() => req.id && handleCheckboxChange(req.id)}
+                                  />
+                                ) : (
+                                  <div className="flex h-4 w-4 items-center justify-center rounded-sm border border-green-500 bg-green-50">
+                                    <Check className="h-3 w-3 text-green-500" />
+                                  </div>
+                                )}
                               </div>
                               <div className="flex-1">
-                                <label 
-                                  htmlFor={`req-${req.id}`} 
+                                <div 
                                   className="block cursor-pointer"
+                                  onClick={() => handleSingleRequirementSelect(req.id as number)}
                                 >
                                   <div className="font-medium text-slate-700">{req.category}</div>
                                   <div className="text-sm text-slate-600 mt-1">{req.requirement}</div>
-                                </label>
+                                </div>
                               </div>
+                              {req.finalResponse && (
+                                <div>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => {
+                                      handleSingleRequirementSelect(req.id as number);
+                                      setShowReprocessModal(true);
+                                    }}
+                                    className="h-8 px-2"
+                                  >
+                                    <RotateCw className="h-4 w-4 mr-1" />
+                                    Reprocess
+                                  </Button>
+                                </div>
+                              )}
                             </div>
                           ))}
                         </div>
                       ) : (
                         <div className="p-4 text-center text-slate-500">
-                          No requirements without responses found. Try changing the filters.
+                          No requirements found. Try changing the filters.
                         </div>
                       )}
                     </div>
