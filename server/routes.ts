@@ -604,6 +604,89 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Add a new endpoint for testing LLM connectivity
+  app.post("/api/test-llm", async (req: Request, res: Response) => {
+    try {
+      const { requirement, provider = "openai" } = req.body;
+      
+      if (!requirement) {
+        return res.status(400).json({ message: "Requirement text is required" });
+      }
+      
+      // Use Python script to test connectivity
+      const scriptPath = path.resolve(process.cwd(), 'server/rfp_response_generator.py');
+      
+      return new Promise<void>((resolve, reject) => {
+        // Spawn Python process
+        const process = spawn('python3', [scriptPath, requirement, provider]);
+        
+        let stdout = '';
+        let stderr = '';
+        
+        // Collect stdout data
+        process.stdout.on('data', (data) => {
+          stdout += data.toString();
+        });
+        
+        // Collect stderr data
+        process.stderr.on('data', (data) => {
+          stderr += data.toString();
+        });
+        
+        // Handle process close
+        process.on('close', async (code) => {
+          if (code !== 0) {
+            console.error(`Python process exited with code ${code}`);
+            console.error(`Error output: ${stderr}`);
+            res.status(500).json({ 
+              message: "Failed to test LLM connectivity", 
+              error: stderr,
+              stdout: stdout
+            });
+            resolve();
+            return;
+          }
+          
+          try {
+            console.log("===== TEST LLM RAW OUTPUT FROM PYTHON =====");
+            console.log(stdout);
+            console.log("===== END RAW OUTPUT =====");
+            
+            // Parse the output as JSON
+            const result = JSON.parse(stdout);
+            
+            // Add logs to help with debugging
+            if (result.error) {
+              console.error("Error from Python:", result.error);
+            }
+            
+            res.json({
+              ...result,
+              pythonLogs: stderr
+            });
+            
+            resolve();
+          } catch (error) {
+            console.error("Error parsing Python output:", error);
+            console.error("Raw stdout:", stdout);
+            console.error("Raw stderr:", stderr);
+            
+            res.status(500).json({ 
+              message: "Failed to parse Python output", 
+              error: String(error),
+              stdout: stdout,
+              stderr: stderr
+            });
+            resolve();
+          }
+        });
+      });
+    } catch (error) {
+      console.error("Error in test-llm endpoint:", error);
+      return res.status(500).json({ message: "Failed to test LLM connectivity", error: String(error) });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

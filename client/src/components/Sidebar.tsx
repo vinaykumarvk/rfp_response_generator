@@ -10,7 +10,8 @@ import {
   BookOpen,
   Menu,
   X,
-  FileText
+  FileText,
+  Terminal
 } from 'lucide-react';
 import intellectLogo from '@assets/intellect_logo.png';
 import { Button } from '@/components/ui/button';
@@ -53,6 +54,12 @@ export default function Sidebar() {
       icon: <BookOpen className="h-5 w-5" />,
       path: '/generated-responses',
       active: location === '/generated-responses'
+    },
+    {
+      title: 'LLM Test',
+      icon: <Terminal className="h-5 w-5" />,
+      path: '/llm-test',
+      active: location === '/llm-test'
     }
   ];
 
