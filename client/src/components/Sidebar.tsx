@@ -3,15 +3,16 @@ import { Link, useLocation } from 'wouter';
 import { cn } from '@/lib/utils';
 import { 
   Upload, 
-  Table, 
   MessageSquare,
   ChevronRight,
   ChevronLeft,
   Archive,
   BookOpen,
   Menu,
-  X
+  X,
+  FileText
 } from 'lucide-react';
+import intellectLogo from '@assets/intellect_logo.png';
 import { Button } from '@/components/ui/button';
 import { useIsMobile } from '@/hooks/use-mobile';
 
@@ -37,7 +38,7 @@ export default function Sidebar() {
     },
     {
       title: 'View Uploaded Data',
-      icon: <Table className="h-5 w-5" />,
+      icon: <FileText className="h-5 w-5" />,
       path: '/view-data',
       active: location === '/view-data'
     },
@@ -73,7 +74,10 @@ export default function Sidebar() {
       <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex">
         <div className="bg-white dark:bg-slate-800 w-[250px] h-full">
           <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
-            <h2 className="font-semibold text-slate-800 dark:text-slate-100">Excel Analyzer</h2>
+            <div className="flex items-center">
+              <img src={intellectLogo} alt="intellectAI Logo" className="h-6 w-auto" />
+              <h2 className="ml-2 font-semibold text-slate-800 dark:text-slate-100">RFP Generator</h2>
+            </div>
             <Button 
               variant="ghost" 
               size="sm" 
@@ -136,13 +140,19 @@ export default function Sidebar() {
       <div className="flex flex-col h-full">
         <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
           {!collapsed && (
-            <h2 className="font-semibold text-slate-800 dark:text-slate-100">Excel Analyzer</h2>
+            <div className="flex items-center">
+              <img src={intellectLogo} alt="intellectAI Logo" className="h-6 w-auto" />
+              <h2 className="ml-2 font-semibold text-slate-800 dark:text-slate-100">RFP Generator</h2>
+            </div>
+          )}
+          {collapsed && (
+            <img src={intellectLogo} alt="intellectAI Logo" className="h-6 w-auto mx-auto" />
           )}
           <Button 
             variant="ghost" 
             size="sm" 
             onClick={() => setCollapsed(!collapsed)}
-            className="ml-auto"
+            className={!collapsed ? "ml-auto" : "ml-auto mt-3"}
           >
             {collapsed ? (
               <ChevronRight className="h-5 w-5" />

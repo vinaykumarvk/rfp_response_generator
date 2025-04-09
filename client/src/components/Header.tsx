@@ -1,9 +1,10 @@
-import { Table, HelpCircle, Menu } from 'lucide-react';
+import { HelpCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Link } from 'wouter';
 import { useState } from 'react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import intellectLogo from '@assets/intellect_logo.png';
 
 export default function Header() {
   const isMobile = useIsMobile();
@@ -16,9 +17,13 @@ export default function Header() {
           <div className="flex items-center">
             <Link href="/">
               <div className="flex items-center cursor-pointer">
-                <Table className="h-8 w-8 text-primary" />
-                <h1 className="ml-2 text-xl font-semibold text-slate-800 dark:text-slate-100 hidden sm:block">Excel Requirements Analyzer</h1>
-                <h1 className="ml-2 text-xl font-semibold text-slate-800 dark:text-slate-100 sm:hidden">RFP Analyzer</h1>
+                <img 
+                  src={intellectLogo} 
+                  alt="intellectAI Logo" 
+                  className="h-8 w-auto"
+                />
+                <h1 className="ml-3 text-xl font-semibold text-slate-800 dark:text-slate-100 hidden sm:block">RFP Response Generator</h1>
+                <h1 className="ml-3 text-xl font-semibold text-slate-800 dark:text-slate-100 sm:hidden">RFP Generator</h1>
               </div>
             </Link>
           </div>
