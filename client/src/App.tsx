@@ -11,17 +11,27 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import Sidebar from "@/components/Sidebar";
 
+import { useIsMobile } from '@/hooks/use-mobile';
+
 function AppLayout({ children }: { children: React.ReactNode }) {
+  const isMobile = useIsMobile();
+  
   return (
     <div className="flex flex-col min-h-screen">
       <Header />
       <div className="flex flex-1 overflow-hidden">
-        <Sidebar />
-        <main className="flex-1 overflow-auto bg-slate-50">
-          {children}
+        {/* Only show sidebar on desktop */}
+        {!isMobile && <Sidebar />}
+        <main className="flex-1 overflow-auto bg-slate-50 pb-16 md:pb-0">
+          <div className="px-4 py-4 sm:px-6 md:px-8">
+            {children}
+          </div>
         </main>
       </div>
       <Footer />
+      
+      {/* On mobile, Sidebar component will render a floating menu button */}
+      {isMobile && <Sidebar />}
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'wouter';
 import { cn } from '@/lib/utils';
 import { 
@@ -8,13 +8,25 @@ import {
   ChevronRight,
   ChevronLeft,
   Archive,
-  BookOpen
+  BookOpen,
+  Menu,
+  X
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 export default function Sidebar() {
   const [location] = useLocation();
   const [collapsed, setCollapsed] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const isMobile = useIsMobile();
+
+  // Auto-collapse sidebar on mobile
+  useEffect(() => {
+    if (isMobile) {
+      setCollapsed(true);
+    }
+  }, [isMobile]);
 
   const navItems = [
     {
@@ -43,6 +55,75 @@ export default function Sidebar() {
     }
   ];
 
+  // Handle mobile menu toggle
+  const toggleMobileMenu = () => {
+    setMobileMenuOpen(!mobileMenuOpen);
+  };
+
+  // When a link is clicked on mobile, close the menu
+  const handleLinkClick = () => {
+    if (isMobile) {
+      setMobileMenuOpen(false);
+    }
+  };
+
+  // Render mobile menu overlay
+  if (isMobile && mobileMenuOpen) {
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex">
+        <div className="bg-white w-[250px] h-full">
+          <div className="p-4 border-b border-slate-200 flex justify-between items-center">
+            <h2 className="font-semibold text-slate-800">Excel Analyzer</h2>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={toggleMobileMenu}
+            >
+              <X className="h-5 w-5" />
+            </Button>
+          </div>
+          <nav className="flex-1 p-2">
+            <ul className="space-y-1">
+              {navItems.map((item) => (
+                <li key={item.path}>
+                  <Link href={item.path}>
+                    <span 
+                      onClick={handleLinkClick}
+                      className={cn(
+                        "flex items-center rounded-md px-3 py-2 text-sm hover:bg-slate-100 cursor-pointer",
+                        item.active ? "bg-slate-100 text-primary font-medium" : "text-slate-700"
+                      )}
+                    >
+                      <span className="flex-shrink-0 mr-3">
+                        {item.icon}
+                      </span>
+                      <span>{item.title}</span>
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </nav>
+        </div>
+      </div>
+    );
+  }
+
+  // On mobile, show a fixed menu button
+  if (isMobile) {
+    return (
+      <div className="fixed bottom-4 left-4 z-40">
+        <Button 
+          onClick={toggleMobileMenu} 
+          className="rounded-full h-12 w-12 shadow-lg"
+        >
+          <Menu className="h-6 w-6" />
+        </Button>
+      </div>
+    );
+  }
+
+  // Desktop sidebar
   return (
     <div 
       className={cn(

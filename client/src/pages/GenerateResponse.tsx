@@ -711,17 +711,17 @@ export default function GenerateResponse() {
                                   </div>
                                 )}
                               </div>
-                              <div className="flex-1">
+                              <div className="flex-1 min-w-0">
                                 <div 
                                   className="block cursor-pointer"
                                   onClick={() => handleSingleRequirementSelect(req.id as number)}
                                 >
-                                  <div className="font-medium text-slate-700">{req.category}</div>
-                                  <div className="text-sm text-slate-600 mt-1">{req.requirement}</div>
+                                  <div className="font-medium text-slate-700 break-words">{req.category}</div>
+                                  <div className="text-sm text-slate-600 mt-1 break-words">{req.requirement}</div>
                                 </div>
                               </div>
                               {req.finalResponse && (
-                                <div>
+                                <div className="flex-shrink-0">
                                   <Button
                                     variant="ghost"
                                     size="sm"
@@ -731,8 +731,8 @@ export default function GenerateResponse() {
                                     }}
                                     className="h-8 px-2"
                                   >
-                                    <RotateCw className="h-4 w-4 mr-1" />
-                                    Reprocess
+                                    <RotateCw className="h-4 w-4 sm:mr-1" />
+                                    <span className="hidden sm:inline">Reprocess</span>
                                   </Button>
                                 </div>
                               )}
@@ -802,30 +802,32 @@ export default function GenerateResponse() {
               
               <CardContent className="px-6 py-4">
                 <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                  <TabsList className="grid w-full grid-cols-6 mb-6">
-                    <TabsTrigger value="response" className="flex items-center gap-2">
+                  <TabsList className="grid w-full grid-cols-3 sm:grid-cols-6 mb-6">
+                    <TabsTrigger value="response" className="flex items-center gap-1 sm:gap-2">
                       <MessageSquare className="h-4 w-4" />
-                      Final
+                      <span className="sm:inline">Final</span>
                     </TabsTrigger>
-                    <TabsTrigger value="preview" className="flex items-center gap-2">
+                    <TabsTrigger value="preview" className="flex items-center gap-1 sm:gap-2">
                       <Eye className="h-4 w-4" />
-                      Preview
+                      <span className="sm:inline">Preview</span>
                     </TabsTrigger>
-                    <TabsTrigger value="openai" className="flex items-center gap-2">
+                    <TabsTrigger value="openai" className="flex items-center gap-1 sm:gap-2">
                       <MessageSquare className="h-4 w-4" />
-                      OpenAI
+                      <span className="sm:inline">OpenAI</span>
                     </TabsTrigger>
-                    <TabsTrigger value="anthropic" className="flex items-center gap-2">
+                    <TabsTrigger value="anthropic" className="flex items-center gap-1 sm:gap-2">
                       <MessageSquare className="h-4 w-4" />
-                      Anthropic
+                      <span className="hidden sm:inline">Anthropic</span>
+                      <span className="sm:hidden">Claude</span>
                     </TabsTrigger>
-                    <TabsTrigger value="deepseek" className="flex items-center gap-2">
+                    <TabsTrigger value="deepseek" className="flex items-center gap-1 sm:gap-2">
                       <MessageSquare className="h-4 w-4" />
-                      Deepseek
+                      <span className="sm:inline">Deepseek</span>
                     </TabsTrigger>
-                    <TabsTrigger value="references" className="flex items-center gap-2">
+                    <TabsTrigger value="references" className="flex items-center gap-1 sm:gap-2">
                       <BookOpen className="h-4 w-4" />
-                      References
+                      <span className="hidden sm:inline">References</span>
+                      <span className="sm:hidden">Refs</span>
                     </TabsTrigger>
                   </TabsList>
                   
@@ -836,8 +838,8 @@ export default function GenerateResponse() {
                       className="min-h-[250px]"
                     />
                     
-                    <div className="flex justify-between space-x-3">
-                      <div className="flex gap-2">
+                    <div className="flex flex-col sm:flex-row justify-between space-y-2 sm:space-y-0 sm:space-x-3">
+                      <div className="flex flex-wrap gap-2">
                         {similarResponses.length > 0 && (
                           <Button 
                             onClick={toggleSimilarResponses}
@@ -845,7 +847,8 @@ export default function GenerateResponse() {
                             className="flex items-center gap-2"
                           >
                             <RefreshCw className="h-4 w-4" />
-                            {showSimilarResponses ? "Hide Similar Responses" : "Show Similar Responses"}
+                            <span className="hidden sm:inline">{showSimilarResponses ? "Hide Similar Responses" : "Show Similar Responses"}</span>
+                            <span className="sm:hidden">{showSimilarResponses ? "Hide References" : "Show References"}</span>
                           </Button>
                         )}
                         
@@ -864,7 +867,7 @@ export default function GenerateResponse() {
                       <Button 
                         onClick={handleSaveResponse}
                         disabled={!responseText}
-                        className="flex items-center gap-2"
+                        className="flex items-center gap-2 sm:mt-0"
                       >
                         <Save className="h-4 w-4" />
                         Save Response
@@ -883,8 +886,8 @@ export default function GenerateResponse() {
                       </div>
                     </div>
                     
-                    <div className="flex justify-between space-x-3 mt-4">
-                      <div className="flex gap-2">
+                    <div className="flex flex-col sm:flex-row justify-between space-y-2 sm:space-y-0 sm:space-x-3 mt-4">
+                      <div className="flex flex-wrap gap-2">
                         {similarResponses.length > 0 && (
                           <Button 
                             onClick={toggleSimilarResponses}
@@ -892,7 +895,8 @@ export default function GenerateResponse() {
                             className="flex items-center gap-2"
                           >
                             <RefreshCw className="h-4 w-4" />
-                            {showSimilarResponses ? "Hide Similar Responses" : "Show Similar Responses"}
+                            <span className="hidden sm:inline">{showSimilarResponses ? "Hide Similar Responses" : "Show Similar Responses"}</span>
+                            <span className="sm:hidden">{showSimilarResponses ? "Hide References" : "Show References"}</span>
                           </Button>
                         )}
                       </div>
@@ -900,7 +904,7 @@ export default function GenerateResponse() {
                       <Button 
                         onClick={handleSaveResponse}
                         disabled={!responseText}
-                        className="flex items-center gap-2"
+                        className="flex items-center gap-2 sm:mt-0"
                       >
                         <Save className="h-4 w-4" />
                         Save Response
