@@ -307,7 +307,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Extract data from the uploaded Excel file
       const excelData = req.body.data;
       const replaceExisting = req.body.replaceExisting === true;
-      const username = req.body.username || "default_user"; // Get username from request or use default
       
       if (!excelData || !Array.isArray(excelData)) {
         return res.status(400).json({ message: "Invalid Excel data format. Expected an array." });
@@ -317,8 +316,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const requirements = excelData.map(row => ({
         category: row.category || "Uncategorized",
         requirement: row.requirement || row.text || row.content || "",
-        finalResponse: "",  // Initially empty
-        username: username  // Add username to each record
+        finalResponse: ""  // Initially empty
         // timestamp is set by defaultNow() in the schema
       }));
       

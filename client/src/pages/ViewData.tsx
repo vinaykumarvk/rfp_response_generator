@@ -11,15 +11,6 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import ReferencePanel from '@/components/ReferencePanel';
 import { ExcelRequirementResponse } from '@shared/schema';
 
-// Helper function to safely format dates
-const formatDate = (dateString: string): string => {
-  try {
-    return format(new Date(dateString), 'MMM d, yyyy HH:mm');
-  } catch (e) {
-    return String(dateString);
-  }
-};
-
 export default function ViewData() {
   const [showResponseDialog, setShowResponseDialog] = useState(false);
   const [selectedResponse, setSelectedResponse] = useState<ExcelRequirementResponse | null>(null);
@@ -98,18 +89,17 @@ export default function ViewData() {
                           <div className="text-sm text-slate-400 dark:text-slate-500 italic mb-4">No response generated yet</div>
                         )}
                         
-                        <div className="text-xs text-slate-500 dark:text-slate-400 mb-3 mt-auto">
-                          {row.username && (
-                            <div className="mb-1">
-                              Uploaded by: <span className="font-medium">{row.username}</span>
-                            </div>
-                          )}
-                          {row.timestamp && (
-                            <div>
-                              Generated: {formatDate(row.timestamp)}
-                            </div>
-                          )}
-                        </div>
+                        {row.timestamp && (
+                          <div className="text-xs text-slate-500 dark:text-slate-400 mb-3 mt-auto">
+                            Generated: {(() => {
+                              try {
+                                return format(new Date(row.timestamp), 'MMM d, yyyy HH:mm');
+                              } catch (e) {
+                                return row.timestamp;
+                              }
+                            })()}
+                          </div>
+                        )}
                         
                         <div className="flex justify-end mt-2">
                           <Button 
@@ -161,13 +151,6 @@ export default function ViewData() {
                 <h4 className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-1">Requirement:</h4>
                 <p className="text-slate-800 dark:text-slate-200">{selectedResponse.requirement}</p>
               </div>
-              
-              {selectedResponse.username && (
-                <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-md mb-4">
-                  <h4 className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-1">Uploaded by:</h4>
-                  <p className="text-slate-800 dark:text-slate-200">{selectedResponse.username}</p>
-                </div>
-              )}
               
               <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                 <TabsList className="grid w-full grid-cols-2 mb-6">

@@ -41,7 +41,6 @@ export default function UploadRequirements() {
   const [excelData, setExcelData] = useState<ExcelRow[]>([]);
   const [showDialog, setShowDialog] = useState(false);
   const [recordsAdded, setRecordsAdded] = useState<number | null>(null);
-  const [username, setUsername] = useState<string>("");
   
   // Reset the form when file upload is successful
   const resetForm = () => {
@@ -158,8 +157,7 @@ export default function UploadRequirements() {
         },
         body: JSON.stringify({ 
           data: parsedData,
-          replaceExisting: replaceExisting,
-          username: username || "default_user" // Include username in the request
+          replaceExisting: replaceExisting 
         })
       });
       
@@ -254,47 +252,30 @@ export default function UploadRequirements() {
                         Upload a file containing requirements data with 'Category' and 'Requirement' columns.
                       </p>
                     </div>
-                    <div className="mt-2 space-y-4">
-                      {/* Username Input */}
-                      <div className="flex justify-center">
-                        <div className="w-full max-w-xs">
-                          <Input
-                            id="username"
-                            type="text"
-                            placeholder="Enter your username"
-                            value={username}
-                            onChange={(e) => setUsername(e.target.value)}
-                            className="w-full"
-                          />
-                        </div>
-                      </div>
-                      
-                      {/* File Upload Controls */}
-                      <div>
-                        <Input
-                          id="file-upload"
-                          type="file"
-                          accept=".xlsx,.xls"
-                          onChange={handleFileChange}
-                          className="hidden"
-                        />
-                        <label htmlFor="file-upload">
-                          <Button type="button" variant="outline" className="cursor-pointer" asChild>
-                            <span>
-                              <FileText className="mr-2 h-4 w-4" />
-                              Select File
-                            </span>
-                          </Button>
-                        </label>
-                        <Button
-                          type="button"
-                          onClick={handleUpload}
-                          disabled={!file || isUploading}
-                          className="ml-3"
-                        >
-                          {isUploading ? "Processing..." : "Process File"}
+                    <div className="mt-2">
+                      <Input
+                        id="file-upload"
+                        type="file"
+                        accept=".xlsx,.xls"
+                        onChange={handleFileChange}
+                        className="hidden"
+                      />
+                      <label htmlFor="file-upload">
+                        <Button type="button" variant="outline" className="cursor-pointer" asChild>
+                          <span>
+                            <FileText className="mr-2 h-4 w-4" />
+                            Select File
+                          </span>
                         </Button>
-                      </div>
+                      </label>
+                      <Button
+                        type="button"
+                        onClick={handleUpload}
+                        disabled={!file || isUploading}
+                        className="ml-3"
+                      >
+                        {isUploading ? "Processing..." : "Process File"}
+                      </Button>
                     </div>
                     <div className="text-sm">
                       {file && (
