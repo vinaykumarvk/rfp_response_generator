@@ -10,6 +10,7 @@ import {
 import { fromZodError } from "zod-validation-error";
 import { spawn } from "child_process";
 import * as path from "path";
+import * as fs from "fs";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // API routes - prefix with /api
@@ -600,6 +601,204 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(500).json({ 
         message: "Failed to generate response",
         error: error instanceof Error ? error.message : "Unknown error" 
+      });
+    }
+  });
+
+  // Add extended echo endpoint for testing that also handles file operations
+  app.post("/api/echo", async (req: Request, res: Response) => {
+    try {
+      const { action } = req.body;
+      
+      if (action === 'create_temp_file') {
+        const { filename, content } = req.body;
+        if (!filename || !content) {
+          return res.status(400).json({ success: false, error: 'Missing filename or content' });
+        }
+        
+        const tempFilePath = path.join(process.cwd(), 'server', 'temp_files', filename);
+        fs.writeFileSync(tempFilePath, content);
+        
+        return res.json({
+          success: true,
+          message: `File ${filename} created successfully`
+        });
+      }
+      
+      if (action === 'execute_python') {
+        const { filename } = req.body;
+        if (!filename) {
+          return res.status(400).json({ success: false, error: 'Missing filename' });
+        }
+        
+        const tempFilePath = path.join(process.cwd(), 'server', 'temp_files', filename);
+        
+        if (!fs.existsSync(tempFilePath)) {
+          return res.status(404).json({ success: false, error: `File ${filename} not found` });
+        }
+        
+        // Execute the Python file and return its output
+        const pythonProcess = spawn('python3', [tempFilePath]);
+        
+        let stdout = '';
+        let stderr = '';
+        
+        pythonProcess.stdout.on('data', (data) => {
+          stdout += data.toString();
+        });
+        
+        pythonProcess.stderr.on('data', (data) => {
+          stderr += data.toString();
+        });
+        
+        return new Promise<void>((resolve) => {
+          pythonProcess.on('close', (code) => {
+            if (code !== 0) {
+              res.status(500).json({
+                success: false,
+                error: stderr || `Python process exited with code ${code}`,
+                stdout,
+                stderr
+              });
+              resolve();
+              return;
+            }
+            
+            try {
+              // Try to parse the output as JSON
+              const result = JSON.parse(stdout);
+              res.json(result);
+            } catch (e) {
+              // If not valid JSON, return the raw output
+              res.json({
+                success: true,
+                output: stdout,
+                error: stderr
+              });
+            }
+            resolve();
+          });
+        });
+      }
+      
+      if (action === 'delete_temp_file') {
+        const { filename } = req.body;
+        if (!filename) {
+          return res.status(400).json({ success: false, error: 'Missing filename' });
+        }
+        
+        const tempFilePath = path.join(process.cwd(), 'server', 'temp_files', filename);
+        
+        if (fs.existsSync(tempFilePath)) {
+          fs.unlinkSync(tempFilePath);
+        }
+        
+        return res.json({
+          success: true,
+          message: `File ${filename} deleted successfully`
+        });
+      }
+      
+      // Default echo behavior if no action specified
+      res.json({
+        success: true,
+        message: "Echo endpoint is working",
+        receivedData: req.body
+      });
+    } catch (error) {
+      console.error("Error in echo endpoint:", error);
+      res.status(500).json({ 
+        success: false, 
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
+
+  // Add a simple API test endpoint
+  app.post("/api/simple-test", async (req: Request, res: Response) => {
+    try {
+      const { provider = "openai" } = req.body;
+      
+      // Use the simplified Python test module
+      const scriptPath = path.resolve(process.cwd(), 'server/api_test.py');
+      
+      if (!fs.existsSync(scriptPath)) {
+        return res.status(500).json({
+          success: false,
+          error: `Test script not found at: ${scriptPath}`
+        });
+      }
+      
+      // Spawn a process with a timeout
+      const pythonProcess = spawn('python3', [scriptPath, provider]);
+      
+      let stdout = '';
+      let stderr = '';
+      
+      // Collect stdout
+      pythonProcess.stdout.on('data', (data) => {
+        stdout += data.toString();
+      });
+      
+      // Collect stderr
+      pythonProcess.stderr.on('data', (data) => {
+        stderr += data.toString();
+      });
+      
+      // Set a timeout
+      const timeoutMs = 15000; // 15 seconds
+      const timeout = setTimeout(() => {
+        console.error(`API test timed out after ${timeoutMs}ms`);
+        pythonProcess.kill();
+      }, timeoutMs);
+      
+      // Return a promise that resolves when the process completes
+      return new Promise<void>((resolve) => {
+        pythonProcess.on('close', (code) => {
+          clearTimeout(timeout);
+          
+          if (code !== 0) {
+            return res.status(500).json({
+              success: false,
+              error: stderr || `Python process exited with code ${code}`,
+              stdout,
+              stderr
+            });
+          }
+          
+          try {
+            // Try to parse JSON output
+            const result = JSON.parse(stdout);
+            res.json(result);
+          } catch (e) {
+            // If parsing fails, send raw output
+            res.status(500).json({
+              success: false,
+              error: `Failed to parse script output: ${e instanceof Error ? e.message : String(e)}`,
+              stdout,
+              stderr
+            });
+          }
+          
+          resolve();
+        });
+        
+        // Handle process errors
+        pythonProcess.on('error', (error) => {
+          clearTimeout(timeout);
+          console.error(`Failed to start API test process: ${error}`);
+          res.status(500).json({
+            success: false,
+            error: `Failed to start Python process: ${error.message}`
+          });
+          resolve();
+        });
+      });
+    } catch (error) {
+      console.error("Error in simple-test endpoint:", error);
+      return res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : String(error)
       });
     }
   });

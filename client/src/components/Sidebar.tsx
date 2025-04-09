@@ -60,6 +60,12 @@ export default function Sidebar() {
       icon: <Terminal className="h-5 w-5" />,
       path: '/llm-test',
       active: location === '/llm-test'
+    },
+    {
+      title: 'API Test',
+      icon: <Terminal className="h-5 w-5" />,
+      path: '/simple-api-test',
+      active: location === '/simple-api-test'
     }
   ];
 
