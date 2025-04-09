@@ -21,7 +21,7 @@ export default function SimpleApiTest() {
     setResults(null);
     
     try {
-      const response = await fetch('/api/simple-test', {
+      const response = await fetch('http://localhost:5000/api/simple-test', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
