@@ -193,7 +193,7 @@ export default function LlmResponseViewer() {
 
   return (
     <div className="container mx-auto py-8 px-4">
-      <h1 className="text-2xl font-bold mb-6">LLM Response Viewer</h1>
+      <h1 className="text-2xl font-bold mb-6 bg-gradient-to-r from-primary to-primary/70 text-transparent bg-clip-text">Standalone Response</h1>
       
       <Card className="mb-8">
         <CardHeader>

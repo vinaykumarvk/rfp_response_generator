@@ -38,7 +38,7 @@ export default function Sidebar() {
       active: location === '/'
     },
     {
-      title: 'View Uploaded Data',
+      title: 'View Requirements',
       icon: <FileText className="h-5 w-5" />,
       path: '/view-data',
       active: location === '/view-data'
@@ -50,25 +50,7 @@ export default function Sidebar() {
       active: location === '/generate-response'
     },
     {
-      title: 'Generated Responses',
-      icon: <BookOpen className="h-5 w-5" />,
-      path: '/generated-responses',
-      active: location === '/generated-responses'
-    },
-    {
-      title: 'LLM Test',
-      icon: <Terminal className="h-5 w-5" />,
-      path: '/llm-test',
-      active: location === '/llm-test'
-    },
-    {
-      title: 'API Test',
-      icon: <Terminal className="h-5 w-5" />,
-      path: '/simple-api-test',
-      active: location === '/simple-api-test'
-    },
-    {
-      title: 'LLM Response Viewer',
+      title: 'Standalone Response',
       icon: <BookOpen className="h-5 w-5" />,
       path: '/llm-response-viewer',
       active: location === '/llm-response-viewer'
