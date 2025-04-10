@@ -48,18 +48,6 @@ export default function Sidebar() {
       icon: <BookOpen className="h-5 w-5" />,
       path: '/llm-response-viewer',
       active: location === '/llm-response-viewer'
-    },
-    {
-      title: 'Test Cancel Button',
-      icon: <Terminal className="h-5 w-5" />,
-      path: '/test-cancel-button',
-      active: location === '/test-cancel-button'
-    },
-    {
-      title: 'Test AbortController',
-      icon: <Terminal className="h-5 w-5" />,
-      path: '/test-abort-controller',
-      active: location === '/test-abort-controller'
     }
   ];
 

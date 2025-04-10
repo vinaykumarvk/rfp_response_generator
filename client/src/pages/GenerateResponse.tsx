@@ -71,7 +71,6 @@ export default function GenerateResponse() {
   const [reprocessModelProvider, setReprocessModelProvider] = useState<string>("openai");
   const [reprocessUseModelMixture, setReprocessUseModelMixture] = useState<boolean>(true);
   const [reprocessing, setReprocessing] = useState(false);
-  const [isCanceled, setIsCanceled] = useState(false); // Track if generation has been canceled
   const { toast } = useToast();
 
   useEffect(() => {
@@ -321,31 +320,6 @@ export default function GenerateResponse() {
     }
   };
   
-  // Handle canceling the generation process
-  const handleCancelGeneration = () => {
-    // Instead of just updating state, create a more visible cancellation feedback
-    setIsCanceled(true);
-    
-    // Update UI to reflect cancellation is in progress
-    // We keep the progress visible with a cancellation message
-    toast({
-      title: "Canceling generation...",
-      description: "Stopping the process. Any in-progress requests will complete before stopping.",
-      variant: "default"
-    });
-    
-    // After a short delay, show a follow-up toast to confirm cancellation
-    setTimeout(() => {
-      if (document.hasFocus()) { // Only show if the user hasn't navigated away
-        toast({
-          title: "Ready to start again",
-          description: "You can now generate new responses.",
-          variant: "default"
-        });
-      }
-    }, 1500);
-  };
-  
   // Generate responses for multiple selected requirements
   const handleBatchGenerate = async () => {
     if (selectedRequirementIds.size === 0) {
@@ -359,7 +333,6 @@ export default function GenerateResponse() {
     
     setBatchGenerating(true);
     setErrorMessage(null);
-    setIsCanceled(false); // Reset cancel state
     
     // Initialize progress tracking
     const selectedIds = Array.from(selectedRequirementIds);
@@ -377,23 +350,6 @@ export default function GenerateResponse() {
       let failCount = 0;
       
       for (let i = 0; i < selectedIds.length; i++) {
-        // Check if user has canceled the operation
-        if (isCanceled) {
-          // Exit the loop if canceled
-          toast({
-            title: "Generation canceled",
-            description: `Processed ${i} of ${selectedIds.length} requirements before cancellation.`,
-            variant: "default"
-          });
-          // Set final state for progress
-          setBatchGenerating(false);
-          setMoaPhase(null);
-          setMoaPhaseProgress(0);
-          setCurrentModelFetching(null);
-          setIsCanceled(false);
-          return; // Exit the function completely
-        }
-
         const id = selectedIds[i];
         const requirement = requirements.find(r => r.id === id);
         
@@ -407,11 +363,6 @@ export default function GenerateResponse() {
         
         try {
           // If using MOA, we need to handle the two-phase process
-          // Check again if user has canceled before starting a new model request
-          if (isCanceled) {
-            break; // Skip to the next requirement or exit the loop
-          }
-            
           if (useModelMixture) {
             // Phase 1: Collect responses from all models
             setMoaPhase(1);
@@ -419,9 +370,6 @@ export default function GenerateResponse() {
             // Start with OpenAI
             setCurrentModelFetching("OpenAI");
             setMoaPhaseProgress(0);
-            
-            // Check for cancellation before starting request
-            if (isCanceled) break;
             
             const phase1Response = await fetch("/api/generate-response", {
               method: "POST",
@@ -466,19 +414,8 @@ export default function GenerateResponse() {
               setMoaPhase(2);
               setMoaPhaseProgress(0);
               
-              // Check for cancellation before starting Phase 2
-              if (isCanceled) {
-                break;
-              }
-              
               // Show incremental progress in synthesis phase
               const progressInterval = setInterval(() => {
-                // Check for cancellation during the progress animation
-                if (isCanceled) {
-                  clearInterval(progressInterval);
-                  return;
-                }
-                
                 setMoaPhaseProgress(prev => {
                   if (prev >= 90) {
                     clearInterval(progressInterval);
@@ -488,98 +425,53 @@ export default function GenerateResponse() {
                 });
               }, 400);
               
-              // Final check before making Phase 2 request
-              if (isCanceled) {
-                clearInterval(progressInterval);
-                break;
+              const phase2Response = await fetch("/api/generate-response", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  requirement: requirement.requirement,
+                  provider: "moa",
+                  requirementId: requirement.id,
+                  phase: 2,
+                  modelResponses: phase1Result.modelResponses
+                })
+              });
+              
+              if (!phase2Response.ok) {
+                throw new Error("Failed to synthesize responses in Phase 2");
               }
               
-              // Use AbortController to allow cancelling fetch requests
-              const abortController = new AbortController();
+              const phase2Result = await phase2Response.json();
               
-              // Create a cancellation checker that runs frequently
-              const cancellationChecker = setInterval(() => {
-                if (isCanceled) {
-                  console.log("Cancellation detected during API request - aborting");
-                  abortController.abort();
-                  clearInterval(cancellationChecker);
-                }
-              }, 100);
-              
-              let phase2Response;
-              try {
-                phase2Response = await fetch("/api/generate-response", {
-                  method: "POST",
-                  headers: {
-                    "Content-Type": "application/json",
-                  },
-                  body: JSON.stringify({
-                    requirement: requirement.requirement,
-                    provider: "moa",
-                    requirementId: requirement.id,
-                    phase: 2,
-                    modelResponses: phase1Result.modelResponses
-                  }),
-                  signal: abortController.signal
-                });
-                
-                // Clear the cancellation checker since fetch completed
-                clearInterval(cancellationChecker);
-                
-                // Check again if we were canceled during the fetch
-                if (isCanceled) {
-                  console.log("Cancellation detected after API request completed");
-                  break;
-                }
-              
-                if (!phase2Response.ok) {
-                  throw new Error("Failed to synthesize responses in Phase 2");
-                }
-                
-                const phase2Result = await phase2Response.json();
-                
-                if (phase2Result.error) {
-                  throw new Error(phase2Result.error);
-                }
-                
-                // Clear the interval and set progress to 100%
-                clearInterval(progressInterval);
-                setMoaPhaseProgress(100);
-                
-                // Update the requirements list with the new response
-                setRequirements(prev => prev.map(req => 
-                  req.id === requirement.id ? { 
-                    ...req, 
-                    finalResponse: phase2Result.generated_response || phase2Result.moa_response,
-                    openaiResponse: phase1Result.modelResponses?.openaiResponse || req.openaiResponse,
-                    anthropicResponse: phase1Result.modelResponses?.anthropicResponse || req.anthropicResponse,
-                    deepseekResponse: phase1Result.modelResponses?.deepseekResponse || req.deepseekResponse,
-                    moaResponse: phase2Result.moa_response
-                  } : req
-                ));
-                
-                successCount++;
-                
-                // Clear the interval and set progress to 100%
-                clearInterval(progressInterval);
-                setMoaPhaseProgress(100);
-              } catch (error) {
-                console.error("Error in Phase 2:", error);
-                failCount++;
-                
-                // Clear the interval even if error occurs
-                clearInterval(progressInterval);
-                setMoaPhaseProgress(100);
+              if (phase2Result.error) {
+                throw new Error(phase2Result.error);
               }
+              
+              // Clear the interval and set progress to 100%
+              clearInterval(progressInterval);
+              setMoaPhaseProgress(100);
+              
+              // Update the requirements list with the new response
+              setRequirements(prev => prev.map(req => 
+                req.id === requirement.id ? { 
+                  ...req, 
+                  finalResponse: phase2Result.generated_response || phase2Result.moa_response,
+                  openaiResponse: phase1Result.modelResponses?.openaiResponse || req.openaiResponse,
+                  anthropicResponse: phase1Result.modelResponses?.anthropicResponse || req.anthropicResponse,
+                  deepseekResponse: phase1Result.modelResponses?.deepseekResponse || req.deepseekResponse,
+                  moaResponse: phase2Result.moa_response
+                } : req
+              ));
+              
+              successCount++;
             } else {
               // If synthesis isn't ready, consider it a failure
               failCount++;
             }
           } else {
             // Standard single-model processing
-            // Check for cancellation before making request
-            if (isCanceled) break;
-            
             const response = await fetch("/api/generate-response", {
               method: "POST",
               headers: {
@@ -668,7 +560,6 @@ export default function GenerateResponse() {
       setMoaPhase(null);
       setMoaPhaseProgress(0);
       setCurrentModelFetching(null);
-      setIsCanceled(false);
     }
   };
   
@@ -1014,19 +905,9 @@ export default function GenerateResponse() {
                       {/* Overall progress */}
                       <div className="flex justify-between text-sm text-slate-500">
                         <span>Processing: {processedCount} of {totalToProcess}</span>
-                        <div className="flex items-center gap-2">
-                          <span>{progressValue}%</span>
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
-                            onClick={handleCancelGeneration} 
-                            className="h-6 px-2 text-xs text-red-500 hover:text-red-700 border-red-200 hover:border-red-300"
-                          >
-                            Cancel
-                          </Button>
-                        </div>
+                        <span>{progressValue}%</span>
                       </div>
-                      <Progress value={progressValue} animated={true} className="h-2" />
+                      <Progress value={progressValue} className="h-2" />
                       
                       {/* MOA phase-specific progress */}
                       {useModelMixture && moaPhase && (
@@ -1036,7 +917,7 @@ export default function GenerateResponse() {
                             <span>{moaPhaseProgress}%</span>
                           </div>
                           
-                          <Progress value={moaPhaseProgress} animated={true} className="h-2 mb-3" />
+                          <Progress value={moaPhaseProgress} className="h-2 mb-3" />
                           
                           {moaPhase === 1 && (
                             <div className="grid grid-cols-3 gap-2 mt-2">
