@@ -13,6 +13,14 @@ import { fromZodError } from "zod-validation-error";
 import { spawn } from "child_process";
 import * as path from "path";
 import * as fs from "fs";
+import { fileURLToPath } from "url";
+import { dirname } from "path";
+
+// Helper function for getting the directory path in ES modules
+const getDirPath = () => {
+  const currentFilePath = fileURLToPath(import.meta.url);
+  return dirname(currentFilePath);
+};
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // API routes - prefix with /api
@@ -530,7 +538,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Use Python script to generate response
-      const scriptPath = path.join(__dirname, 'rfp_response_generator.py');
+      const scriptPath = path.join(getDirPath(), 'rfp_response_generator.py');
       
       return new Promise<void>((resolve, reject) => {
         // Spawn Python process
@@ -656,7 +664,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 
                 try {
                   // Instead of returning the response, we'll trigger Phase 2 immediately
-                  const scriptPath = path.join(__dirname, 'moa_synthesis.py');
+                  const scriptPath = path.join(getDirPath(), 'moa_synthesis.py');
                   
                   // Create a temporary synthesis input file
                   const synthInput = {
@@ -669,7 +677,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     requirement_id: requirementId
                   };
                   
-                  const tempFilePath = path.join(__dirname, `temp_files/moa_synthesis_${Date.now()}.json`);
+                  const tempFilePath = path.join(getDirPath(), `temp_files/moa_synthesis_${Date.now()}.json`);
                   fs.mkdirSync(path.dirname(tempFilePath), { recursive: true });
                   fs.writeFileSync(tempFilePath, JSON.stringify(synthInput, null, 2));
                   
