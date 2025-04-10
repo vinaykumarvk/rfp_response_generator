@@ -366,6 +366,8 @@ export default function GenerateResponse() {
           if (useModelMixture) {
             // Phase 1: Collect responses from all models
             setMoaPhase(1);
+            
+            // Start with OpenAI
             setCurrentModelFetching("OpenAI");
             setMoaPhaseProgress(0);
             
@@ -392,6 +394,16 @@ export default function GenerateResponse() {
               throw new Error(phase1Result.error);
             }
             
+            // Simulate progress through different models in Phase 1
+            // In a real implementation, the backend would provide this information
+            setMoaPhaseProgress(33);
+            setCurrentModelFetching("Anthropic");
+            await new Promise(resolve => setTimeout(resolve, 500)); // Small delay to show UI update
+            
+            setMoaPhaseProgress(66);
+            setCurrentModelFetching("Deepseek");
+            await new Promise(resolve => setTimeout(resolve, 500)); // Small delay to show UI update
+            
             // Check if phase 1 completed successfully and synthesis is ready
             if (phase1Result.phase === 1 && phase1Result.synthesisReady) {
               // Update MOA phase progress
@@ -401,6 +413,17 @@ export default function GenerateResponse() {
               // Phase 2: Synthesize responses
               setMoaPhase(2);
               setMoaPhaseProgress(0);
+              
+              // Show incremental progress in synthesis phase
+              const progressInterval = setInterval(() => {
+                setMoaPhaseProgress(prev => {
+                  if (prev >= 90) {
+                    clearInterval(progressInterval);
+                    return prev;
+                  }
+                  return prev + 10;
+                });
+              }, 400);
               
               const phase2Response = await fetch("/api/generate-response", {
                 method: "POST",
@@ -425,6 +448,10 @@ export default function GenerateResponse() {
               if (phase2Result.error) {
                 throw new Error(phase2Result.error);
               }
+              
+              // Clear the interval and set progress to 100%
+              clearInterval(progressInterval);
+              setMoaPhaseProgress(100);
               
               // Update the requirements list with the new response
               setRequirements(prev => prev.map(req => 
@@ -875,11 +902,64 @@ export default function GenerateResponse() {
                   {/* Progress bar for batch generation */}
                   {batchGenerating && (
                     <div className="space-y-2 mt-4">
+                      {/* Overall progress */}
                       <div className="flex justify-between text-sm text-slate-500">
                         <span>Processing: {processedCount} of {totalToProcess}</span>
                         <span>{progressValue}%</span>
                       </div>
                       <Progress value={progressValue} className="h-2" />
+                      
+                      {/* MOA phase-specific progress */}
+                      {useModelMixture && moaPhase && (
+                        <div className="mt-4 border border-slate-200 rounded-md p-3 bg-slate-50">
+                          <div className="flex justify-between text-sm font-medium mb-1">
+                            <span>MOA Phase {moaPhase}: {moaPhase === 1 ? "Collecting Responses" : "Synthesizing"}</span>
+                            <span>{moaPhaseProgress}%</span>
+                          </div>
+                          
+                          <Progress value={moaPhaseProgress} className="h-2 mb-3" />
+                          
+                          {moaPhase === 1 && (
+                            <div className="grid grid-cols-3 gap-2 mt-2">
+                              <div className={`text-xs py-1 px-2 rounded-md flex items-center justify-center ${
+                                currentModelFetching === "OpenAI" ? "bg-blue-100 text-blue-800" : "bg-slate-100"
+                              }`}>
+                                <div className={`w-2 h-2 rounded-full mr-1 ${
+                                  currentModelFetching === "OpenAI" ? "bg-blue-500 animate-pulse" : "bg-slate-300"
+                                }`}></div>
+                                OpenAI
+                              </div>
+                              <div className={`text-xs py-1 px-2 rounded-md flex items-center justify-center ${
+                                currentModelFetching === "Anthropic" ? "bg-purple-100 text-purple-800" : "bg-slate-100"
+                              }`}>
+                                <div className={`w-2 h-2 rounded-full mr-1 ${
+                                  currentModelFetching === "Anthropic" ? "bg-purple-500 animate-pulse" : "bg-slate-300"
+                                }`}></div>
+                                Anthropic
+                              </div>
+                              <div className={`text-xs py-1 px-2 rounded-md flex items-center justify-center ${
+                                currentModelFetching === "Deepseek" ? "bg-green-100 text-green-800" : "bg-slate-100"
+                              }`}>
+                                <div className={`w-2 h-2 rounded-full mr-1 ${
+                                  currentModelFetching === "Deepseek" ? "bg-green-500 animate-pulse" : "bg-slate-300"
+                                }`}></div>
+                                Deepseek
+                              </div>
+                            </div>
+                          )}
+                          
+                          {moaPhase === 2 && (
+                            <div className={`text-xs py-1 px-2 rounded-md flex items-center justify-center ${
+                              currentModelFetching === "Synthesis" ? "bg-amber-100 text-amber-800" : "bg-slate-100"
+                            }`}>
+                              <div className={`w-2 h-2 rounded-full mr-1 ${
+                                currentModelFetching === "Synthesis" ? "bg-amber-500 animate-pulse" : "bg-slate-300"
+                              }`}></div>
+                              Synthesizing with OpenAI
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
