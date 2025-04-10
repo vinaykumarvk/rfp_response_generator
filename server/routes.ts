@@ -432,6 +432,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
             // Parse the output as JSON
             const result = JSON.parse(stdout);
             
+            // IMPORTANT FIX: Debug the raw fields from Python to see what model-specific responses exist
+            console.log("===== MODEL-SPECIFIC RESPONSE DEBUG =====");
+            for (const key of Object.keys(result)) {
+              if (typeof result[key] === 'string' && key.includes('_response')) {
+                console.log(`Found Python response field: ${key} (${result[key].length} chars)`);
+              }
+            }
+            // Explicitly check for known model-specific fields
+            console.log("- openai_response:", result.openai_response ? `Present (${result.openai_response.length} chars)` : "Not present");
+            console.log("- anthropic_response:", result.anthropic_response ? `Present (${result.anthropic_response.length} chars)` : "Not present");
+            console.log("- deepseek_response:", result.deepseek_response ? `Present (${result.deepseek_response.length} chars)` : "Not present");
+            console.log("- moa_response:", result.moa_response ? `Present (${result.moa_response.length} chars)` : "Not present");
+            console.log("===== END MODEL-SPECIFIC DEBUG =====");
+            
             // Check if we have a generated response
             // Always ensure we have a generated_response, regardless of whether it came from the AI or not
             if (!result.generated_response || result.generated_response.trim() === '') {

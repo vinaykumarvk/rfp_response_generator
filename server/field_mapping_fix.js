@@ -31,6 +31,16 @@ export function mapPythonResponseToDbFields(pythonOutput, provider) {
     moaResponse: null
   };
   
+  // DEBUG: Show all available fields in pythonOutput
+  console.log("FIELD MAPPING DEBUG - Available keys in pythonOutput:");
+  Object.keys(pythonOutput).forEach(key => {
+    if (typeof pythonOutput[key] === 'string') {
+      console.log(`- ${key}: ${pythonOutput[key].substring(0, 30)}... (${pythonOutput[key].length} chars)`);
+    } else {
+      console.log(`- ${key}: ${JSON.stringify(pythonOutput[key]).substring(0, 30)}...`);
+    }
+  });
+  
   // Default to generated_response for finalResponse if available
   if (pythonOutput.generated_response) {
     mappedFields.finalResponse = pythonOutput.generated_response;
