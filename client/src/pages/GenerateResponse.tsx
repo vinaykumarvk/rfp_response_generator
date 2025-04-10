@@ -323,18 +323,20 @@ export default function GenerateResponse() {
   
   // Handle canceling the generation process
   const handleCancelGeneration = () => {
-    // Instead of just updating state, create a more visible cancellation feedback
+    // Set the canceled flag to tell all processes to stop
     setIsCanceled(true);
     
+    // Log the cancellation for debugging
+    console.log("User requested cancellation of batch generation");
+    
     // Update UI to reflect cancellation is in progress
-    // We keep the progress visible with a cancellation message
     toast({
       title: "Canceling generation...",
-      description: "Stopping the process. Any in-progress requests will complete before stopping.",
+      description: "Stopping the process. This may take a moment to complete...",
       variant: "default"
     });
     
-    // After a short delay, show a follow-up toast to confirm cancellation
+    // After a short delay, show a follow-up toast to confirm cancellation is in progress
     setTimeout(() => {
       if (document.hasFocus()) { // Only show if the user hasn't navigated away
         toast({
@@ -564,23 +566,7 @@ export default function GenerateResponse() {
                 failCount++;
               }
               
-              // Clear the interval and set progress to 100%
-              clearInterval(progressInterval);
-              setMoaPhaseProgress(100);
-              
-              // Update the requirements list with the new response
-              setRequirements(prev => prev.map(req => 
-                req.id === requirement.id ? { 
-                  ...req, 
-                  finalResponse: phase2Result.generated_response || phase2Result.moa_response,
-                  openaiResponse: phase1Result.modelResponses?.openaiResponse || req.openaiResponse,
-                  anthropicResponse: phase1Result.modelResponses?.anthropicResponse || req.anthropicResponse,
-                  deepseekResponse: phase1Result.modelResponses?.deepseekResponse || req.deepseekResponse,
-                  moaResponse: phase2Result.moa_response
-                } : req
-              ));
-              
-              successCount++;
+
             } else {
               // If synthesis isn't ready, consider it a failure
               failCount++;
