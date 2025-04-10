@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,10 +20,10 @@ export default function TestAbortController() {
     message: string;
   } | null>(null);
   
-  // Reference to the abort controller
-  const abortControllerRef = useRef<AbortController | null>(null);
+  // Store controller in state instead of ref
+  const [controller, setController] = useState<AbortController | null>(null);
   
-  // Add a log message
+  // Add a log message with timestamp
   const addLog = (message: string) => {
     setLogs(prev => [...prev, `${new Date().toLocaleTimeString()} - ${message}`]);
   };
@@ -36,110 +36,97 @@ export default function TestAbortController() {
     setLogs([]);
     setTestResult(null);
     
+    // Create new controller and store in state
+    const newController = new AbortController();
+    setController(newController);
+    
     addLog("Starting AbortController test");
+    addLog("Created AbortController");
+    addLog("Starting fetch request with 10 second timeout");
+    
+    // Progress interval
+    const progressInterval = setInterval(() => {
+      setProgress(prev => Math.min(prev + 5, 95));
+    }, 500);
     
     try {
-      // Create a new AbortController
-      const controller = new AbortController();
-      abortControllerRef.current = controller;
+      // Perform fetch with signal
+      const response = await fetch("/api/echo", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: "Test request",
+          sleep: 10000 // 10 seconds delay
+        }),
+        signal: newController.signal
+      });
       
-      addLog("Created AbortController");
+      // Request completed successfully
+      clearInterval(progressInterval);
+      setProgress(100);
+      addLog("Fetch completed successfully");
       
-      // Make a simulated API request that takes a while to complete
-      addLog("Starting fetch request with 10 second timeout");
+      const data = await response.json();
+      addLog(`Response: ${JSON.stringify(data)}`);
       
-      // Show progress
-      const progressInterval = setInterval(() => {
-        setProgress(prev => {
-          if (prev >= 95) {
-            clearInterval(progressInterval);
-            return prev;
-          }
-          return prev + 5;
-        });
-      }, 500);
+      setTestResult({
+        success: true,
+        message: "Request completed without cancellation"
+      });
+    } catch (error: any) {
+      clearInterval(progressInterval);
       
-      try {
-        // Use a dummy endpoint with a long timeout to simulate a long API call
-        const response = await fetch("/api/echo", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            message: "This is a test request with abort controller",
-            sleep: 10000 // 10 seconds timeout
-          }),
-          signal: controller.signal // Connect the AbortController signal to the fetch
-        });
-        
-        // If we get here, the request completed without being cancelled
-        addLog("Fetch request completed successfully");
-        clearInterval(progressInterval);
-        setProgress(100);
-        
-        const data = await response.json();
-        addLog(`Response data: ${JSON.stringify(data)}`);
-        
+      // Check for AbortError
+      if (error.name === "AbortError") {
+        addLog("Request was successfully aborted!");
+        setProgress(0);
         setTestResult({
           success: true,
-          message: "Request completed without cancellation"
+          message: "Request was successfully cancelled"
         });
-      } catch (error) {
-        // This is where we'll end up if the request is aborted
-        clearInterval(progressInterval);
-        
-        if (error instanceof DOMException && error.name === "AbortError") {
-          addLog("Fetch request was successfully aborted");
-          setTestResult({
-            success: true,
-            message: "Request was successfully cancelled with AbortController"
-          });
-        } else {
-          addLog(`Fetch error: ${error}`);
-          setTestResult({
-            success: false,
-            message: `Error during fetch: ${error}`
-          });
-        }
+      } else {
+        addLog(`Error: ${error.message}`);
+        setTestResult({
+          success: false,
+          message: `An error occurred: ${error.message}`
+        });
       }
-    } catch (error) {
-      addLog(`Test error: ${error}`);
-      setTestResult({
-        success: false,
-        message: `Error during test: ${error}`
-      });
     } finally {
       setIsRunning(false);
-      abortControllerRef.current = null;
+      // Don't clear controller here, we'll do it in cancelTest
     }
   };
   
-  // Cancel the running test
+  // Cancel the request
   const cancelTest = () => {
-    if (!abortControllerRef.current) {
-      addLog("No active AbortController to cancel");
+    if (!controller) {
+      addLog("No active controller to cancel");
       return;
     }
     
-    addLog("Cancelling request via AbortController");
-    toast({
-      title: "Cancelling request",
-      description: "Aborting the fetch request",
-      variant: "default"
-    });
+    addLog("Attempting to cancel request...");
     
     try {
-      // This is the key part - calling abort() on the controller
-      // Check that abort method exists and is a function before calling it
-      if (abortControllerRef.current && typeof abortControllerRef.current.abort === 'function') {
-        abortControllerRef.current.abort();
-      } else {
-        addLog("Error: AbortController doesn't have an abort method");
-      }
-    } catch (error) {
-      addLog(`Error aborting request: ${error}`);
-      console.error("Error aborting request:", error);
+      // Simple direct abort call
+      controller.abort();
+      addLog("Abort signal sent successfully");
+      
+      toast({
+        title: "Request cancelled",
+        description: "Cancel signal sent to the API request",
+      });
+    } catch (error: any) {
+      addLog(`Error cancelling: ${error.message}`);
+      console.error("Error during cancellation:", error);
+      
+      toast({
+        title: "Cancellation error",
+        description: `Failed to cancel: ${error.message}`,
+        variant: "destructive"
+      });
+    } finally {
+      // Reset controller after cancellation
+      setController(null);
     }
   };
   
@@ -293,7 +280,7 @@ controller.abort();`}
   const response = await fetch("/api/endpoint", { signal: controller.signal });
   // Process response
 } catch (error) {
-  if (error instanceof DOMException && error.name === "AbortError") {
+  if (error.name === "AbortError") {
     console.log("Fetch was cancelled");
   } else {
     console.error("Other fetch error:", error);
