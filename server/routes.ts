@@ -473,10 +473,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   return res.status(404).json({ message: "Requirement not found" });
                 }
                 
-                // Update only the moaResponse and finalResponse fields
+                // Update the moaResponse, finalResponse, and model_provider fields
                 const updatedResponse = await storage.updateExcelRequirementResponse(Number(requirementId), {
                   moaResponse: result.moa_response || result.generated_response,
-                  finalResponse: result.moa_response || result.generated_response
+                  finalResponse: result.moa_response || result.generated_response,
+                  model_provider: "moa" // Explicitly set the model_provider to "moa"
                 });
                 
                 if (!updatedResponse) {
