@@ -79,7 +79,7 @@ export default function ViewData() {
   
   const uniqueCategories = useMemo(() => {
     const categories = excelData
-      .map(item => item.category)
+      .map(item => item.category || '')
       .filter((value, index, self) => 
         value && self.indexOf(value) === index
       );
