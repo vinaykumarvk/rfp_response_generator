@@ -265,11 +265,24 @@ export class DatabaseStorage implements IStorage {
       console.log("- moaResponse:", response.moaResponse ? `Present (Length: ${response.moaResponse.length})` : "Not present or empty");
       
       // Always update all model-specific responses with whatever values came in
-      // Even if they're null, we need to ensure they get updated
-      updateData.openaiResponse = response.openaiResponse;
-      updateData.anthropicResponse = response.anthropicResponse;
-      updateData.deepseekResponse = response.deepseekResponse;
-      updateData.moaResponse = response.moaResponse;
+      // But check for empty strings which should be stored as null instead
+      
+      // IMPORTANT FIX: Don't save empty strings to database - use null instead
+      updateData.openaiResponse = (response.openaiResponse !== undefined && response.openaiResponse !== null && response.openaiResponse !== '') 
+        ? response.openaiResponse 
+        : null;
+      
+      updateData.anthropicResponse = (response.anthropicResponse !== undefined && response.anthropicResponse !== null && response.anthropicResponse !== '') 
+        ? response.anthropicResponse 
+        : null;
+      
+      updateData.deepseekResponse = (response.deepseekResponse !== undefined && response.deepseekResponse !== null && response.deepseekResponse !== '')
+        ? response.deepseekResponse 
+        : null;
+      
+      updateData.moaResponse = (response.moaResponse !== undefined && response.moaResponse !== null && response.moaResponse !== '')
+        ? response.moaResponse 
+        : null;
       if (response.similarQuestions !== undefined) updateData.similarQuestions = response.similarQuestions;
       
       // Update the existing response
@@ -292,10 +305,25 @@ export class DatabaseStorage implements IStorage {
         finalResponse: response.finalResponse || '',
         modelProvider: response.modelProvider || null,
         rating: response.rating || null,
-        openaiResponse: response.openaiResponse || null,
-        anthropicResponse: response.anthropicResponse || null,
-        deepseekResponse: response.deepseekResponse || null,
-        moaResponse: response.moaResponse || null,
+        
+        // IMPORTANT FIX: Don't replace empty strings with null - this causes the fields to be saved
+        // but with zero length. Instead, preserve null values but keep non-empty strings.
+        openaiResponse: (response.openaiResponse !== undefined && response.openaiResponse !== null && response.openaiResponse !== '') 
+          ? response.openaiResponse 
+          : null,
+        
+        anthropicResponse: (response.anthropicResponse !== undefined && response.anthropicResponse !== null && response.anthropicResponse !== '') 
+          ? response.anthropicResponse 
+          : null,
+        
+        deepseekResponse: (response.deepseekResponse !== undefined && response.deepseekResponse !== null && response.deepseekResponse !== '') 
+          ? response.deepseekResponse 
+          : null,
+        
+        moaResponse: (response.moaResponse !== undefined && response.moaResponse !== null && response.moaResponse !== '') 
+          ? response.moaResponse 
+          : null,
+        
         similarQuestions: response.similarQuestions || ''
       };
       
