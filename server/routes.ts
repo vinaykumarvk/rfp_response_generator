@@ -836,6 +836,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     moaResponse: responseToSave.moaResponse ? `Present (${String(responseToSave.moaResponse).length} chars)` : "Not set"
                   });
                   
+                  // DEBUG: Deep inspection of responseToSave to ensure all fields are correctly typed
+                  console.log("MODEL RESPONSE FIELD DETAILED INSPECTION:");
+                  console.log("- finalResponse type:", typeof responseToSave.finalResponse);
+                  console.log("- openaiResponse type:", typeof responseToSave.openaiResponse);
+                  console.log("- anthropicResponse type:", typeof responseToSave.anthropicResponse);
+                  console.log("- deepseekResponse type:", typeof responseToSave.deepseekResponse);
+                  console.log("- moaResponse type:", typeof responseToSave.moaResponse);
+                  
                   try {
                     // Save the response with references
                     const savedData = await storage.createResponseWithReferences(
