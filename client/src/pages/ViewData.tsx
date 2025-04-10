@@ -622,8 +622,13 @@ export default function ViewData() {
                             {row.finalResponse && (
                               <div className="mt-3 p-3 bg-slate-50 dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700">
                                 <h4 className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Response:</h4>
-                                <div className="text-sm text-slate-700 dark:text-slate-200 line-clamp-3">
-                                  {row.finalResponse}
+                                <div className="text-sm text-slate-700 dark:text-slate-200 line-clamp-3 prose prose-sm max-w-none">
+                                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                    {row.finalResponse
+                                      .replace(/\\n/g, '\n')
+                                      .replace(/\\"/g, '"')
+                                      .replace(/\\\\/g, '\\')}
+                                  </ReactMarkdown>
                                 </div>
                               </div>
                             )}
