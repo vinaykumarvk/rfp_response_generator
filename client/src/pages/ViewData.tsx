@@ -383,12 +383,22 @@ export default function ViewData() {
           <Button 
             size="sm" 
             onClick={handleRefresh}
-            className="h-8 w-8 p-0"
-            variant="ghost"
-            title="Refresh data"
+            className="h-8 px-3"
+            variant="outline"
+            title="Refresh all data from database"
+            disabled={loading}
           >
-            <RefreshCcw className="h-4 w-4" />
-            <span className="sr-only">{loading ? 'Refreshing...' : 'Refresh'}</span>
+            {loading ? (
+              <>
+                <RefreshCcw className="h-4 w-4 mr-1.5 animate-spin" />
+                <span>Refreshing...</span>
+              </>
+            ) : (
+              <>
+                <RefreshCcw className="h-4 w-4 mr-1.5" />
+                <span>Refresh Data</span>
+              </>
+            )}
           </Button>
         </div>
       </div>
@@ -426,16 +436,7 @@ export default function ViewData() {
                     </label>
                   </div>
                   
-                  <Button 
-                    size="sm" 
-                    onClick={handleRefresh}
-                    className="h-9 px-2 sm:px-3 flex gap-1.5 items-center"
-                    variant="outline"
-                    title="Refresh data"
-                  >
-                    <RefreshCcw className="h-4 w-4" />
-                    <span className="hidden sm:inline">Refresh</span>
-                  </Button>
+
 
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
