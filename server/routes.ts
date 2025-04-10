@@ -1057,7 +1057,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     // Metadata
                     // Set current timestamp when a response is generated
                     timestamp: new Date().toISOString(),
-                    modelProvider: provider,
+                    // Make sure the modelProvider is correctly set to "moa" when using MOA approach
+                    modelProvider: provider === "moa" || phase === 2 ? "moa" : provider,
                     
                     // RFP identification fields
                     rfpName: rfpName || existingRequirement?.rfpName || '',
