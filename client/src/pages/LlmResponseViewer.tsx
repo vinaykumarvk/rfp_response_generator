@@ -78,7 +78,7 @@ export default function LlmResponseViewer() {
       setApiResponse(jsonResponse);
     } catch (error: any) {
       console.error('Error:', error);
-      setApiResponse({ error: error?.message || "Unknown error occurred" });
+      setApiResponse({ error: error?.message || String(error) || "Unknown error occurred" });
       toast({
         variant: "destructive",
         title: "Error",

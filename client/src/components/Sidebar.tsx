@@ -66,6 +66,12 @@ export default function Sidebar() {
       icon: <Terminal className="h-5 w-5" />,
       path: '/simple-api-test',
       active: location === '/simple-api-test'
+    },
+    {
+      title: 'LLM Response Viewer',
+      icon: <BookOpen className="h-5 w-5" />,
+      path: '/llm-response-viewer',
+      active: location === '/llm-response-viewer'
     }
   ];
 
