@@ -31,6 +31,8 @@ import {
   Network
 } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useToast } from '@/hooks/use-toast';
+import { Progress } from '@/components/ui/progress';
 import ReferencePanel from '@/components/ReferencePanel';
 import { ExcelRequirementResponse } from '@shared/schema';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -69,6 +71,7 @@ export default function ViewData() {
   });
   
   const isMobile = useIsMobile();
+  const { toast } = useToast();
   
   const { data: excelData = [], isLoading: loading, refetch } = useQuery<ExcelRequirementResponse[]>({
     queryKey: ['/api/excel-requirements'],
@@ -168,29 +171,127 @@ export default function ViewData() {
     setSelectAll(!selectAll);
   };
   
+  const [processingItems, setProcessingItems] = useState<number[]>([]);
+  const [processedCount, setProcessedCount] = useState(0);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generationError, setGenerationError] = useState<string | null>(null);
+  
+  // Function to generate response for a single requirement
+  const generateResponseForRequirement = async (
+    requirementId: number, 
+    modelProvider: 'openai' | 'anthropic' | 'deepseek' | 'moa'
+  ) => {
+    try {
+      // Find the requirement data
+      const requirement = excelData.find(item => item.id === requirementId);
+      
+      if (!requirement) {
+        console.error(`Requirement with ID ${requirementId} not found`);
+        return false;
+      }
+      
+      // Make API call to generate response
+      const response = await fetch('/api/generate-response', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          requirement: requirement.requirement,
+          provider: modelProvider,
+          requirementId: requirementId.toString(),
+          rfpName: requirement.rfpName,
+          uploadedBy: requirement.uploadedBy,
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`API returned ${response.status} ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      
+      if (data.error) {
+        throw new Error(data.error);
+      }
+      
+      console.log(`Response generated for requirement ID ${requirementId} with ${modelProvider}`);
+      return true;
+    } catch (error) {
+      console.error(`Error generating response for requirement ${requirementId}:`, error);
+      setGenerationError(error instanceof Error ? error.message : String(error));
+      return false;
+    }
+  };
+  
+  // Function to handle bulk generation of responses
+  const handleGenerateResponses = async (modelProvider: 'openai' | 'anthropic' | 'deepseek' | 'moa') => {
+    setProcessingItems(selectedItems);
+    setProcessedCount(0);
+    setIsGenerating(true);
+    setGenerationError(null);
+    
+    const totalItems = selectedItems.length;
+    let successCount = 0;
+    
+    try {
+      // Process items sequentially to avoid overloading the API
+      for (let i = 0; i < selectedItems.length; i++) {
+        const requirementId = selectedItems[i];
+        const success = await generateResponseForRequirement(requirementId, modelProvider);
+        
+        if (success) {
+          successCount++;
+        }
+        
+        setProcessedCount(i + 1);
+      }
+      
+      // Refresh data after all items are processed
+      await refetch();
+      
+      toast({
+        title: "Response Generation Complete",
+        description: `Successfully generated responses for ${successCount} out of ${totalItems} requirements.`,
+        variant: successCount === totalItems ? "default" : "destructive",
+      });
+    } catch (error) {
+      console.error('Error in bulk generation:', error);
+      setGenerationError(error instanceof Error ? error.message : String(error));
+      
+      toast({
+        title: "Generation Error",
+        description: `Failed to complete response generation: ${error instanceof Error ? error.message : String(error)}`,
+        variant: "destructive",
+      });
+    } finally {
+      setIsGenerating(false);
+      setProcessingItems([]);
+    }
+  };
+  
   const handleBulkAction = (action: string) => {
     if (selectedItems.length === 0) {
-      alert('Please select at least one item first');
+      toast({
+        title: "No Items Selected",
+        description: "Please select at least one item first",
+        variant: "destructive",
+      });
       return;
     }
     
-    // Demo actions for now - would be connected to API endpoints
     switch (action) {
       case 'generate-openai':
-        console.log('Generate answers with OpenAI for:', selectedItems);
-        alert(`Generate answers with OpenAI for ${selectedItems.length} selected items`);
+        handleGenerateResponses('openai');
         break;
       case 'generate-anthropic':
-        console.log('Generate answers with Anthropic for:', selectedItems);
-        alert(`Generate answers with Anthropic for ${selectedItems.length} selected items`);
+        handleGenerateResponses('anthropic');
         break;
       case 'generate-deepseek':
-        console.log('Generate answers with DeepSeek for:', selectedItems);
-        alert(`Generate answers with DeepSeek for ${selectedItems.length} selected items`);
+        handleGenerateResponses('deepseek');
         break;
       case 'generate-moa':
-        console.log('Generate answers with MOA for:', selectedItems);
-        alert(`Generate answers with MOA (Mixture of Agents) for ${selectedItems.length} selected items`);
+        handleGenerateResponses('moa');
         break;
       case 'print':
         console.log('Print items:', selectedItems);
@@ -398,6 +499,31 @@ export default function ViewData() {
             </div>
           </div>
 
+          {/* Progress indicator for generation */}
+          {isGenerating && (
+            <div className="p-4 border-b border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-900">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center">
+                    <Sparkles className="h-4 w-4 text-blue-500 mr-2" />
+                    <span className="font-medium text-sm">
+                      Generating responses ({processedCount}/{processingItems.length})
+                    </span>
+                  </div>
+                  <span className="text-xs font-medium text-slate-500">
+                    {Math.round((processedCount / processingItems.length) * 100)}%
+                  </span>
+                </div>
+                <Progress value={(processedCount / processingItems.length) * 100} className="h-2" />
+                {generationError && (
+                  <div className="text-xs text-red-500 mt-1">
+                    Error: {generationError}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+          
           <CardContent className="p-4">
             {loading ? (
               <div className="space-y-4">
