@@ -612,20 +612,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   
                   console.log(`Using ${provider} provider - setting corresponding response field`);
                   
+                  // Log the model-specific responses that will be saved
+                  console.log("Model-specific responses prepared for saving:");
+                  console.log("- openaiResponse:", openaiResponse ? "Present (Length: " + openaiResponse.length + ")" : "Not present");
+                  console.log("- anthropicResponse:", anthropicResponse ? "Present (Length: " + anthropicResponse.length + ")" : "Not present");
+                  console.log("- deepseekResponse:", deepseekResponse ? "Present (Length: " + deepseekResponse.length + ")" : "Not present");
+                  console.log("- moaResponse:", moaResponse ? "Present (Length: " + moaResponse.length + ")" : "Not present");
+                  console.log("- finalResponse:", finalResponse ? "Present (Length: " + finalResponse.length + ")" : "Not present");
+                  
+                  // Create the response object with all fields explicitly set
+                  const responseToSave = {
+                    // Core fields
+                    requirement: requirement,
+                    finalResponse: finalResponse,
+                    openaiResponse: openaiResponse,
+                    anthropicResponse: anthropicResponse,
+                    deepseekResponse: deepseekResponse,
+                    category: existingRequirement?.category || '',
+                    timestamp: new Date().toISOString(),
+                    modelProvider: provider,
+                    
+                    // Store MOA response if available
+                    moaResponse: moaResponse,
+                  };
+                  
+                  // Log the entire object being saved
+                  console.log("Full response object prepared for saving:", responseToSave);
+                  
                   const savedData = await storage.createResponseWithReferences(
                     {
-                      // Core fields
-                      requirement: requirement,
-                      finalResponse: finalResponse,
-                      openaiResponse: openaiResponse,
-                      anthropicResponse: anthropicResponse,
-                      deepseekResponse: deepseekResponse,
-                      category: existingRequirement?.category || '',
-                      timestamp: new Date().toISOString(),
-                      modelProvider: provider,
-                      
-                      // Store MOA response if available
-                      moaResponse: moaResponse,
+                      ...responseToSave,
                       
                       // Store similar questions as JSON string if available
                       similarQuestions: result.similar_responses ? JSON.stringify(result.similar_responses) : '',
