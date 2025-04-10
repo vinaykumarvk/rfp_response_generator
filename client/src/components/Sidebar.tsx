@@ -87,60 +87,75 @@ export default function Sidebar() {
     }
   };
 
-  // Render mobile menu overlay
+  // Render mobile menu overlay with improved UX and transitions
   if (isMobile && mobileMenuOpen) {
     return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex">
-        <div className="bg-white dark:bg-slate-800 w-[250px] h-full">
-          <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
+      <div 
+        className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex justify-end"
+        onClick={(e) => {
+          // Close when clicking outside the menu
+          if (e.target === e.currentTarget) {
+            toggleMobileMenu();
+          }
+        }}
+      >
+        <div className="bg-white dark:bg-slate-800 w-full max-w-[300px] h-full shadow-xl animate-in slide-in-from-right">
+          <div className="p-5 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
             <div className="flex items-center">
-              <img src={intellectLogo} alt="intellectAI Logo" className="h-6 w-auto" />
-              <h2 className="ml-2 font-semibold text-slate-800 dark:text-slate-100">RFP Generator</h2>
+              <img src={intellectLogo} alt="intellectAI Logo" className="h-8 w-auto" />
+              <h2 className="ml-3 font-semibold text-slate-800 dark:text-slate-100 text-lg">RFP Generator</h2>
             </div>
             <Button 
               variant="ghost" 
-              size="sm" 
+              size="sm"
+              className="rounded-full h-8 w-8 p-0"
               onClick={toggleMobileMenu}
+              aria-label="Close menu"
             >
               <X className="h-5 w-5" />
             </Button>
           </div>
-          <nav className="flex-1 p-2">
-            <ul className="space-y-1">
+          <nav className="flex-1 p-4 overflow-y-auto">
+            <ul className="space-y-2">
               {navItems.map((item) => (
                 <li key={item.path}>
                   <Link href={item.path}>
                     <span 
                       onClick={handleLinkClick}
                       className={cn(
-                        "flex items-center rounded-md px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer",
+                        "flex items-center rounded-md px-4 py-3 text-sm hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer transition-colors",
                         item.active 
-                          ? "bg-slate-100 dark:bg-slate-700 text-primary font-medium" 
+                          ? "bg-primary/10 dark:bg-primary/20 text-primary font-medium border-l-4 border-primary" 
                           : "text-slate-700 dark:text-slate-200"
                       )}
                     >
-                      <span className="flex-shrink-0 mr-3">
+                      <span className="flex-shrink-0 mr-4">
                         {item.icon}
                       </span>
-                      <span>{item.title}</span>
+                      <span className="font-medium">{item.title}</span>
                     </span>
                   </Link>
                 </li>
               ))}
             </ul>
+            
+            <div className="mt-8 border-t border-slate-200 dark:border-slate-700 pt-4">
+              <div className="text-xs text-slate-500 dark:text-slate-400 mb-2 px-4">Version 0.3</div>
+            </div>
           </nav>
         </div>
       </div>
     );
   }
 
-  // On mobile, show a fixed menu button
+  // On mobile, show a fixed menu button with better positioning and visual feedback
   if (isMobile) {
     return (
-      <div className="fixed bottom-4 left-4 z-40">
+      <div className="fixed bottom-4 right-4 z-40">
         <Button 
           onClick={toggleMobileMenu} 
-          className="rounded-full h-12 w-12 shadow-lg"
+          className="rounded-full h-14 w-14 shadow-lg bg-primary hover:bg-primary/90 transition-all duration-200 flex items-center justify-center"
+          aria-label="Open navigation menu"
         >
           <Menu className="h-6 w-6" />
         </Button>

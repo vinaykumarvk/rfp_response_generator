@@ -22,17 +22,21 @@ function AppLayout({ children }: { children: React.ReactNode }) {
   const isMobile = useIsMobile();
   
   return (
-    <div className="flex flex-col min-h-screen">
+    <div className="flex flex-col min-h-screen bg-slate-50 dark:bg-slate-900">
       <Header />
-      <div className="flex flex-1 overflow-hidden">
-        {/* Only show sidebar on desktop */}
+      <div className="flex flex-1 overflow-hidden relative">
+        {/* Only show fixed sidebar on desktop */}
         {!isMobile && <Sidebar />}
-        <main className="flex-1 overflow-auto bg-slate-50 dark:bg-slate-900 pb-16 md:pb-0">
-          <div className="px-4 py-4 sm:px-6 md:px-8">
+        
+        {/* Main content area with improved padding for different screen sizes */}
+        <main className="flex-1 overflow-auto pb-20 sm:pb-16 md:pb-0 transition-all">
+          <div className="px-4 py-4 sm:px-6 md:px-8 lg:px-10 max-w-7xl mx-auto">
             {children}
           </div>
         </main>
       </div>
+      
+      {/* Improved footer with responsive padding */}
       <Footer />
       
       {/* On mobile, Sidebar component will render a floating menu button */}
