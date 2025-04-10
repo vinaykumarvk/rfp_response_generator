@@ -1436,7 +1436,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/echo", async (req: Request, res: Response) => {
     try {
-      const { action } = req.body;
+      const { action, sleep, message } = req.body;
+      
+      // If sleep is provided, create a delay (useful for testing cancellation)
+      if (sleep && typeof sleep === 'number') {
+        console.log(`Echo endpoint: Sleeping for ${sleep}ms`);
+        await new Promise(resolve => setTimeout(resolve, sleep));
+        console.log(`Echo endpoint: Finished sleeping for ${sleep}ms`);
+      }
+      
+      // If just a message is passed, echo it back (for simple testing)
+      if (message && !action) {
+        return res.json({ 
+          success: true, 
+          message: message, 
+          echo: `Echo: ${message}`,
+          timestamp: new Date().toISOString()
+        });
+      }
       
       if (action === 'create_temp_file') {
         const { filename, content } = req.body;

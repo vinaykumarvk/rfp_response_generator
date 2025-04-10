@@ -54,6 +54,12 @@ export default function Sidebar() {
       icon: <Terminal className="h-5 w-5" />,
       path: '/test-cancel-button',
       active: location === '/test-cancel-button'
+    },
+    {
+      title: 'Test AbortController',
+      icon: <Terminal className="h-5 w-5" />,
+      path: '/test-abort-controller',
+      active: location === '/test-abort-controller'
     }
   ];
 
