@@ -324,9 +324,12 @@ export default function GenerateResponse() {
   // Handle canceling the generation process
   const handleCancelGeneration = () => {
     setIsCanceled(true);
+    // Make sure the progress UI reflects that the operation is being cancelled
+    // We don't reset the batch generating state immediately to keep the progress visible
+    // The loop in handleBatchGenerate will detect this flag and stop processing
     toast({
-      title: "Generation canceled",
-      description: "The response generation process has been canceled.",
+      title: "Canceling generation...",
+      description: "Stopping the generation process. Please wait...",
       variant: "default"
     });
   };
@@ -392,6 +395,11 @@ export default function GenerateResponse() {
         
         try {
           // If using MOA, we need to handle the two-phase process
+          // Check again if user has canceled before starting a new model request
+          if (isCanceled) {
+            break; // Skip to the next requirement or exit the loop
+          }
+            
           if (useModelMixture) {
             // Phase 1: Collect responses from all models
             setMoaPhase(1);
@@ -399,6 +407,9 @@ export default function GenerateResponse() {
             // Start with OpenAI
             setCurrentModelFetching("OpenAI");
             setMoaPhaseProgress(0);
+            
+            // Check for cancellation before starting request
+            if (isCanceled) break;
             
             const phase1Response = await fetch("/api/generate-response", {
               method: "POST",
@@ -443,8 +454,19 @@ export default function GenerateResponse() {
               setMoaPhase(2);
               setMoaPhaseProgress(0);
               
+              // Check for cancellation before starting Phase 2
+              if (isCanceled) {
+                break;
+              }
+              
               // Show incremental progress in synthesis phase
               const progressInterval = setInterval(() => {
+                // Check for cancellation during the progress animation
+                if (isCanceled) {
+                  clearInterval(progressInterval);
+                  return;
+                }
+                
                 setMoaPhaseProgress(prev => {
                   if (prev >= 90) {
                     clearInterval(progressInterval);
@@ -453,6 +475,12 @@ export default function GenerateResponse() {
                   return prev + 10;
                 });
               }, 400);
+              
+              // Final check before making Phase 2 request
+              if (isCanceled) {
+                clearInterval(progressInterval);
+                break;
+              }
               
               const phase2Response = await fetch("/api/generate-response", {
                 method: "POST",
@@ -501,6 +529,9 @@ export default function GenerateResponse() {
             }
           } else {
             // Standard single-model processing
+            // Check for cancellation before making request
+            if (isCanceled) break;
+            
             const response = await fetch("/api/generate-response", {
               method: "POST",
               headers: {
