@@ -996,6 +996,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Add direct test endpoint as a cleaner alternative
+  app.post("/api/test-field-mapping", async (req: Request, res: Response) => {
+    try {
+      // Execute our field mapping test script and return the output
+      const scriptPath = path.resolve(process.cwd(), 'server/test_field_mapping.js');
+      
+      if (!fs.existsSync(scriptPath)) {
+        return res.status(500).json({
+          success: false,
+          error: `Test script not found at: ${scriptPath}`
+        });
+      }
+      
+      const nodeProcess = spawn('node', [scriptPath]);
+      
+      let stdout = '';
+      let stderr = '';
+      
+      nodeProcess.stdout.on('data', (data) => {
+        stdout += data.toString();
+      });
+      
+      nodeProcess.stderr.on('data', (data) => {
+        stderr += data.toString();
+      });
+      
+      nodeProcess.on('close', (code) => {
+        if (code !== 0) {
+          return res.status(500).json({
+            success: false,
+            error: stderr || `Process exited with code ${code}`
+          });
+        }
+        
+        return res.json({
+          success: true,
+          message: "Field mapping test completed successfully",
+          output: stdout
+        });
+      });
+    } catch (error) {
+      console.error("Error testing field mapping:", error);
+      return res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
+
   app.post("/api/direct-test", async (req: Request, res: Response) => {
     try {
       const { provider = "openai" } = req.body;
