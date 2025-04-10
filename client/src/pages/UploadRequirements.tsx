@@ -505,8 +505,8 @@ export default function UploadRequirements() {
                     <TableRow>
                       <TableHead>Category</TableHead>
                       <TableHead>Requirement</TableHead>
-                      <TableHead>Final Response</TableHead>
-                      <TableHead>Rating</TableHead>
+                      <TableHead>RFP Name</TableHead>
+                      <TableHead>Uploaded By</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -514,8 +514,8 @@ export default function UploadRequirements() {
                       <TableRow key={index}>
                         <TableCell>{row.category}</TableCell>
                         <TableCell>{row.requirement}</TableCell>
-                        <TableCell>{row.finalResponse || "—"}</TableCell>
-                        <TableCell>{row.rating !== undefined ? row.rating : "—"}</TableCell>
+                        <TableCell>{rfpName || "—"}</TableCell>
+                        <TableCell>{uploadedBy || "—"}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
