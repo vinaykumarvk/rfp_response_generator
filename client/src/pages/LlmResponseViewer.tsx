@@ -28,6 +28,7 @@ export default function LlmResponseViewer() {
   const [isLoading, setIsLoading] = useState(false);
   const [requirement, setRequirement] = useState("How do you perform portfolio rebalancing?");
   const [apiResponse, setApiResponse] = useState<ApiResponse | null>(null);
+  const [rawOutput, setRawOutput] = useState<string>("");
   const { toast } = useToast();
 
   const handleSubmit = async () => {
@@ -52,6 +53,9 @@ export default function LlmResponseViewer() {
 
       const responseText = await response.text();
       console.log('Raw response:', responseText);
+      
+      // Store the raw response text
+      setRawOutput(responseText);
 
       let jsonResponse;
       try {
@@ -73,6 +77,15 @@ export default function LlmResponseViewer() {
             error: `Failed to parse response: ${responseText.substring(0, 100)}...` 
           };
         }
+      }
+      
+      // Store any raw stdout/stderr if present in the response
+      if (jsonResponse.stdout) {
+        setRawOutput(jsonResponse.stdout);
+      } else if (jsonResponse.raw_stdout) {
+        setRawOutput(jsonResponse.raw_stdout);
+      } else if (jsonResponse.raw) {
+        setRawOutput(jsonResponse.raw);
       }
       
       setApiResponse(jsonResponse);
@@ -185,15 +198,21 @@ export default function LlmResponseViewer() {
           </CardHeader>
           <CardContent>
             <Tabs defaultValue="final" className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
+              <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="final">Final Response</TabsTrigger>
                 <TabsTrigger value="similar">Similar Questions</TabsTrigger>
+                <TabsTrigger value="raw">Raw Output</TabsTrigger>
               </TabsList>
               <TabsContent value="final" className="mt-4 p-4 border rounded-md">
                 {renderFinalResponse()}
               </TabsContent>
               <TabsContent value="similar" className="mt-4">
                 {renderSimilarResponses()}
+              </TabsContent>
+              <TabsContent value="raw" className="mt-4 p-4 border rounded-md">
+                <div className="bg-slate-100 dark:bg-slate-800 p-4 rounded-md overflow-auto">
+                  <pre className="text-xs whitespace-pre-wrap">{rawOutput || "No raw output available"}</pre>
+                </div>
               </TabsContent>
             </Tabs>
           </CardContent>

@@ -1011,6 +1011,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
         
+        // Include the raw stdout in the response
+        responseData.raw_stdout = stdout;
+        
         res.status(200).json(responseData);
       });
       
