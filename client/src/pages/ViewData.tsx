@@ -841,8 +841,8 @@ export default function ViewData() {
                               <Badge 
                                 variant="outline" 
                                 className={`text-[10px] sm:text-xs px-1.5 py-0 ${row.finalResponse 
-                                  ? "bg-green-50 text-green-600 dark:bg-green-900/30 dark:text-green-300 border-green-200 dark:border-green-800" 
-                                  : "bg-slate-50 text-slate-600 dark:bg-slate-900/50 dark:text-slate-300"}`}
+                                  ? "bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-200 border-green-200 dark:border-green-800" 
+                                  : "bg-slate-50 text-slate-700 dark:bg-slate-800 dark:text-slate-200 border-slate-200 dark:border-slate-700"}`}
                               >
                                 {row.finalResponse ? 
                                   <><Check className="h-3 w-3 mr-0.5" /> Generated</> : 
@@ -851,14 +851,14 @@ export default function ViewData() {
                               
                               {/* RFP Badge */}
                               {row.rfpName && (
-                                <Badge variant="outline" className="text-[10px] sm:text-xs bg-blue-50 dark:bg-blue-900/40 text-blue-600 dark:text-blue-300 border-blue-200 dark:border-blue-800">
+                                <Badge variant="outline" className="text-[10px] sm:text-xs bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-200 border-blue-200 dark:border-blue-800">
                                   {row.rfpName}
                                 </Badge>
                               )}
                               
                               {/* Generation mode badge */}
                               {(row.openaiResponse || row.anthropicResponse || row.deepseekResponse || row.moaResponse) && (
-                                <Badge variant="outline" className="text-[10px] sm:text-xs bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-300 border-amber-200 dark:border-amber-800">
+                                <Badge variant="outline" className="text-[10px] sm:text-xs bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-200 border-amber-200 dark:border-amber-800">
                                   {row.moaResponse ? 
                                     <><Network className="h-3 w-3 mr-0.5" /> MOA</> : 
                                     row.openaiResponse ? 'OpenAI' : 
@@ -868,7 +868,7 @@ export default function ViewData() {
                               )}
                               
                               {/* Category display */}
-                              <Badge variant="outline" className="text-[10px] sm:text-xs">
+                              <Badge variant="outline" className="text-[10px] sm:text-xs bg-slate-50 text-slate-700 dark:bg-slate-800 dark:text-slate-200 border-slate-200 dark:border-slate-700">
                                 {row.category}
                               </Badge>
                             </div>
@@ -880,8 +880,8 @@ export default function ViewData() {
                             
                             {/* Response preview for mobile */}
                             {row.finalResponse && (
-                              <div className="mt-2 p-2 sm:p-3 bg-slate-50 dark:bg-slate-800/50 rounded-sm border border-slate-200 dark:border-slate-700">
-                                <div className="text-xs sm:text-sm text-slate-700 dark:text-slate-200 line-clamp-2 prose prose-sm max-w-none">
+                              <div className="mt-2 p-2 sm:p-3 bg-slate-50 dark:bg-slate-800 rounded-sm border border-slate-200 dark:border-slate-700">
+                                <div className="text-xs sm:text-sm text-slate-800 dark:text-slate-100 font-medium line-clamp-2 prose prose-sm max-w-none">
                                   <ReactMarkdown remarkPlugins={[remarkGfm]}>
                                     {row.finalResponse
                                       .replace(/\\n/g, '\n')
@@ -928,8 +928,8 @@ export default function ViewData() {
               </div>
             ) : (
               <div className="p-12 text-center">
-                <p className="text-slate-500 dark:text-slate-400">No data available. Please upload Excel files first.</p>
-                <p className="text-slate-400 dark:text-slate-500 text-sm mt-2">
+                <p className="text-slate-700 dark:text-slate-300 font-medium">No data available. Please upload Excel files first.</p>
+                <p className="text-slate-600 dark:text-slate-400 text-sm mt-2">
                   Go to the Upload Requirements page to add data.
                 </p>
               </div>
@@ -942,8 +942,8 @@ export default function ViewData() {
       <Dialog open={showResponseDialog} onOpenChange={setShowResponseDialog}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Response Details</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="text-slate-900 dark:text-white">Response Details</DialogTitle>
+            <DialogDescription className="text-slate-700 dark:text-slate-300">
               View complete response and reference information
             </DialogDescription>
           </DialogHeader>
@@ -951,13 +951,13 @@ export default function ViewData() {
           {selectedResponse && (
             <div className="space-y-4 py-2">
               <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-md mb-4">
-                <h4 className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-1">Category:</h4>
-                <p className="text-slate-800 dark:text-slate-200">{selectedResponse.category}</p>
+                <h4 className="text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">Category:</h4>
+                <p className="text-slate-900 dark:text-slate-100 font-medium">{selectedResponse.category}</p>
               </div>
               
               <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-md mb-4">
-                <h4 className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-1">Requirement:</h4>
-                <p className="text-slate-800 dark:text-slate-200">{selectedResponse.requirement}</p>
+                <h4 className="text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">Requirement:</h4>
+                <p className="text-slate-900 dark:text-slate-100">{selectedResponse.requirement}</p>
               </div>
               
               <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -974,8 +974,8 @@ export default function ViewData() {
                 
                 <TabsContent value="response">
                   <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-md mb-4">
-                    <h4 className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-2">Response:</h4>
-                    <div className="prose prose-slate dark:prose-invert max-w-none">
+                    <h4 className="text-sm font-medium text-slate-600 dark:text-slate-300 mb-2">Response:</h4>
+                    <div className="prose prose-slate dark:prose-invert max-w-none text-slate-900 dark:text-white">
                       {selectedResponse.finalResponse && (
                         <ReactMarkdown remarkPlugins={[remarkGfm]}>
                           {selectedResponse.finalResponse
