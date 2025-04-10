@@ -892,11 +892,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Missing requirement_text parameter" });
       }
       
-      // Call the Python script to process the requirement
+      // Call the Python script to process the requirement (positional arguments)
       const pythonProcess = spawn("python3", [
         path.join(process.cwd(), "server", "rfp_response_generator.py"),
-        "--requirement", requirement_text,
-        "--model", model_provider
+        requirement_text,
+        model_provider
       ]);
       
       let stdout = "";
