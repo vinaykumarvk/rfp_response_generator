@@ -878,20 +878,6 @@ export default function ViewData() {
                               {row.requirement}
                             </div>
                             
-                            {/* Response preview for mobile */}
-                            {row.finalResponse && (
-                              <div className="mt-2 p-2 sm:p-3 bg-slate-50 dark:bg-slate-800 rounded-sm border border-slate-200 dark:border-slate-700">
-                                <div className="text-xs sm:text-sm text-slate-800 dark:text-slate-100 font-medium line-clamp-2 prose prose-sm max-w-none">
-                                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                                    {row.finalResponse
-                                      .replace(/\\n/g, '\n')
-                                      .replace(/\\"/g, '"')
-                                      .replace(/\\\\/g, '\\')}
-                                  </ReactMarkdown>
-                                </div>
-                              </div>
-                            )}
-                            
                             {/* Footer with timestamp and action buttons */}
                             <div className="flex justify-between items-center mt-3 pt-2 border-t border-slate-100 dark:border-slate-700">
                               {row.timestamp ? (
@@ -973,16 +959,18 @@ export default function ViewData() {
                 </TabsList>
                 
                 <TabsContent value="response">
-                  <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-md mb-4">
-                    <h4 className="text-sm font-medium text-slate-600 dark:text-slate-300 mb-2">Response:</h4>
-                    <div className="prose prose-slate dark:prose-invert max-w-none text-slate-900 dark:text-white">
+                  <div className="p-4 bg-slate-50 dark:bg-slate-900 rounded-md mb-4">
+                    <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-3">Response:</h4>
+                    <div className="prose prose-slate dark:prose-invert max-w-none text-slate-900 dark:text-slate-50 font-medium">
                       {selectedResponse.finalResponse && (
-                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                          {selectedResponse.finalResponse
-                            .replace(/\\n/g, '\n')
-                            .replace(/\\"/g, '"')
-                            .replace(/\\\\/g, '\\')}
-                        </ReactMarkdown>
+                        <div className="bg-white dark:bg-slate-800 p-3 rounded-md border border-slate-200 dark:border-slate-700">
+                          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                            {selectedResponse.finalResponse
+                              .replace(/\\n/g, '\n')
+                              .replace(/\\"/g, '"')
+                              .replace(/\\\\/g, '\\')}
+                          </ReactMarkdown>
+                        </div>
                       )}
                     </div>
                   </div>
