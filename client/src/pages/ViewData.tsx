@@ -137,7 +137,7 @@ export default function ViewData() {
     if (selectAll) {
       setSelectedItems([]);
     } else {
-      setSelectedItems(excelData.map(item => item.id || 0).filter(id => id !== 0));
+      setSelectedItems(filteredData.map(item => item.id || 0).filter(id => id !== 0));
     }
     setSelectAll(!selectAll);
   };
@@ -181,7 +181,12 @@ export default function ViewData() {
         <Card>
           <div className="flex justify-between items-center p-4 border-b border-slate-100 dark:border-slate-700">
             <div className="flex items-center space-x-4">
-              <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-50">Requirements Data</h2>
+              <div>
+                <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-50">Requirements Data</h2>
+                <p className="text-sm text-slate-500 dark:text-slate-400">
+                  {filteredData.length} {filteredData.length === 1 ? 'item' : 'items'} {filteredData.length !== excelData.length ? `(filtered from ${excelData.length})` : ''}
+                </p>
+              </div>
               <div className="flex items-center">
                 <Checkbox 
                   id="select-all" 
@@ -322,9 +327,9 @@ export default function ViewData() {
                 <Skeleton className="h-40 w-full" />
                 <Skeleton className="h-40 w-full" />
               </div>
-            ) : excelData.length > 0 ? (
+            ) : filteredData.length > 0 ? (
               <div className="space-y-4">
-                {excelData.map((row: ExcelRequirementResponse, index: number) => {
+                {filteredData.map((row: ExcelRequirementResponse, index: number) => {
                   const isSelected = row.id ? selectedItems.includes(row.id) : false;
                   return (
                     <Card key={row.id || index} className={`overflow-hidden border ${isSelected ? 'border-blue-400 dark:border-blue-600' : 'border-slate-200 dark:border-slate-700'}`}>
@@ -343,22 +348,19 @@ export default function ViewData() {
                           <div className="flex-1">
                             <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between mb-4">
                               <div>
-                                <div className="font-medium text-slate-800 dark:text-slate-100 mb-1">{row.category}</div>
+                                <div className="flex items-center gap-2">
+                                  <div className="font-medium text-slate-800 dark:text-slate-100">{row.category}</div>
+                                  {row.finalResponse && (
+                                    <span className="inline-flex text-green-600 dark:text-green-400">
+                                      <Check className="h-4 w-4" />
+                                    </span>
+                                  )}
+                                </div>
                                 <div className="text-sm text-slate-600 dark:text-slate-300 mb-3">{row.requirement}</div>
                                 <div className="flex flex-wrap gap-2 mb-3">
                                   {row.rfpName && (
                                     <span className="text-xs bg-blue-50 text-blue-600 dark:bg-blue-900 dark:text-blue-300 px-2 py-1 rounded-full">
                                       RFP: {row.rfpName}
-                                    </span>
-                                  )}
-                                  {row.uploadedBy && (
-                                    <span className="text-xs bg-green-50 text-green-600 dark:bg-green-900 dark:text-green-300 px-2 py-1 rounded-full">
-                                      Uploaded by: {row.uploadedBy}
-                                    </span>
-                                  )}
-                                  {row.rating !== undefined && (
-                                    <span className="text-xs bg-amber-50 text-amber-600 dark:bg-amber-900 dark:text-amber-300 px-2 py-1 rounded-full">
-                                      Rating: {row.rating}/5
                                     </span>
                                   )}
                                 </div>
