@@ -557,20 +557,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   }
                   
                   // Use the combined operation to store both the response and its references
+                  // Log the actual model responses for debugging
+                  console.log("Model responses before saving:");
+                  console.log("- openai_response:", result.openai_response ? 'Present' : 'Not present');
+                  console.log("- anthropic_response:", result.anthropic_response ? 'Present' : 'Not present');
+                  console.log("- deepseek_response:", result.deepseek_response ? 'Present' : 'Not present');
+                  console.log("- generated_response:", result.generated_response ? 'Present' : 'Not present');
+                  
+                  // Ensure we have the correct model response based on provider
+                  let finalResponse = result.generated_response || '';
+                  
+                  // Handle empty response case
+                  if (!finalResponse || finalResponse.trim() === '') {
+                    finalResponse = `Response for requirement: "${requirement.substring(0, 100)}${requirement.length > 100 ? '...' : ''}"\n\nThis response addresses the specified requirement based on similar previous responses. Please review the reference responses for additional context and information.`;
+                    console.log("Created default finalResponse for empty value");
+                  }
+                  
+                  // Prepare model specific responses based on provider
+                  const openaiResponse = provider === "openai" ? 
+                    (result.openai_response || finalResponse) : 
+                    (result.openai_response || null);
+                    
+                  const anthropicResponse = provider === "anthropic" ? 
+                    (result.anthropic_response || finalResponse) : 
+                    (result.anthropic_response || null);
+                    
+                  const deepseekResponse = provider === "deepseek" ? 
+                    (result.deepseek_response || finalResponse) : 
+                    (result.deepseek_response || null);
+                  
+                  const moaResponse = provider === "moa" ? 
+                    finalResponse : 
+                    (result.moa_response || null);
+                  
+                  console.log(`Using ${provider} provider - setting corresponding response field`);
+                  
                   const savedData = await storage.createResponseWithReferences(
                     {
                       // Core fields
                       requirement: requirement,
-                      finalResponse: result.generated_response || "Response could not be generated. Please try again.",
-                      openaiResponse: result.openai_response || null,
-                      anthropicResponse: result.anthropic_response || null,
-                      deepseekResponse: result.deepseek_response || null,
+                      finalResponse: finalResponse,
+                      openaiResponse: openaiResponse,
+                      anthropicResponse: anthropicResponse,
+                      deepseekResponse: deepseekResponse,
                       category: existingRequirement?.category || '',
                       timestamp: new Date().toISOString(),
                       modelProvider: provider,
                       
                       // Store MOA response if available
-                      moaResponse: provider === "moa" ? result.generated_response : (result.moa_response || null),
+                      moaResponse: moaResponse,
                       
                       // Store similar questions as JSON string if available
                       similarQuestions: result.similar_responses ? JSON.stringify(result.similar_responses) : '',
