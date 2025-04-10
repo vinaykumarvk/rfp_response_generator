@@ -725,11 +725,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
                       }
                       
                       try {
+                        console.log("Phase 2 stdout before parsing:", phase2Stdout.trim());
+                        
                         // Parse Phase 2 result
                         const phase2Result = JSON.parse(phase2Stdout.trim());
+                        console.log("Phase 2 result successfully parsed:", JSON.stringify(phase2Result, null, 2));
                         
                         // Update the response with the synthesized content
                         const moaResponse = phase2Result.moa_response || phase2Result.generated_response;
+                        console.log("MOA response extracted:", moaResponse ? "Present" : "Not found");
                         
                         if (moaResponse) {
                           // Update response with synthesized content
