@@ -12,6 +12,7 @@ import LlmTestPage from "@/pages/LlmTestPage";
 import DirectLlmTestPage from "@/pages/DirectLlmTestPage";
 import SimpleApiTest from "@/pages/SimpleApiTest";
 import LlmResponseViewer from "@/pages/LlmResponseViewer";
+import TestCancelButton from "@/pages/TestCancelButton";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import Sidebar from "@/components/Sidebar";
@@ -57,6 +58,7 @@ function Router() {
         <Route path="/direct-llm-test" component={DirectLlmTestPage} />
         <Route path="/simple-api-test" component={SimpleApiTest} />
         <Route path="/llm-response-viewer" component={LlmResponseViewer} />
+        <Route path="/test-cancel-button" component={TestCancelButton} />
         <Route component={NotFound} />
       </Switch>
     </AppLayout>
