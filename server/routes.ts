@@ -576,16 +576,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   
                   // Determine which model response to use based on provider
                   if (provider === "openai" && result.openai_response) {
+                    console.log("OPENAI RESPONSE FOUND, using it directly");
                     modelResponse = result.openai_response;
                   } else if (provider === "anthropic" && result.anthropic_response) {
+                    console.log("ANTHROPIC RESPONSE FOUND, using it directly");
                     modelResponse = result.anthropic_response;
                   } else if (provider === "deepseek" && result.deepseek_response) {
+                    console.log("DEEPSEEK RESPONSE FOUND, using it directly");
                     modelResponse = result.deepseek_response;
                   } else if (provider === "moa") {
                     // For MOA, use the generated response directly
+                    console.log("MOA MODE, using generated_response");
                     modelResponse = result.generated_response || '';
                   } else {
                     // Fallback to generated response
+                    console.log("NO MODEL-SPECIFIC RESPONSE FOUND, using generated_response as fallback");
                     modelResponse = result.generated_response || '';
                   }
                   
@@ -625,20 +630,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   console.log("- moaResponse:", moaResponse ? "Present (Length: " + moaResponse.length + ")" : "Not present");
                   console.log("- finalResponse:", finalResponse ? "Present (Length: " + finalResponse.length + ")" : "Not present");
                   
+                  // DIRECT DEBUG: Log the raw values from result
+                  console.log("DIRECT CHECK - RAW VALUES FROM PYTHON:");
+                  console.log("- openai_response:", result.openai_response ? "Present and length " + result.openai_response.length : "Not present");
+                  console.log("- generated_response:", result.generated_response ? "Present and length " + result.generated_response.length : "Not present");
+                  
+                  // For OpenAI provider, let's use a more direct approach
+                  let directOpenaiResponse = null;
+                  let directAnthropicResponse = null;
+                  let directDeepseekResponse = null;
+                  let directFinalResponse = null;
+                  
+                  if (provider === "openai") {
+                    directOpenaiResponse = result.generated_response || '';
+                    directFinalResponse = result.generated_response || '';
+                  } else if (provider === "anthropic") {
+                    directAnthropicResponse = result.generated_response || '';
+                    directFinalResponse = result.generated_response || '';
+                  } else if (provider === "deepseek") {
+                    directDeepseekResponse = result.generated_response || '';
+                    directFinalResponse = result.generated_response || '';
+                  } else { // moa
+                    directFinalResponse = result.generated_response || '';
+                  }
+                  
+                  console.log("DIRECT APPROACH - Values to save:");
+                  console.log("- directOpenaiResponse:", directOpenaiResponse ? "Present and length " + directOpenaiResponse.length : "Not present");
+                  console.log("- directFinalResponse:", directFinalResponse ? "Present and length " + directFinalResponse.length : "Not present");
+                  
                   // Create the response object with all fields explicitly set
                   const responseToSave = {
                     // Core fields
                     requirement: requirement,
-                    finalResponse: finalResponse,
-                    openaiResponse: openaiResponse,
-                    anthropicResponse: anthropicResponse,
-                    deepseekResponse: deepseekResponse,
+                    finalResponse: directFinalResponse || finalResponse,
+                    openaiResponse: provider === "openai" ? (directOpenaiResponse || '') : (openaiResponse || null),
+                    anthropicResponse: provider === "anthropic" ? (directAnthropicResponse || '') : (anthropicResponse || null),
+                    deepseekResponse: provider === "deepseek" ? (directDeepseekResponse || '') : (deepseekResponse || null),
                     category: existingRequirement?.category || '',
                     timestamp: new Date().toISOString(),
                     modelProvider: provider,
                     
                     // Store MOA response if available
-                    moaResponse: moaResponse,
+                    moaResponse: provider === "moa" ? (result.generated_response || '') : (moaResponse || null),
                   };
                   
                   // Log the entire object being saved
