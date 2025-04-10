@@ -289,7 +289,7 @@ export class DatabaseStorage implements IStorage {
       const insertData: InsertExcelRequirementResponse = {
         requirement: response.requirement,
         category: response.category || '',
-        finalResponse: '', // Temporary value, will be updated below
+        finalResponse: response.finalResponse || '',
         modelProvider: response.modelProvider || null,
         rating: response.rating || null,
         openaiResponse: response.openaiResponse || null,
@@ -298,6 +298,14 @@ export class DatabaseStorage implements IStorage {
         moaResponse: response.moaResponse || null,
         similarQuestions: response.similarQuestions || ''
       };
+      
+      // Log model-specific fields for debugging
+      console.log("MODEL FIELDS IN NEW RECORD:");
+      console.log("- finalResponse:", insertData.finalResponse ? `Present (${insertData.finalResponse.length} chars)` : "Not set");
+      console.log("- openaiResponse:", insertData.openaiResponse ? `Present (${insertData.openaiResponse.length} chars)` : "Not set");
+      console.log("- anthropicResponse:", insertData.anthropicResponse ? `Present (${insertData.anthropicResponse.length} chars)` : "Not set");
+      console.log("- deepseekResponse:", insertData.deepseekResponse ? `Present (${insertData.deepseekResponse.length} chars)` : "Not set");
+      console.log("- moaResponse:", insertData.moaResponse ? `Present (${insertData.moaResponse.length} chars)` : "Not set");
       
       // Ensure finalResponse is never empty for new records
       if (response.finalResponse !== undefined && response.finalResponse !== null && response.finalResponse.trim() !== '') {

@@ -676,16 +676,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   
                   // Create a simple field mapping function that we can use without imports
                   // This is a simplified version of our field_mapping_fix.js module
-                  function mapFieldsDirectly(pythonOutput, provider) {
+                  // Using an immediately invoked function to avoid block-scoped function declaration issues
+                  const mapFieldsDirectly = (pythonOutput: any, provider: string): { 
+                    finalResponse: string | null;
+                    openaiResponse: string | null;
+                    anthropicResponse: string | null;
+                    deepseekResponse: string | null;
+                    moaResponse: string | null;
+                  } => {
                     console.log("Mapping fields directly for provider:", provider);
                     
                     // Create the mapped fields object with default nulls
                     const mappedFields = {
-                      finalResponse: null,
-                      openaiResponse: null,
-                      anthropicResponse: null,
-                      deepseekResponse: null,
-                      moaResponse: null
+                      finalResponse: null as string | null,
+                      openaiResponse: null as string | null,
+                      anthropicResponse: null as string | null,
+                      deepseekResponse: null as string | null,
+                      moaResponse: null as string | null
                     };
                     
                     // Set finalResponse from generated_response if available
@@ -756,8 +763,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
                         if (!mappedFields.finalResponse && (mappedFields.openaiResponse || mappedFields.anthropicResponse)) {
                           // Create a combined response if none exists
                           const combinedResponse = `## Combined MOA Response\n\n${mappedFields.openaiResponse ? `### OpenAI:\n${mappedFields.openaiResponse}\n\n` : ''}${mappedFields.anthropicResponse ? `### Anthropic:\n${mappedFields.anthropicResponse}` : ''}`;
-                          mappedFields.finalResponse = combinedResponse;
-                          mappedFields.moaResponse = combinedResponse;
+                          // Use explicit typing for string assignment to null variables
+                          mappedFields.finalResponse = combinedResponse as string;
+                          mappedFields.moaResponse = combinedResponse as string;
                           console.log("Created combined response for MOA from individual responses");
                         }
                         break;
@@ -767,7 +775,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     console.log("MAPPED FIELDS (After direct mapping):");
                     for (const [key, value] of Object.entries(mappedFields)) {
                       if (value) {
-                        console.log(`- ${key}: Present (${value.length} chars)`);
+                        console.log(`- ${key}: Present (${(value as string).length} chars)`);
                       } else {
                         console.log(`- ${key}: Not present`);
                       }
@@ -779,47 +787,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   // Perform the field mapping
                   const mappedFields = mapFieldsDirectly(pythonResults, provider);
                   
-                  // Create the response object with field mapped values
+                  // Debug the contents of the mapped fields - these should have the correct values
+                  console.log("MAPPED FIELDS DETAILED DEBUG:");
+                  if (mappedFields.finalResponse) console.log("- finalResponse:", String(mappedFields.finalResponse).substring(0, 50) + "...");
+                  if (mappedFields.openaiResponse) console.log("- openaiResponse:", String(mappedFields.openaiResponse).substring(0, 50) + "...");
+                  if (mappedFields.anthropicResponse) console.log("- anthropicResponse:", String(mappedFields.anthropicResponse).substring(0, 50) + "...");
+                  if (mappedFields.deepseekResponse) console.log("- deepseekResponse:", String(mappedFields.deepseekResponse).substring(0, 50) + "...");
+                  if (mappedFields.moaResponse) console.log("- moaResponse:", String(mappedFields.moaResponse).substring(0, 50) + "...");
+                  
+                  // Create an explicit response object with ONLY the exact fields we need
                   const responseToSave = {
                     // Core fields
                     requirement: requirement,
-                    finalResponse: mappedFields.finalResponse || '', // Ensure we always have something here
-                    openaiResponse: mappedFields.openaiResponse,
-                    anthropicResponse: mappedFields.anthropicResponse,
-                    deepseekResponse: mappedFields.deepseekResponse,
-                    moaResponse: mappedFields.moaResponse,
                     category: existingRequirement?.category || '',
+                    
+                    // Response fields - use the mapped fields directly without any transformation
+                    finalResponse: mappedFields.finalResponse || '',
+                    openaiResponse: mappedFields.openaiResponse || null,
+                    anthropicResponse: mappedFields.anthropicResponse || null,
+                    deepseekResponse: mappedFields.deepseekResponse || null,
+                    moaResponse: mappedFields.moaResponse || null,
+                    
+                    // Metadata
                     timestamp: new Date().toISOString(),
-                    modelProvider: provider
+                    modelProvider: provider,
+                    
+                    // RFP identification fields
+                    rfpName: rfpName || existingRequirement?.rfpName || '',
+                    requirementId: existingRequirement?.requirementId || '',
+                    uploadedBy: uploadedBy || existingRequirement?.uploadedBy || '',
+                    
+                    // Similar questions
+                    similarQuestions: result.similar_responses ? JSON.stringify(result.similar_responses) : '',
+                    
+                    // If this is an update, include the ID
+                    ...(existingRequirement ? { id: existingRequirement.id } : {})
                   };
                   
                   // Log the entire object being saved
                   console.log("Response object prepared for saving:", {
                     requirement: responseToSave.requirement.substring(0, 50) + "...",
                     finalResponse: responseToSave.finalResponse ? responseToSave.finalResponse.substring(0, 50) + "..." : "Not set",
-                    openaiResponse: responseToSave.openaiResponse ? `Present (${responseToSave.openaiResponse.length} chars)` : "Not set",
-                    anthropicResponse: responseToSave.anthropicResponse ? `Present (${responseToSave.anthropicResponse.length} chars)` : "Not set",
-                    deepseekResponse: responseToSave.deepseekResponse ? `Present (${responseToSave.deepseekResponse.length} chars)` : "Not set",
-                    moaResponse: responseToSave.moaResponse ? `Present (${responseToSave.moaResponse.length} chars)` : "Not set"
+                    openaiResponse: responseToSave.openaiResponse ? `Present (${String(responseToSave.openaiResponse).length} chars)` : "Not set",
+                    anthropicResponse: responseToSave.anthropicResponse ? `Present (${String(responseToSave.anthropicResponse).length} chars)` : "Not set",
+                    deepseekResponse: responseToSave.deepseekResponse ? `Present (${String(responseToSave.deepseekResponse).length} chars)` : "Not set",
+                    moaResponse: responseToSave.moaResponse ? `Present (${String(responseToSave.moaResponse).length} chars)` : "Not set"
                   });
                   
                   try {
                     // Save the response with references
                     const savedData = await storage.createResponseWithReferences(
-                      {
-                        ...responseToSave,
-                        
-                        // Store similar questions as JSON string if available
-                        similarQuestions: result.similar_responses ? JSON.stringify(result.similar_responses) : '',
-                        
-                        // Store RFP identification fields
-                        rfpName: rfpName || existingRequirement?.rfpName || '',
-                        requirementId: existingRequirement?.requirementId || '',
-                        uploadedBy: uploadedBy || existingRequirement?.uploadedBy || '',
-                        
-                        // If there was an existing requirement, preserve other fields
-                        ...(existingRequirement || {})
-                      },
+                      responseToSave,
                       referenceData
                     );
                     
