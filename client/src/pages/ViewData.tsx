@@ -6,16 +6,41 @@ import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, Di
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { MessageSquare, ArrowLeft, BookOpen, Eye, RefreshCcw } from 'lucide-react';
+import { 
+  MessageSquare, 
+  ArrowLeft, 
+  BookOpen, 
+  Eye, 
+  RefreshCcw, 
+  Trash2, 
+  Printer, 
+  Mail, 
+  PlayCircle, 
+  MoreHorizontal, 
+  Sparkles,
+  CheckSquare,
+  Square
+} from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import ReferencePanel from '@/components/ReferencePanel';
 import { ExcelRequirementResponse } from '@shared/schema';
+import { Checkbox } from '@/components/ui/checkbox';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 export default function ViewData() {
   const [showResponseDialog, setShowResponseDialog] = useState(false);
   const [selectedResponse, setSelectedResponse] = useState<ExcelRequirementResponse | null>(null);
   const [selectedResponseId, setSelectedResponseId] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState('response');
+  const [selectedItems, setSelectedItems] = useState<number[]>([]);
+  const [selectAll, setSelectAll] = useState(false);
   const isMobile = useIsMobile();
   
   const { data: excelData = [], isLoading: loading, refetch } = useQuery<ExcelRequirementResponse[]>({
@@ -32,6 +57,56 @@ export default function ViewData() {
     refetch();
   };
   
+  const toggleSelectItem = (id: number) => {
+    setSelectedItems(prev => 
+      prev.includes(id) 
+        ? prev.filter(item => item !== id) 
+        : [...prev, id]
+    );
+  };
+  
+  const toggleSelectAll = () => {
+    if (selectAll) {
+      setSelectedItems([]);
+    } else {
+      setSelectedItems(excelData.map(item => item.id || 0).filter(id => id !== 0));
+    }
+    setSelectAll(!selectAll);
+  };
+  
+  const handleBulkAction = (action: string) => {
+    if (selectedItems.length === 0) {
+      alert('Please select at least one item first');
+      return;
+    }
+    
+    // Demo actions for now - would be connected to API endpoints
+    switch (action) {
+      case 'generate':
+        console.log('Generate answers for:', selectedItems);
+        alert(`Generate answers for ${selectedItems.length} selected items`);
+        break;
+      case 'print':
+        console.log('Print items:', selectedItems);
+        alert(`Print ${selectedItems.length} selected items`);
+        break;
+      case 'mail':
+        console.log('Mail items:', selectedItems);
+        alert(`Mail ${selectedItems.length} selected items`);
+        break;
+      case 'reprocess':
+        console.log('Reprocess items:', selectedItems);
+        alert(`Reprocess ${selectedItems.length} selected items`);
+        break;
+      case 'delete':
+        console.log('Delete items:', selectedItems);
+        alert(`Delete ${selectedItems.length} selected items`);
+        break;
+      default:
+        console.log('Unknown action:', action);
+    }
+  };
+  
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -41,19 +116,68 @@ export default function ViewData() {
       <div className="pt-2">
         <Card>
           <div className="flex justify-between items-center p-4 border-b border-slate-100 dark:border-slate-700">
-            <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-50">Requirements Data</h2>
-            <Button 
-              size="sm" 
-              onClick={handleRefresh}
-              className="gap-1"
-              variant="outline"
-            >
-              <RefreshCcw className="h-4 w-4" />
-              <span>{loading ? 'Refreshing...' : 'Refresh'}</span>
-            </Button>
+            <div className="flex items-center space-x-4">
+              <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-50">Requirements Data</h2>
+              <div className="flex items-center">
+                <Checkbox 
+                  id="select-all" 
+                  checked={selectAll}
+                  onCheckedChange={toggleSelectAll}
+                />
+                <label htmlFor="select-all" className="ml-2 text-sm font-medium text-slate-700 dark:text-slate-300">
+                  Select All
+                </label>
+              </div>
+            </div>
+            
+            <div className="flex space-x-2">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="h-9 gap-1" disabled={selectedItems.length === 0}>
+                    <span>Actions</span>
+                    <MoreHorizontal className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuLabel>Bulk Actions</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => handleBulkAction('generate')} className="gap-2">
+                    <Sparkles className="h-4 w-4" />
+                    <span>Generate Answers</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleBulkAction('print')} className="gap-2">
+                    <Printer className="h-4 w-4" />
+                    <span>Print</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleBulkAction('mail')} className="gap-2">
+                    <Mail className="h-4 w-4" />
+                    <span>Send Email</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleBulkAction('reprocess')} className="gap-2">
+                    <PlayCircle className="h-4 w-4" />
+                    <span>Reprocess</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => handleBulkAction('delete')} className="text-red-600 gap-2">
+                    <Trash2 className="h-4 w-4" />
+                    <span>Delete</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              
+              <Button 
+                size="sm" 
+                onClick={handleRefresh}
+                className="gap-1"
+                variant="outline"
+              >
+                <RefreshCcw className="h-4 w-4" />
+                <span>{loading ? 'Refreshing...' : 'Refresh'}</span>
+              </Button>
+            </div>
           </div>
           
-          <CardContent className={isMobile ? "p-4" : "p-0 overflow-auto"}>
+          <CardContent className="p-4">
             {loading ? (
               <div className="space-y-4">
                 <Skeleton className="h-40 w-full" />
@@ -61,62 +185,88 @@ export default function ViewData() {
                 <Skeleton className="h-40 w-full" />
               </div>
             ) : excelData.length > 0 ? (
-              <div className={isMobile ? "space-y-4" : "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"}>
-                {excelData.map((row: ExcelRequirementResponse, index: number) => (
-                  <Card key={row.id || index} className="overflow-hidden h-full">
-                    <CardContent className="p-0 h-full flex flex-col">
-                      <div className="p-4 bg-slate-50 dark:bg-slate-800 border-b dark:border-slate-700">
-                        <div className="flex justify-between items-start mb-2">
-                          <div className="font-medium text-slate-800 dark:text-slate-100">{row.category}</div>
-                          {row.rating !== undefined && (
-                            <div className="text-sm bg-slate-100 dark:bg-slate-700 px-2 py-1 rounded-full">
-                              Rating: {row.rating}/5
-                            </div>
-                          )}
-                        </div>
-                        <div className="text-sm line-clamp-2 mt-1 text-slate-600 dark:text-slate-300">{row.requirement}</div>
-                      </div>
-                      
-                      <div className="p-4 flex-1 flex flex-col">
-                        {row.finalResponse ? (
-                          <>
-                            <h4 className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Response Preview:</h4>
-                            <div className="text-sm line-clamp-3 mb-4 text-slate-700 dark:text-slate-200">
-                              {row.finalResponse}
-                            </div>
-                          </>
-                        ) : (
-                          <div className="text-sm text-slate-400 dark:text-slate-500 italic mb-4">No response generated yet</div>
-                        )}
-                        
-                        {row.timestamp && (
-                          <div className="text-xs text-slate-500 dark:text-slate-400 mb-3 mt-auto">
-                            Generated: {(() => {
-                              try {
-                                return format(new Date(row.timestamp), 'MMM d, yyyy HH:mm');
-                              } catch (e) {
-                                return row.timestamp;
-                              }
-                            })()}
+              <div className="space-y-4">
+                {excelData.map((row: ExcelRequirementResponse, index: number) => {
+                  const isSelected = row.id ? selectedItems.includes(row.id) : false;
+                  return (
+                    <Card key={row.id || index} className={`overflow-hidden border ${isSelected ? 'border-blue-400 dark:border-blue-600' : 'border-slate-200 dark:border-slate-700'}`}>
+                      <CardContent className="p-4">
+                        <div className="flex items-start">
+                          <div className="mr-3 pt-1">
+                            {row.id && (
+                              <Checkbox 
+                                id={`select-${row.id}`}
+                                checked={isSelected}
+                                onCheckedChange={() => toggleSelectItem(row.id || 0)}
+                              />
+                            )}
                           </div>
-                        )}
-                        
-                        <div className="flex justify-end mt-2">
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            onClick={() => handleViewResponse(row)}
-                            className="h-8"
-                            disabled={!row.finalResponse}
-                          >
-                            <Eye className="h-4 w-4 mr-1" />
-                            View Details
-                          </Button>
+                          
+                          <div className="flex-1">
+                            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between mb-4">
+                              <div>
+                                <div className="font-medium text-slate-800 dark:text-slate-100 mb-1">{row.category}</div>
+                                <div className="text-sm text-slate-600 dark:text-slate-300 mb-3">{row.requirement}</div>
+                                <div className="flex flex-wrap gap-2 mb-3">
+                                  {row.rfpName && (
+                                    <span className="text-xs bg-blue-50 text-blue-600 dark:bg-blue-900 dark:text-blue-300 px-2 py-1 rounded-full">
+                                      RFP: {row.rfpName}
+                                    </span>
+                                  )}
+                                  {row.uploadedBy && (
+                                    <span className="text-xs bg-green-50 text-green-600 dark:bg-green-900 dark:text-green-300 px-2 py-1 rounded-full">
+                                      Uploaded by: {row.uploadedBy}
+                                    </span>
+                                  )}
+                                  {row.rating !== undefined && (
+                                    <span className="text-xs bg-amber-50 text-amber-600 dark:bg-amber-900 dark:text-amber-300 px-2 py-1 rounded-full">
+                                      Rating: {row.rating}/5
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                              
+                              <div className="flex sm:flex-col items-center sm:items-end mt-3 sm:mt-0">
+                                {row.timestamp && (
+                                  <div className="text-xs text-slate-500 dark:text-slate-400 mb-2">
+                                    Generated: {(() => {
+                                      try {
+                                        return format(new Date(row.timestamp), 'MMM d, yyyy');
+                                      } catch (e) {
+                                        return String(row.timestamp);
+                                      }
+                                    })()}
+                                  </div>
+                                )}
+                                <Button 
+                                  variant="outline" 
+                                  size="sm"
+                                  onClick={() => handleViewResponse(row)}
+                                  className="h-8"
+                                  disabled={!row.finalResponse}
+                                >
+                                  <Eye className="h-4 w-4 mr-1" />
+                                  View Details
+                                </Button>
+                              </div>
+                            </div>
+                            
+                            {row.finalResponse ? (
+                              <div className="mt-3 p-3 bg-slate-50 dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700">
+                                <h4 className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Response:</h4>
+                                <div className="text-sm text-slate-700 dark:text-slate-200 line-clamp-3">
+                                  {row.finalResponse}
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="text-sm text-slate-400 dark:text-slate-500 italic mt-3">No response generated yet</div>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
+                      </CardContent>
+                    </Card>
+                  );
+                })}
               </div>
             ) : (
               <div className="p-12 text-center">
