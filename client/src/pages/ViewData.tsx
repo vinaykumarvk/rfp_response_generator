@@ -23,7 +23,12 @@ import {
   Square,
   Check,
   Filter,
-  X
+  X,
+  ChevronRight,
+  Atom,
+  Bot,
+  Brain,
+  Network
 } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import ReferencePanel from '@/components/ReferencePanel';
@@ -171,9 +176,21 @@ export default function ViewData() {
     
     // Demo actions for now - would be connected to API endpoints
     switch (action) {
-      case 'generate':
-        console.log('Generate answers for:', selectedItems);
-        alert(`Generate answers for ${selectedItems.length} selected items`);
+      case 'generate-openai':
+        console.log('Generate answers with OpenAI for:', selectedItems);
+        alert(`Generate answers with OpenAI for ${selectedItems.length} selected items`);
+        break;
+      case 'generate-anthropic':
+        console.log('Generate answers with Anthropic for:', selectedItems);
+        alert(`Generate answers with Anthropic for ${selectedItems.length} selected items`);
+        break;
+      case 'generate-deepseek':
+        console.log('Generate answers with DeepSeek for:', selectedItems);
+        alert(`Generate answers with DeepSeek for ${selectedItems.length} selected items`);
+        break;
+      case 'generate-moa':
+        console.log('Generate answers with MOA for:', selectedItems);
+        alert(`Generate answers with MOA (Mixture of Agents) for ${selectedItems.length} selected items`);
         break;
       case 'print':
         console.log('Print items:', selectedItems);
@@ -231,10 +248,36 @@ export default function ViewData() {
                 <DropdownMenuContent align="end">
                   <DropdownMenuLabel>Bulk Actions</DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => handleBulkAction('generate')} className="gap-2">
-                    <Sparkles className="h-4 w-4" />
-                    <span>Generate Answers</span>
-                  </DropdownMenuItem>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <DropdownMenuItem className="gap-2" onSelect={(e) => e.preventDefault()}>
+                        <Sparkles className="h-4 w-4" />
+                        <span>Generate Answers</span>
+                        <ChevronRight className="h-4 w-4 ml-auto" />
+                      </DropdownMenuItem>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent className="ml-1">
+                      <DropdownMenuLabel>Select LLM Model</DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={() => handleBulkAction('generate-openai')} className="gap-2">
+                        <Atom className="h-4 w-4 text-blue-500" />
+                        <span>OpenAI</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleBulkAction('generate-anthropic')} className="gap-2">
+                        <Bot className="h-4 w-4 text-purple-500" />
+                        <span>Anthropic</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleBulkAction('generate-deepseek')} className="gap-2">
+                        <Brain className="h-4 w-4 text-amber-500" />
+                        <span>DeepSeek</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={() => handleBulkAction('generate-moa')} className="gap-2">
+                        <Network className="h-4 w-4 text-green-500" />
+                        <span>MOA (Mixture of Agents)</span>
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                   <DropdownMenuItem onClick={() => handleBulkAction('print')} className="gap-2">
                     <Printer className="h-4 w-4" />
                     <span>Print</span>
