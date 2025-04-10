@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
@@ -114,10 +113,29 @@ export default function LlmResponseViewer() {
 
     if (!finalResponse) return <p>No response content available</p>;
 
+    // Format the response with markdown syntax
+    const formattedResponse = finalResponse
+      // Format headings (# Heading -> <h1>Heading</h1>, etc.)
+      .replace(/^### (.*$)/gm, '<h3>$1</h3>')
+      .replace(/^## (.*$)/gm, '<h2>$1</h2>')
+      .replace(/^# (.*$)/gm, '<h1>$1</h1>')
+      // Format bold text (**text** -> <strong>text</strong>)
+      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+      // Format italic text (*text* -> <em>text</em>)
+      .replace(/\*(.*?)\*/g, '<em>$1</em>')
+      // Format lists
+      .replace(/^\d+\.\s+(.*$)/gm, '<li>$1</li>')
+      .replace(/^\*\s+(.*$)/gm, '<li>$1</li>')
+      // Format paragraphs (double line breaks)
+      .replace(/\n\n/g, '</p><p>')
+      // Preserve line breaks within paragraphs
+      .replace(/\n/g, '<br />');
+
     return (
-      <div className="whitespace-pre-wrap markdown-content">
-        {finalResponse}
-      </div>
+      <div 
+        className="prose prose-slate dark:prose-invert max-w-none"
+        dangerouslySetInnerHTML={{ __html: `<p>${formattedResponse}</p>` }}
+      />
     );
   };
 
@@ -133,29 +151,14 @@ export default function LlmResponseViewer() {
         {apiResponse.similar_responses.map((item, index) => (
           <Card key={index} className="flex flex-col h-full">
             <CardHeader>
-              <CardTitle>{item.text || 'Unnamed Response'}</CardTitle>
+              <CardTitle className="text-base">{item.text || 'Unnamed Response'}</CardTitle>
               <CardDescription>
-                Score: {(item.score * 100).toFixed(2)}% | Category: {item.category}
+                Score: {(item.score * 100).toFixed(2)}% | Category: {item.category} 
+                {item.reference && ` | Ref: ${item.reference}`}
               </CardDescription>
             </CardHeader>
             <CardContent className="flex-grow">
-              <Accordion type="single" collapsible>
-                <AccordionItem value="response">
-                  <AccordionTrigger>Response</AccordionTrigger>
-                  <AccordionContent>
-                    <div className="whitespace-pre-wrap">{item.response}</div>
-                  </AccordionContent>
-                </AccordionItem>
-                <AccordionItem value="details">
-                  <AccordionTrigger>Details</AccordionTrigger>
-                  <AccordionContent>
-                    <div className="space-y-2">
-                      <div><strong>Requirement:</strong> {item.requirement}</div>
-                      <div><strong>Reference:</strong> {item.reference}</div>
-                    </div>
-                  </AccordionContent>
-                </AccordionItem>
-              </Accordion>
+              <div className="whitespace-pre-wrap text-sm">{item.response}</div>
             </CardContent>
           </Card>
         ))}
