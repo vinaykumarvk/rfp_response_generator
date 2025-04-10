@@ -55,10 +55,10 @@ export default function ViewData() {
   
   // Filters
   const [filters, setFilters] = useState({
-    rfpName: '',
-    category: '',
+    rfpName: 'all',
+    category: 'all',
     hasResponse: 'all', // 'all', 'yes', 'no'
-    generationMode: '', // 'openai', 'anthropic', 'deepseek', 'moa', ''
+    generationMode: 'all', // 'all', 'openai', 'anthropic', 'deepseek', 'moa'
   });
   
   const isMobile = useIsMobile();
@@ -89,14 +89,14 @@ export default function ViewData() {
   // Apply filters to the data
   const filteredData = excelData.filter(row => {
     // Filter by RFP name
-    if (filters.rfpName && row.rfpName) {
+    if (filters.rfpName && filters.rfpName !== 'all' && row.rfpName) {
       if (row.rfpName !== filters.rfpName) {
         return false;
       }
     }
     
     // Filter by category
-    if (filters.category && row.category) {
+    if (filters.category && filters.category !== 'all' && row.category) {
       if (row.category !== filters.category) {
         return false;
       }
@@ -274,8 +274,8 @@ export default function ViewData() {
                     <SelectValue placeholder="Select RFP name" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">All</SelectItem>
-                    {uniqueRfpNames.map(name => (
+                    <SelectItem value="all">All</SelectItem>
+                    {uniqueRfpNames.filter(name => name).map(name => (
                       <SelectItem key={name} value={name}>{name}</SelectItem>
                     ))}
                   </SelectContent>
@@ -292,8 +292,8 @@ export default function ViewData() {
                     <SelectValue placeholder="Select category" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">All</SelectItem>
-                    {uniqueCategories.map(category => (
+                    <SelectItem value="all">All</SelectItem>
+                    {uniqueCategories.filter(category => category).map(category => (
                       <SelectItem key={category} value={category}>{category}</SelectItem>
                     ))}
                   </SelectContent>
@@ -340,8 +340,8 @@ export default function ViewData() {
                 variant="outline" 
                 size="sm" 
                 onClick={() => setFilters({
-                  rfpName: '',
-                  category: '',
+                  rfpName: 'all',
+                  category: 'all',
                   hasResponse: 'all',
                   generationMode: 'all',
                 })}
