@@ -71,6 +71,7 @@ export default function GenerateResponse() {
   const [reprocessModelProvider, setReprocessModelProvider] = useState<string>("openai");
   const [reprocessUseModelMixture, setReprocessUseModelMixture] = useState<boolean>(true);
   const [reprocessing, setReprocessing] = useState(false);
+  const [isCanceled, setIsCanceled] = useState(false); // Track if generation has been canceled
   const { toast } = useToast();
 
   useEffect(() => {
@@ -320,6 +321,16 @@ export default function GenerateResponse() {
     }
   };
   
+  // Handle canceling the generation process
+  const handleCancelGeneration = () => {
+    setIsCanceled(true);
+    toast({
+      title: "Generation canceled",
+      description: "The response generation process has been canceled.",
+      variant: "default"
+    });
+  };
+  
   // Generate responses for multiple selected requirements
   const handleBatchGenerate = async () => {
     if (selectedRequirementIds.size === 0) {
@@ -333,6 +344,7 @@ export default function GenerateResponse() {
     
     setBatchGenerating(true);
     setErrorMessage(null);
+    setIsCanceled(false); // Reset cancel state
     
     // Initialize progress tracking
     const selectedIds = Array.from(selectedRequirementIds);
@@ -350,6 +362,17 @@ export default function GenerateResponse() {
       let failCount = 0;
       
       for (let i = 0; i < selectedIds.length; i++) {
+        // Check if user has canceled the operation
+        if (isCanceled) {
+          // Exit the loop if canceled
+          toast({
+            title: "Generation canceled",
+            description: `Processed ${i} of ${selectedIds.length} requirements before cancellation.`,
+            variant: "default"
+          });
+          break;
+        }
+
         const id = selectedIds[i];
         const requirement = requirements.find(r => r.id === id);
         
@@ -560,6 +583,7 @@ export default function GenerateResponse() {
       setMoaPhase(null);
       setMoaPhaseProgress(0);
       setCurrentModelFetching(null);
+      setIsCanceled(false);
     }
   };
   
@@ -905,9 +929,19 @@ export default function GenerateResponse() {
                       {/* Overall progress */}
                       <div className="flex justify-between text-sm text-slate-500">
                         <span>Processing: {processedCount} of {totalToProcess}</span>
-                        <span>{progressValue}%</span>
+                        <div className="flex items-center gap-2">
+                          <span>{progressValue}%</span>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={handleCancelGeneration} 
+                            className="h-6 px-2 text-xs text-red-500 hover:text-red-700 border-red-200 hover:border-red-300"
+                          >
+                            Cancel
+                          </Button>
+                        </div>
                       </div>
-                      <Progress value={progressValue} className="h-2" />
+                      <Progress value={progressValue} animated={true} className="h-2" />
                       
                       {/* MOA phase-specific progress */}
                       {useModelMixture && moaPhase && (
@@ -917,7 +951,7 @@ export default function GenerateResponse() {
                             <span>{moaPhaseProgress}%</span>
                           </div>
                           
-                          <Progress value={moaPhaseProgress} className="h-2 mb-3" />
+                          <Progress value={moaPhaseProgress} animated={true} className="h-2 mb-3" />
                           
                           {moaPhase === 1 && (
                             <div className="grid grid-cols-3 gap-2 mt-2">
