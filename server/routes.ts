@@ -1774,19 +1774,128 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       console.log("Running MOA response test...");
       
-      // Import the test script
-      const moaTest = require('./moa_test');
+      // Run the test script directly via spawn
+      const { spawn } = await import('child_process');
       
-      // Run the test
-      const results = await moaTest.testMoaResponses();
+      const nodeProcess = spawn('node', ['server/direct_moa_test.js'], {
+        env: process.env
+      });
       
-      // Return the results
-      return res.status(200).json({
-        message: "MOA Response Test completed",
-        results
+      let stdout = '';
+      let stderr = '';
+      
+      nodeProcess.stdout.on('data', (data) => {
+        stdout += data.toString();
+      });
+      
+      nodeProcess.stderr.on('data', (data) => {
+        stderr += data.toString();
+      });
+      
+      nodeProcess.on('close', (code) => {
+        if (code !== 0) {
+          console.error(`MOA Test process exited with code ${code}`);
+          return res.status(500).json({
+            message: "MOA Response Test failed",
+            error: `Process exited with code ${code}`,
+            stderr
+          });
+        }
+        
+        try {
+          // Parse the results from the JSON at the end of stdout
+          const resultsMatch = stdout.match(/\{[\s\S]*\}$/);
+          const results = resultsMatch ? JSON.parse(resultsMatch[0]) : { error: "Could not parse test results" };
+          
+          // Return the results with the full output
+          return res.status(200).json({
+            message: "MOA Response Test completed",
+            results,
+            output: stdout
+          });
+        } catch (parseError: any) {
+          return res.status(500).json({
+            message: "Failed to parse test results",
+            error: parseError.message,
+            output: stdout
+          });
+        }
+      });
+      
+      nodeProcess.on('error', (error) => {
+        console.error("Error spawning node process:", error);
+        return res.status(500).json({
+          message: "Failed to run MOA test script",
+          error: error.message
+        });
       });
     } catch (error: any) {
       console.error("Error running MOA response test:", error);
+      return res.status(500).json({ error: error.message || "Unknown error occurred" });
+    }
+  });
+  
+  app.get("/api/fix-moa-responses", async (_req: Request, res: Response) => {
+    try {
+      console.log("Fixing MOA responses...");
+      
+      // Run the fix script directly via spawn
+      const { spawn } = await import('child_process');
+      
+      const nodeProcess = spawn('node', ['server/fix_moa_responses.js'], {
+        env: process.env
+      });
+      
+      let stdout = '';
+      let stderr = '';
+      
+      nodeProcess.stdout.on('data', (data) => {
+        stdout += data.toString();
+      });
+      
+      nodeProcess.stderr.on('data', (data) => {
+        stderr += data.toString();
+      });
+      
+      nodeProcess.on('close', (code) => {
+        if (code !== 0) {
+          console.error(`MOA Fix process exited with code ${code}`);
+          return res.status(500).json({
+            message: "MOA Response fix failed",
+            error: `Process exited with code ${code}`,
+            stderr
+          });
+        }
+        
+        try {
+          // Parse the results from the JSON at the end of stdout
+          const resultsMatch = stdout.match(/\{[\s\S]*\}$/);
+          const results = resultsMatch ? JSON.parse(resultsMatch[0]) : { error: "Could not parse fix results" };
+          
+          // Return the results with the full output
+          return res.status(200).json({
+            message: "MOA Response fix completed",
+            results,
+            output: stdout
+          });
+        } catch (parseError: any) {
+          return res.status(500).json({
+            message: "Failed to parse fix results",
+            error: parseError.message,
+            output: stdout
+          });
+        }
+      });
+      
+      nodeProcess.on('error', (error) => {
+        console.error("Error spawning node process:", error);
+        return res.status(500).json({
+          message: "Failed to run MOA fix script",
+          error: error.message
+        });
+      });
+    } catch (error: any) {
+      console.error("Error fixing MOA responses:", error);
       return res.status(500).json({ error: error.message || "Unknown error occurred" });
     }
   });
@@ -1795,17 +1904,141 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       console.log("Generating a test MOA response...");
       
-      // Import the test script
-      const moaTest = require('./moa_test');
+      // Import necessary modules
+      const { Pool, neonConfig } = await import('@neondatabase/serverless');
+      const ws = await import('ws');
+      const { spawn } = await import('child_process');
       
-      // Run the test generation
-      const results = await moaTest.generateTestMoaResponse();
+      // Configure database connection
+      neonConfig.webSocketConstructor = ws.default;
+      const pool = new Pool({ connectionString: process.env.DATABASE_URL });
       
-      // Return the results
-      return res.status(200).json({
-        message: "MOA test response generation completed",
-        results
-      });
+      try {
+        // First, get a requirement ID to use
+        const requirement = await pool.query(`
+          SELECT id, requirement FROM excel_requirement_responses 
+          ORDER BY id DESC LIMIT 1
+        `);
+        
+        if (requirement.rowCount === 0) {
+          await pool.end();
+          return res.status(404).json({ error: "No requirements found to test with" });
+        }
+        
+        const { id, requirement: reqText } = requirement.rows[0];
+        await pool.end(); // Close database connection
+        
+        // Use the generate-response endpoint
+        console.log(`Using requirement ID ${id} for MOA test`);
+        
+        // Create payload for the API call
+        const payload = JSON.stringify({
+          requirementId: id,
+          requirement: reqText,
+          provider: "moa"
+        });
+        
+        // Use curl process to call the API
+        const curlProcess = spawn('curl', [
+          '-X', 'POST',
+          'http://localhost:5000/api/generate-response',
+          '-H', 'Content-Type: application/json',
+          '-d', payload
+        ]);
+        
+        let apiStdout = '';
+        let apiStderr = '';
+        
+        curlProcess.stdout.on('data', (data) => {
+          apiStdout += data.toString();
+        });
+        
+        curlProcess.stderr.on('data', (data) => {
+          apiStderr += data.toString();
+        });
+        
+        curlProcess.on('close', async (code) => {
+          if (code !== 0) {
+            console.error(`API call process exited with code ${code}`);
+            return res.status(500).json({
+              message: "Failed to call generate-response API",
+              error: `Process exited with code ${code}`,
+              stderr: apiStderr
+            });
+          }
+          
+          console.log("API call succeeded, waiting for MOA Phase 2 to complete...");
+          
+          try {
+            // Wait for Phase 2 to complete
+            await new Promise(r => setTimeout(r, 5000));
+            
+            // Run the test script to verify the MOA response
+            const testProcess = spawn('node', ['server/direct_moa_test.js'], {
+              env: process.env
+            });
+            
+            let testStdout = '';
+            let testStderr = '';
+            
+            testProcess.stdout.on('data', (data) => {
+              testStdout += data.toString();
+            });
+            
+            testProcess.stderr.on('data', (data) => {
+              testStderr += data.toString();
+            });
+            
+            testProcess.on('close', (testCode) => {
+              if (testCode !== 0) {
+                console.error(`MOA Test process exited with code ${testCode}`);
+                return res.status(500).json({
+                  message: "Error testing MOA response after generation",
+                  error: `Test process exited with code ${testCode}`,
+                  stderr: testStderr
+                });
+              }
+              
+              return res.status(200).json({
+                message: "MOA test response generation and verification completed",
+                apiResponse: apiStdout,
+                testResults: testStdout
+              });
+            });
+            
+            testProcess.on('error', (testError) => {
+              console.error("Error spawning test process:", testError);
+              return res.status(500).json({
+                message: "Failed to run MOA test script",
+                error: testError.message
+              });
+            });
+          } catch (postError: any) {
+            return res.status(500).json({
+              message: "Error after generating MOA response",
+              error: postError.message
+            });
+          }
+        });
+        
+        curlProcess.on('error', (error) => {
+          console.error("Error spawning curl process:", error);
+          return res.status(500).json({
+            message: "Failed to run curl command",
+            error: error.message
+          });
+        });
+      } catch (dbError: any) {
+        console.error("Database error:", dbError);
+        try {
+          await pool.end();
+        } catch (e) { /* Ignore cleanup errors */ }
+        
+        return res.status(500).json({
+          message: "Error accessing database",
+          error: dbError.message
+        });
+      }
     } catch (error: any) {
       console.error("Error generating test MOA response:", error);
       return res.status(500).json({ error: error.message || "Unknown error occurred" });
