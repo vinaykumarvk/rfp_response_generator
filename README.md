@@ -1,4 +1,4 @@
-# RFP Response Generator (v0.1)
+# RFP Response Generator (v0.2)
 
 An advanced AI-powered RFP Response Generator that transforms complex proposal creation through intelligent multi-model AI integration and robust API connectivity.
 
@@ -11,6 +11,7 @@ An advanced AI-powered RFP Response Generator that transforms complex proposal c
 - **Response Editing**: Edit and customize AI-generated responses
 - **Batch Processing**: Generate responses for multiple requirements at once
 - **Proper Markdown Rendering**: Enhanced display with ReactMarkdown and remark-gfm
+- **Advanced Data Sorting**: Sort requirements by ID, date, RFP name, and category with visual indicators
 
 ## Tech Stack
 
@@ -46,8 +47,11 @@ The application follows a multi-tier architecture:
 ## Usage
 
 1. **Upload Requirements**: Use the Excel Analyzer to upload and process RFP requirements
-2. **View Data**: Browse through the uploaded requirements
-3. **Generate Responses**: Select requirements and generate AI responses
+2. **View Data**: Browse, filter, and sort uploaded requirements using the advanced data management features
+   - **Filter**: Filter data by RFP name, category, response status, and generation model
+   - **Sort**: Sort data by ID, date, RFP name, or category in ascending or descending order
+   - **Select**: Choose multiple items for batch processing
+3. **Generate Responses**: Select requirements and generate AI responses using different models
 4. **Edit Responses**: Customize the generated responses as needed
 5. **Export**: Export the final responses in the desired format
 

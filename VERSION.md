@@ -1,5 +1,26 @@
 # RFP Response Generator - Version History
 
+## Version 0.2 - April 10, 2025
+
+### Enhanced Data Management
+- Added comprehensive sorting functionality to the ViewData component
+- Implemented sort controls for multiple fields:
+  - ID sorting (numeric)
+  - Date sorting (timestamp)
+  - RFP Name sorting (alphabetical)
+  - Category sorting (alphabetical)
+- Added visual indicators showing current sort field and direction
+- Combined sorting with existing filtering capabilities
+- Fixed UI structure issues to ensure proper rendering of sorting controls
+- Enhanced user experience with intuitive sorting UI
+
+### Technical Improvements
+- Implemented custom sorting logic for different data types
+- Added sort state management with sortConfig object
+- Created sort toggle functionality that reverses direction on repeat clicks
+- Ensured compatibility with the existing filter system
+- Optimized performance by using useMemo for filtered and sorted data
+
 ## Version 0.1 - April 10, 2025
 
 ### Core Features
@@ -8,16 +29,6 @@
 - Relational database structure with proper parent-child relationships
 - Response editing capability for customizing AI-generated content
 - Batch processing with real-time progress tracking
-
-### Recent Improvements
-- Fixed parameter passing between Node.js and Python script to resolve "Unsupported model provider" error
-- Added Raw Output tab to the LlmResponseViewer component for better debugging
-- Implemented proper markdown rendering using ReactMarkdown and remark-gfm plugins
-- Enhanced Similar Questions cards with:
-  - Category in bold at the top
-  - Cleaner display of scores and references
-  - Collapsible responses with toggle buttons
-- Fixed string escape sequence issues and Unicode character rendering
 
 ### UI Components
 - Dedicated pages for uploading requirements, viewing data, and generating responses
