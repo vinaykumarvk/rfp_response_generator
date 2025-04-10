@@ -15,11 +15,13 @@ import {
   Trash2, 
   Printer, 
   Mail, 
-  PlayCircle, 
   MoreHorizontal, 
   Sparkles,
   CheckSquare,
-  Square
+  Square,
+  Check,
+  Filter,
+  X
 } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import ReferencePanel from '@/components/ReferencePanel';
@@ -33,6 +35,15 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 export default function ViewData() {
   const [showResponseDialog, setShowResponseDialog] = useState(false);
@@ -41,10 +52,67 @@ export default function ViewData() {
   const [activeTab, setActiveTab] = useState('response');
   const [selectedItems, setSelectedItems] = useState<number[]>([]);
   const [selectAll, setSelectAll] = useState(false);
+  
+  // Filters
+  const [filters, setFilters] = useState({
+    rfpName: '',
+    category: '',
+    hasResponse: 'all', // 'all', 'yes', 'no'
+    generationMode: '', // 'openai', 'anthropic', 'deepseek', 'moa', ''
+  });
+  
   const isMobile = useIsMobile();
   
   const { data: excelData = [], isLoading: loading, refetch } = useQuery<ExcelRequirementResponse[]>({
     queryKey: ['/api/excel-requirements'],
+  });
+  
+  // Apply filters to the data
+  const filteredData = excelData.filter(row => {
+    // Filter by RFP name
+    if (filters.rfpName && row.rfpName) {
+      if (!row.rfpName.toLowerCase().includes(filters.rfpName.toLowerCase())) {
+        return false;
+      }
+    }
+    
+    // Filter by category
+    if (filters.category && row.category) {
+      if (!row.category.toLowerCase().includes(filters.category.toLowerCase())) {
+        return false;
+      }
+    }
+    
+    // Filter by response status
+    if (filters.hasResponse !== 'all') {
+      const hasResponse = !!row.finalResponse;
+      if ((filters.hasResponse === 'yes' && !hasResponse) || 
+          (filters.hasResponse === 'no' && hasResponse)) {
+        return false;
+      }
+    }
+    
+    // Filter by generation mode
+    if (filters.generationMode !== 'all' && filters.generationMode) {
+      // If openAI model was used to generate the response
+      if (filters.generationMode === 'openai' && !row.openaiResponse) {
+        return false;
+      }
+      // If Anthropic model was used
+      else if (filters.generationMode === 'anthropic' && !row.anthropicResponse) {
+        return false;
+      }
+      // If Deepseek model was used
+      else if (filters.generationMode === 'deepseek' && !row.deepseekResponse) {
+        return false;
+      }
+      // If MOA (Mixture of Agents) was used
+      else if (filters.generationMode === 'moa' && !row.moaResponse) {
+        return false;
+      }
+    }
+    
+    return true;
   });
   
   const handleViewResponse = (row: ExcelRequirementResponse) => {
@@ -92,15 +160,11 @@ export default function ViewData() {
         break;
       case 'mail':
         console.log('Mail items:', selectedItems);
-        alert(`Mail ${selectedItems.length} selected items`);
-        break;
-      case 'reprocess':
-        console.log('Reprocess items:', selectedItems);
-        alert(`Reprocess ${selectedItems.length} selected items`);
+        alert(`Email ${selectedItems.length} selected items`);
         break;
       case 'delete':
         console.log('Delete items:', selectedItems);
-        alert(`Delete ${selectedItems.length} selected items`);
+        alert(`Delete answers for ${selectedItems.length} selected items`);
         break;
       default:
         console.log('Unknown action:', action);
@@ -153,14 +217,10 @@ export default function ViewData() {
                     <Mail className="h-4 w-4" />
                     <span>Send Email</span>
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => handleBulkAction('reprocess')} className="gap-2">
-                    <PlayCircle className="h-4 w-4" />
-                    <span>Reprocess</span>
-                  </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => handleBulkAction('delete')} className="text-red-600 gap-2">
                     <Trash2 className="h-4 w-4" />
-                    <span>Delete</span>
+                    <span>Delete Answers</span>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -177,6 +237,84 @@ export default function ViewData() {
             </div>
           </div>
           
+          {/* Filter Section */}
+          <div className="p-4 border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800">
+            <div className="flex flex-col md:flex-row gap-4 items-end">
+              <div className="space-y-1 flex-1">
+                <Label htmlFor="filter-rfp">RFP Name</Label>
+                <Input
+                  id="filter-rfp"
+                  placeholder="Filter by RFP name..."
+                  value={filters.rfpName}
+                  onChange={(e) => setFilters({...filters, rfpName: e.target.value})}
+                  className="max-w-xs"
+                />
+              </div>
+              
+              <div className="space-y-1 flex-1">
+                <Label htmlFor="filter-category">Category</Label>
+                <Input
+                  id="filter-category"
+                  placeholder="Filter by category..."
+                  value={filters.category}
+                  onChange={(e) => setFilters({...filters, category: e.target.value})}
+                  className="max-w-xs"
+                />
+              </div>
+              
+              <div className="space-y-1 flex-1">
+                <Label htmlFor="filter-response">Response Status</Label>
+                <Select
+                  value={filters.hasResponse}
+                  onValueChange={(value) => setFilters({...filters, hasResponse: value})}
+                >
+                  <SelectTrigger id="filter-response" className="max-w-xs">
+                    <SelectValue placeholder="Filter by response status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All</SelectItem>
+                    <SelectItem value="yes">Has Response</SelectItem>
+                    <SelectItem value="no">No Response</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="space-y-1 flex-1">
+                <Label htmlFor="filter-model">Generation Mode</Label>
+                <Select
+                  value={filters.generationMode}
+                  onValueChange={(value) => setFilters({...filters, generationMode: value})}
+                >
+                  <SelectTrigger id="filter-model" className="max-w-xs">
+                    <SelectValue placeholder="Filter by model" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All</SelectItem>
+                    <SelectItem value="openai">OpenAI</SelectItem>
+                    <SelectItem value="anthropic">Anthropic</SelectItem>
+                    <SelectItem value="deepseek">Deepseek</SelectItem>
+                    <SelectItem value="moa">MOA</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => setFilters({
+                  rfpName: '',
+                  category: '',
+                  hasResponse: 'all',
+                  generationMode: 'all',
+                })}
+                className="mb-0.5"
+              >
+                <X className="h-4 w-4 mr-1" />
+                Clear Filters
+              </Button>
+            </div>
+          </div>
+
           <CardContent className="p-4">
             {loading ? (
               <div className="space-y-4">
