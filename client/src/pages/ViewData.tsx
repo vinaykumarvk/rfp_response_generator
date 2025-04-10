@@ -374,22 +374,25 @@ export default function ViewData() {
   };
   
   return (
-    <div className="space-y-4 sm:space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
         <h1 className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-primary to-primary/70 text-transparent bg-clip-text">View Uploaded Requirements</h1>
         
-        <Button 
-          size="sm" 
-          onClick={handleRefresh}
-          className="gap-1 self-end sm:self-auto"
-          variant="outline"
-        >
-          <RefreshCcw className="h-4 w-4" />
-          <span>{loading ? 'Refreshing...' : 'Refresh'}</span>
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button 
+            size="sm" 
+            onClick={handleRefresh}
+            className="h-8 w-8 p-0"
+            variant="ghost"
+            title="Refresh data"
+          >
+            <RefreshCcw className="h-4 w-4" />
+            <span className="sr-only">{loading ? 'Refreshing...' : 'Refresh'}</span>
+          </Button>
+        </div>
       </div>
       
-      <div className="pt-0 sm:pt-2">
+      <div>
         <Card className="shadow-sm">
           {/* Mobile UI - Header with compact controls */}
           <div className="md:hidden flex flex-col border-b border-slate-100 dark:border-slate-700">
@@ -407,9 +410,25 @@ export default function ViewData() {
               </div>
               
               <div className="flex items-center space-x-1">
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="h-8 w-8 p-0" 
+                  onClick={handleRefresh}
+                  title="Refresh data"
+                >
+                  <RefreshCcw className="h-4 w-4" />
+                  <span className="sr-only">Refresh</span>
+                </Button>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0" disabled={selectedItems.length === 0}>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-8 w-8 p-0" 
+                      disabled={selectedItems.length === 0}
+                      title="Generate responses"
+                    >
                       <Sparkles className="h-4 w-4" />
                       <span className="sr-only">Generate</span>
                     </Button>
@@ -439,7 +458,7 @@ export default function ViewData() {
                 
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0" title="Filter requirements">
                       <Filter className="h-4 w-4" />
                       <span className="sr-only">Filter</span>
                     </Button>
@@ -521,7 +540,7 @@ export default function ViewData() {
                 
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0" title="Sort requirements">
                       <ArrowUpDown className="h-4 w-4" />
                       <span className="sr-only">Sort</span>
                     </Button>
@@ -562,6 +581,7 @@ export default function ViewData() {
                   className="h-8 w-8 p-0 text-red-600"
                   onClick={() => handleBulkAction('delete')}
                   disabled={selectedItems.length === 0}
+                  title="Delete selected responses"
                 >
                   <Trash2 className="h-4 w-4" />
                   <span className="sr-only">Delete</span>
@@ -890,13 +910,18 @@ export default function ViewData() {
                             
                             {/* Requirement text with hover interaction */}
                             <div 
-                              className={`relative text-sm sm:text-base font-medium text-slate-800 dark:text-slate-100 line-clamp-3 cursor-pointer transition-all duration-200 ${!row.finalResponse ? 'opacity-70' : ''}`}
+                              className={`group relative text-sm sm:text-base font-medium text-slate-800 dark:text-slate-100 line-clamp-3 cursor-pointer transition-all duration-200 ${!row.finalResponse ? 'opacity-70' : ''}`}
                               onClick={() => row.finalResponse && handleViewResponse(row)}
+                              title={row.finalResponse ? "Click to view full response" : "No response generated yet"}
+                              aria-label={row.finalResponse ? "Click to view full response" : "No response generated yet"}
                             >
                               {row.requirement}
                               
                               {row.finalResponse && (
-                                <div className="absolute inset-0 bg-gradient-to-r from-transparent to-white/80 dark:to-black/80 opacity-0 hover:opacity-100 transition-opacity duration-200 flex items-center justify-end pr-4">
+                                <div className="absolute inset-0 bg-gradient-to-r from-transparent to-white/80 dark:to-black/80 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-end pr-4">
+                                  <span className="absolute right-10 top-1/2 transform -translate-y-1/2 bg-slate-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                                    Click to view
+                                  </span>
                                   <Hand className="h-5 w-5 text-primary" />
                                 </div>
                               )}
