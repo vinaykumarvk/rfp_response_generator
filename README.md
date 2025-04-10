@@ -1,67 +1,56 @@
-# RFP Response Generator
+# RFP Response Generator (v0.1)
 
-An advanced AI-powered RFP Response Generator that transforms complex proposal creation into an intuitive, strategic experience through intelligent document processing and multi-model AI synthesis.
+An advanced AI-powered RFP Response Generator that transforms complex proposal creation through intelligent multi-model AI integration and robust API connectivity.
 
-## Features
+## Key Features
 
-- **Excel Requirements Processing**: Upload and analyze Excel files containing RFP requirements
-- **Multi-Model AI Integration**: Leverage OpenAI, Anthropic, and Deepseek for enhanced response generation
-- **Mixture of Agents (MOA)**: Combine responses from multiple AI models for optimal results
-- **Card-Based UI**: Responsive interface that works well on both desktop and mobile devices
-- **Dark Mode Support**: Full theme support with dark and light modes
-- **Reference Tracking**: Maintains relationships between generated responses and reference materials
+- **Multi-model AI integration**: Supports OpenAI, Anthropic, and Deepseek models for comprehensive response generation
+- **Mixture of Agents (MOA)**: Combines responses from multiple AI models to create high-quality answers
+- **Vector Embeddings**: Uses similarity search to find relevant previous responses
+- **Excel Analysis**: Upload and analyze Excel files containing RFP requirements
+- **Response Editing**: Edit and customize AI-generated responses
+- **Batch Processing**: Generate responses for multiple requirements at once
+- **Proper Markdown Rendering**: Enhanced display with ReactMarkdown and remark-gfm
 
-## Technologies Used
+## Tech Stack
 
-- **Frontend**: React with TypeScript, TailwindCSS, shadcn/ui components
-- **Backend**: Express.js server with PostgreSQL database
-- **AI Models**: OpenAI GPT-4o, Anthropic Claude, Deepseek
-- **Data Processing**: Python with pandas, numpy, scikit-learn
-- **Vector Embeddings**: Text embedding for semantic similarity search
+- **Frontend**: React with TypeScript, TailwindCSS, and ShadCN UI components
+- **Backend**: Express server with Python processing capabilities
+- **Database**: PostgreSQL with Drizzle ORM
+- **AI Models**: OpenAI, Anthropic Claude, and Deepseek
+- **Vector Database**: In-memory vector store with similarity search
 
 ## Getting Started
 
-### Prerequisites
+1. Ensure you have the required environment variables:
+   - `OPENAI_API_KEY`
+   - `ANTHROPIC_API_KEY`
+   - `DATABASE_URL` (PostgreSQL connection string)
 
-- Node.js (v18+)
-- PostgreSQL database
-- Python 3.10+
-- API keys for OpenAI and Anthropic (optional)
-
-### Installation
-
-1. Clone the repository:
-   ```
-   git clone https://github.com/yourusername/rfp_response_generator.git
-   cd rfp_response_generator
-   ```
-
-2. Install dependencies:
-   ```
-   npm install
-   ```
-
-3. Set up environment variables:
-   Create a `.env` file with the following:
-   ```
-   DATABASE_URL=postgresql://username:password@localhost:5432/rfp_db
-   OPENAI_API_KEY=your_openai_api_key
-   ANTHROPIC_API_KEY=your_anthropic_api_key
-   ```
-
-4. Initialize the database:
-   ```
-   npm run db:push
-   ```
-
-5. Start the development server:
+2. Start the application:
    ```
    npm run dev
    ```
 
+3. Access the application at http://localhost:5000
+
+## Architecture
+
+The application follows a multi-tier architecture:
+
+1. **React Frontend**: Handles user interface and interactions
+2. **Express Backend**: Routes API requests and manages database operations
+3. **Python Processing**: Generates embeddings and LLM responses
+4. **PostgreSQL Database**: Stores requirements, responses, and references
+
 ## Usage
 
-1. **Upload Requirements**: Upload Excel files containing RFP requirements
-2. **View Data**: Browse and search through uploaded requirements
+1. **Upload Requirements**: Use the Excel Analyzer to upload and process RFP requirements
+2. **View Data**: Browse through the uploaded requirements
 3. **Generate Responses**: Select requirements and generate AI responses
-4. **Edit & Export**: Modify generated responses and export to desired formats
+4. **Edit Responses**: Customize the generated responses as needed
+5. **Export**: Export the final responses in the desired format
+
+## Development
+
+See the [VERSION.md](VERSION.md) file for a detailed changelog and development history.
