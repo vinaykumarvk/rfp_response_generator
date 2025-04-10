@@ -4,6 +4,8 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 type SimilarResponse = {
   text: string;
@@ -115,36 +117,14 @@ export default function LlmResponseViewer() {
 
     // Clean up escaped characters first
     let cleanedResponse = finalResponse
-      .replace(/\\n/g, "\n")
+      .replace(/\\n/g, '\n')
       .replace(/\\"/g, '"')
       .replace(/\\\\/g, '\\');
 
-    // Format the response with markdown syntax
-    const formattedResponse = cleanedResponse
-      // Format headings (# Heading -> <h1>Heading</h1>, etc.)
-      .replace(/^### (.*$)/gm, '<h3>$1</h3>')
-      .replace(/^## (.*$)/gm, '<h2>$1</h2>')
-      .replace(/^# (.*$)/gm, '<h1>$1</h1>')
-      // Format bold text (**text** -> <strong>text</strong>)
-      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-      // Format italic text (*text* -> <em>text</em>)
-      .replace(/\*(.*?)\*/g, '<em>$1</em>')
-      // Format lists
-      .replace(/^\d+\.\s+(.*$)/gm, '<li>$1</li>')
-      .replace(/^\s*[-*]\s+(.*$)/gm, '<li>$1</li>')
-      // Wrap lists in ul/ol tags
-      .replace(/(<li>.*<\/li>)\n(<li>)/g, '$1$2')
-      .replace(/(<li>.*<\/li>)(?!\n<li>)/g, '<ul>$1</ul>')
-      // Format paragraphs (double line breaks)
-      .replace(/\n\n/g, '</p><p>')
-      // Preserve line breaks within paragraphs
-      .replace(/\n/g, '<br />');
-
     return (
-      <div 
-        className="prose prose-slate dark:prose-invert max-w-none"
-        dangerouslySetInnerHTML={{ __html: `<p>${formattedResponse}</p>` }}
-      />
+      <div className="prose prose-slate dark:prose-invert max-w-none">
+        <ReactMarkdown remarkPlugins={[remarkGfm]}>{cleanedResponse}</ReactMarkdown>
+      </div>
     );
   };
 
