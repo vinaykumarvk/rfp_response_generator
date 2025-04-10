@@ -401,7 +401,6 @@ export default function ViewData() {
             <div className="p-4 bg-white dark:bg-slate-900">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div>
-                  <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100">Requirements</h2>
                   <p className="text-sm text-slate-500 dark:text-slate-400">
                     {filteredData.length} {filteredData.length === 1 ? 'item' : 'items'} 
                     {filteredData.length !== excelData.length ? 
