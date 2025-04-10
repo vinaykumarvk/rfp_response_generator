@@ -1,6 +1,8 @@
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -681,7 +683,16 @@ export default function ViewData() {
                 <TabsContent value="response">
                   <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-md mb-4">
                     <h4 className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-2">Response:</h4>
-                    <p className="text-slate-800 dark:text-slate-200 whitespace-pre-wrap">{selectedResponse.finalResponse}</p>
+                    <div className="prose prose-slate dark:prose-invert max-w-none">
+                      {selectedResponse.finalResponse && (
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                          {selectedResponse.finalResponse
+                            .replace(/\\n/g, '\n')
+                            .replace(/\\"/g, '"')
+                            .replace(/\\\\/g, '\\')}
+                        </ReactMarkdown>
+                      )}
+                    </div>
                   </div>
                 </TabsContent>
                 
