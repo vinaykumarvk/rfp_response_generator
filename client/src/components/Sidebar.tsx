@@ -44,12 +44,6 @@ export default function Sidebar() {
       active: location === '/view-data'
     },
     {
-      title: 'Generate Response',
-      icon: <MessageSquare className="h-5 w-5" />,
-      path: '/generate-response',
-      active: location === '/generate-response'
-    },
-    {
       title: 'Standalone Response',
       icon: <BookOpen className="h-5 w-5" />,
       path: '/llm-response-viewer',
@@ -82,17 +76,15 @@ export default function Sidebar() {
         }}
       >
         <div className="bg-white dark:bg-slate-800 w-full max-w-[300px] h-full shadow-xl animate-in slide-in-from-right">
-          <div className="p-5 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
-            <div className="flex items-center">
-              <img src={intellectLogo} alt="intellectAI Logo" className="h-8 w-auto" />
-              <h2 className="ml-3 font-semibold text-slate-800 dark:text-slate-100 text-lg">RFP Generator</h2>
-            </div>
+          <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
+            <h2 className="font-semibold text-slate-800 dark:text-slate-100 text-lg">Menu</h2>
             <Button 
               variant="ghost" 
               size="sm"
               className="rounded-full h-8 w-8 p-0"
               onClick={toggleMobileMenu}
               aria-label="Close menu"
+              title="Close menu"
             >
               <X className="h-5 w-5" />
             </Button>
@@ -154,21 +146,13 @@ export default function Sidebar() {
       )}
     >
       <div className="flex flex-col h-full">
-        <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
-          {!collapsed && (
-            <div className="flex items-center">
-              <img src={intellectLogo} alt="intellectAI Logo" className="h-6 w-auto" />
-              <h2 className="ml-2 font-semibold text-slate-800 dark:text-slate-100">RFP Generator</h2>
-            </div>
-          )}
-          {collapsed && (
-            <img src={intellectLogo} alt="intellectAI Logo" className="h-6 w-auto mx-auto" />
-          )}
+        <div className="p-2 border-b border-slate-200 dark:border-slate-700 flex justify-end items-center">
           <Button 
             variant="ghost" 
             size="sm" 
             onClick={() => setCollapsed(!collapsed)}
-            className={!collapsed ? "ml-auto" : "ml-auto mt-3"}
+            className="h-8 w-8 p-0"
+            title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           >
             {collapsed ? (
               <ChevronRight className="h-5 w-5" />
@@ -190,6 +174,7 @@ export default function Sidebar() {
                         : "text-slate-700 dark:text-slate-200",
                       collapsed && "justify-center"
                     )}
+                    title={item.title}
                   >
                     <span className={cn("flex-shrink-0", collapsed ? "" : "mr-3")}>
                       {item.icon}
