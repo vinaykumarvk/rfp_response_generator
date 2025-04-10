@@ -241,10 +241,18 @@ export class DatabaseStorage implements IStorage {
       if (response.rating !== undefined) updateData.rating = response.rating;
       
       // Include model-specific responses
-      if (response.openaiResponse !== undefined) updateData.openaiResponse = response.openaiResponse;
-      if (response.anthropicResponse !== undefined) updateData.anthropicResponse = response.anthropicResponse;
-      if (response.deepseekResponse !== undefined) updateData.deepseekResponse = response.deepseekResponse;
-      if (response.moaResponse !== undefined) updateData.moaResponse = response.moaResponse;
+      console.log("MODEL RESPONSE DATA CHECK:");
+      console.log("- openaiResponse:", response.openaiResponse ? `Present (Length: ${response.openaiResponse.length})` : "Not present or empty");
+      console.log("- anthropicResponse:", response.anthropicResponse ? `Present (Length: ${response.anthropicResponse.length})` : "Not present or empty");
+      console.log("- deepseekResponse:", response.deepseekResponse ? `Present (Length: ${response.deepseekResponse.length})` : "Not present or empty");
+      console.log("- moaResponse:", response.moaResponse ? `Present (Length: ${response.moaResponse.length})` : "Not present or empty");
+      
+      // Always update all model-specific responses with whatever values came in
+      // Even if they're null, we need to ensure they get updated
+      updateData.openaiResponse = response.openaiResponse;
+      updateData.anthropicResponse = response.anthropicResponse;
+      updateData.deepseekResponse = response.deepseekResponse;
+      updateData.moaResponse = response.moaResponse;
       if (response.similarQuestions !== undefined) updateData.similarQuestions = response.similarQuestions;
       
       // Update the existing response
