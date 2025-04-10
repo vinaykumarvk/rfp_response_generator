@@ -533,6 +533,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     deepseek_response: result.deepseek_response ? `Present (${result.deepseek_response.substring(0, 30)}...)` : "Not present",
                   });
                   
+                  // Log the complete raw response for debugging
+                  console.log("RAW OPENAI RESPONSE (FULL):", JSON.stringify({
+                    openai_response: result.openai_response || null
+                  }, null, 2));
+                  
                   // Also check for other possible property names
                   if (result.openaiResponse) console.log("Found alternate property: openaiResponse");
                   if (result.anthropicResponse) console.log("Found alternate property: anthropicResponse");
