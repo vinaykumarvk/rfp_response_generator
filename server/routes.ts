@@ -5,7 +5,9 @@ import {
   insertRfpResponseSchema, 
   insertExcelRequirementResponseSchema, 
   insertReferenceResponseSchema, 
-  InsertReferenceResponse 
+  InsertReferenceResponse,
+  type ReferenceResponse,
+  type ExcelRequirementResponse
 } from "@shared/schema";
 import { fromZodError } from "zod-validation-error";
 import { spawn } from "child_process";
@@ -471,14 +473,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   return res.status(404).json({ message: "Requirement not found" });
                 }
                 
-                // Get today's date for the response timestamp
-                const timestamp = new Date();
-                
                 // Update only the moaResponse and finalResponse fields
                 const updatedResponse = await storage.updateExcelRequirementResponse(Number(requirementId), {
                   moaResponse: result.moa_response || result.generated_response,
-                  finalResponse: result.moa_response || result.generated_response,
-                  timestamp: timestamp
+                  finalResponse: result.moa_response || result.generated_response
                 });
                 
                 if (!updatedResponse) {
@@ -610,7 +608,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 deepseekResponse: deepseekResponse,
                 // Don't set moaResponse or finalResponse yet for phase 1
                 modelProvider: provider,
-                timestamp: timestamp,
                 rating: null  // Reset rating for the new response
               });
               
@@ -631,8 +628,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   requirement: item.requirement || '',
                   response: item.response || '',
                   reference: item.reference || '',
-                  score: item.score || 0,
-                  timestamp: new Date()
+                  score: item.score || 0
                 }));
                 
                 // Save references
