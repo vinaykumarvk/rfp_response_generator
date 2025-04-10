@@ -49,7 +49,7 @@ export default function GenerateResponse() {
   const [similarResponses, setSimilarResponses] = useState<SimilarResponse[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [modelProvider, setModelProvider] = useState<string>("openai");
-  const [useModelMixture, setUseModelMixture] = useState<boolean>(false); // Whether to use MOA (Mixture of Agents)
+  const [useModelMixture, setUseModelMixture] = useState<boolean>(true); // Whether to use MOA (Mixture of Agents)
   const [showSimilarResponses, setShowSimilarResponses] = useState(false);
   const [activeTab, setActiveTab] = useState<string>("response");
   const [selectedRequirementId, setSelectedRequirementId] = useState<number | undefined>(undefined);
@@ -69,7 +69,7 @@ export default function GenerateResponse() {
   const [currentModelFetching, setCurrentModelFetching] = useState<string | null>(null); // Current model being fetched
   const [showReprocessModal, setShowReprocessModal] = useState(false);
   const [reprocessModelProvider, setReprocessModelProvider] = useState<string>("openai");
-  const [reprocessUseModelMixture, setReprocessUseModelMixture] = useState<boolean>(false);
+  const [reprocessUseModelMixture, setReprocessUseModelMixture] = useState<boolean>(true);
   const [reprocessing, setReprocessing] = useState(false);
   const { toast } = useToast();
 
