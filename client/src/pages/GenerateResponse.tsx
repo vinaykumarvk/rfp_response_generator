@@ -370,7 +370,13 @@ export default function GenerateResponse() {
             description: `Processed ${i} of ${selectedIds.length} requirements before cancellation.`,
             variant: "default"
           });
-          break;
+          // Set final state for progress
+          setBatchGenerating(false);
+          setMoaPhase(null);
+          setMoaPhaseProgress(0);
+          setCurrentModelFetching(null);
+          setIsCanceled(false);
+          return; // Exit the function completely
         }
 
         const id = selectedIds[i];
