@@ -1770,6 +1770,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Add a new endpoint for testing LLM connectivity
+  app.get("/api/test-moa", async (_req: Request, res: Response) => {
+    try {
+      console.log("Running MOA response test...");
+      
+      // Import the test script (dynamically to avoid TypeScript errors)
+      const testModule = await import('./test_moa_responses.js');
+      const { testMoaResponses } = testModule;
+      
+      // Run the test
+      const results = await testMoaResponses();
+      
+      // Return the results
+      return res.status(200).json({
+        message: "MOA Response Test completed",
+        results
+      });
+    } catch (error: any) {
+      console.error("Error running MOA response test:", error);
+      return res.status(500).json({ error: error.message || "Unknown error occurred" });
+    }
+  });
+  
+  app.get("/api/generate-test-moa", async (_req: Request, res: Response) => {
+    try {
+      console.log("Generating a test MOA response...");
+      
+      // Import the test script (dynamically to avoid TypeScript errors)
+      const testModule = await import('./test_moa_responses.js');
+      const { generateTestMoaResponse } = testModule;
+      
+      // Run the test generation
+      const results = await generateTestMoaResponse();
+      
+      // Return the results
+      return res.status(200).json({
+        message: "MOA test response generation completed",
+        results
+      });
+    } catch (error: any) {
+      console.error("Error generating test MOA response:", error);
+      return res.status(500).json({ error: error.message || "Unknown error occurred" });
+    }
+  });
+  
   app.post("/api/test-llm", async (req: Request, res: Response) => {
     try {
       const { requirement_text, modelProvider = "openai" } = req.body;
