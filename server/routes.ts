@@ -802,6 +802,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     deepseekResponse: responseToSave.deepseekResponse ? `Present (${responseToSave.deepseekResponse.length} chars)` : "Not set",
                     moaResponse: responseToSave.moaResponse ? `Present (${responseToSave.moaResponse.length} chars)` : "Not set"
                   });
+                  
+                  try {
+                    // Save the response with references
+                    const savedData = await storage.createResponseWithReferences(
+                      {
+                        ...responseToSave,
+                        
+                        // Store similar questions as JSON string if available
+                        similarQuestions: result.similar_responses ? JSON.stringify(result.similar_responses) : '',
+                        
+                        // Store RFP identification fields
+                        rfpName: rfpName || existingRequirement?.rfpName || '',
+                        requirementId: existingRequirement?.requirementId || '',
+                        uploadedBy: uploadedBy || existingRequirement?.uploadedBy || '',
+                        
+                        // If there was an existing requirement, preserve other fields
+                        ...(existingRequirement || {})
+                      },
+                      referenceData
+                    );
+                    
+                    console.log("=== REFERENCES SAVED SUCCESSFULLY ===");
+                    console.log("Saved response:", JSON.stringify(savedData.response, null, 2));
+                    console.log("Saved references count:", savedData.references.length);
+                    
+                    if (savedData.response) {
+                      result.saved = true;
+                      result.updatedResponse = savedData.response;
+                      result.savedReferences = savedData.references;
+                    }
+                  } catch (error) {
+                    console.error("Failed to save response and references:", error);
+                    result.saveError = error instanceof Error 
+                      ? error.message 
+                      : "Unknown error saving response";
+                  }
                 } catch (error) {
                   console.error("Failed to save references:", error);
                   result.saveError = error instanceof Error 
