@@ -650,43 +650,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     }
                   }
                   
-                  // For OpenAI provider, let's use a more direct approach
-                  let directOpenaiResponse = null;
-                  let directAnthropicResponse = null;
-                  let directDeepseekResponse = null;
-                  let directFinalResponse = null;
+                  // SIMPLIFIED DIRECT APPROACH FOR MODEL RESPONSES
+                  // Directly map the generated response into the appropriate model field
                   
-                  if (provider === "openai") {
-                    directOpenaiResponse = result.generated_response || '';
-                    directFinalResponse = result.generated_response || '';
-                  } else if (provider === "anthropic") {
-                    directAnthropicResponse = result.generated_response || '';
-                    directFinalResponse = result.generated_response || '';
-                  } else if (provider === "deepseek") {
-                    directDeepseekResponse = result.generated_response || '';
-                    directFinalResponse = result.generated_response || '';
-                  } else { // moa
-                    directFinalResponse = result.generated_response || '';
+                  // First, ensure we have the generated response
+                  const aiGeneratedResponse = result.generated_response || '';
+                  
+                  if (!aiGeneratedResponse) {
+                    console.log("WARNING: No generated_response available in result");
+                  } else {
+                    console.log(`SUCCESS: Got generated_response (${aiGeneratedResponse.length} chars)`);
                   }
                   
-                  console.log("DIRECT APPROACH - Values to save:");
-                  console.log("- directOpenaiResponse:", directOpenaiResponse ? "Present and length " + directOpenaiResponse.length : "Not present");
-                  console.log("- directFinalResponse:", directFinalResponse ? "Present and length " + directFinalResponse.length : "Not present");
+                  // Reset all response fields from above code
+                  finalResponse = '';
+                  openaiResponse = null;
+                  anthropicResponse = null;
+                  deepseekResponse = null;
+                  moaResponse = null;
                   
-                  // Create the response object with all fields explicitly set
+                  // Always set finalResponse to the generated response
+                  finalResponse = aiGeneratedResponse;
+                  
+                  // Also set the model-specific response based on the provider
+                  if (provider === "openai") {
+                    console.log("Setting openaiResponse directly from generated_response");
+                    openaiResponse = aiGeneratedResponse;
+                  } else if (provider === "anthropic") {
+                    console.log("Setting anthropicResponse directly from generated_response");
+                    anthropicResponse = aiGeneratedResponse;
+                  } else if (provider === "deepseek") {
+                    console.log("Setting deepseekResponse directly from generated_response");
+                    deepseekResponse = aiGeneratedResponse;
+                  } else if (provider === "moa") {
+                    console.log("Setting moaResponse directly from generated_response");
+                    moaResponse = aiGeneratedResponse;
+                  }
+                  
+                  // Debug log what we're going to save
+                  console.log("DIRECT FIELD VALUES - About to save:");
+                  console.log("- finalResponse:", finalResponse ? `Present (${finalResponse.length} chars)` : "Not present");
+                  console.log("- openaiResponse:", openaiResponse ? `Present (${openaiResponse.length} chars)` : "Not present");
+                  console.log("- anthropicResponse:", anthropicResponse ? `Present (${anthropicResponse.length} chars)` : "Not present");
+                  console.log("- deepseekResponse:", deepseekResponse ? `Present (${deepseekResponse.length} chars)` : "Not present");
+                  console.log("- moaResponse:", moaResponse ? `Present (${moaResponse.length} chars)` : "Not present");
+                  
+                  // Create the response object with simplified field mapping
                   const responseToSave = {
                     // Core fields
                     requirement: requirement,
-                    finalResponse: directFinalResponse || finalResponse,
-                    openaiResponse: provider === "openai" ? (directOpenaiResponse || '') : (openaiResponse || null),
-                    anthropicResponse: provider === "anthropic" ? (directAnthropicResponse || '') : (anthropicResponse || null),
-                    deepseekResponse: provider === "deepseek" ? (directDeepseekResponse || '') : (deepseekResponse || null),
+                    finalResponse: finalResponse,
+                    openaiResponse: openaiResponse,
+                    anthropicResponse: anthropicResponse,
+                    deepseekResponse: deepseekResponse,
+                    moaResponse: moaResponse,
                     category: existingRequirement?.category || '',
                     timestamp: new Date().toISOString(),
-                    modelProvider: provider,
-                    
-                    // Store MOA response if available
-                    moaResponse: provider === "moa" ? (result.generated_response || '') : (moaResponse || null),
+                    modelProvider: provider
                   };
                   
                   // Log the entire object being saved
@@ -824,6 +844,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updateData = {
         id: existingRequirement.id,
         requirement: existingRequirement.requirement,
+        category: existingRequirement.category,
+        rfpName: existingRequirement.rfpName,
+        requirementId: existingRequirement.requirementId,
+        uploadedBy: existingRequirement.uploadedBy,
         finalResponse,
         openaiResponse: openaiResponse || null,
         anthropicResponse: anthropicResponse || null,
