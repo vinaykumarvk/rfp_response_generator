@@ -19,6 +19,35 @@ app.use((req, res, next) => {
     return originalResJson.apply(res, [bodyJson, ...args]);
   };
 
+  // Add enhanced debugging for specific API endpoints
+  if (path === '/api/generate-response') {
+    console.log('==== DETAILED REQUEST DEBUG - /api/generate-response ====');
+    console.log('Request body:', JSON.stringify(req.body, null, 2));
+    
+    // Capture and log the specific model response fields
+    const originalEnd = res.end;
+    res.end = function(chunk: any, ...args: any[]) {
+      // Only log on successful responses
+      if (res.statusCode >= 200 && res.statusCode < 300 && capturedJsonResponse) {
+        console.log('==== DETAILED RESPONSE DEBUG - /api/generate-response ====');
+        
+        // Check for model-specific response fields
+        const generatedResponse = capturedJsonResponse.generated_response || null;
+        const openaiResponse = capturedJsonResponse.openai_response || null;
+        const anthropicResponse = capturedJsonResponse.anthropic_response || null;
+        const deepseekResponse = capturedJsonResponse.deepseek_response || null;
+        
+        console.log('Response fields:');
+        console.log('- generated_response:', generatedResponse ? `Present (${generatedResponse.length} chars)` : 'Not present');
+        console.log('- openai_response:', openaiResponse ? `Present (${openaiResponse.length} chars)` : 'Not present');
+        console.log('- anthropic_response:', anthropicResponse ? `Present (${anthropicResponse.length} chars)` : 'Not present');
+        console.log('- deepseek_response:', deepseekResponse ? `Present (${deepseekResponse.length} chars)` : 'Not present');
+      }
+      
+      return originalEnd.apply(res, [chunk, ...args]);
+    };
+  }
+
   res.on("finish", () => {
     const duration = Date.now() - start;
     if (path.startsWith("/api")) {

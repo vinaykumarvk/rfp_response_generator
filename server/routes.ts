@@ -401,7 +401,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // Collect stdout data
         process.stdout.on('data', (data) => {
-          stdout += data.toString();
+          const output = data.toString();
+          stdout += output;
+          console.log("PYTHON STDOUT CHUNK:", output.length <= 500 ? output : output.substring(0, 497) + "...");
         });
         
         // Collect stderr data
