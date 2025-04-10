@@ -240,6 +240,13 @@ export class DatabaseStorage implements IStorage {
       if (response.modelProvider !== undefined) updateData.modelProvider = response.modelProvider;
       if (response.rating !== undefined) updateData.rating = response.rating;
       
+      // Include model-specific responses
+      if (response.openaiResponse !== undefined) updateData.openaiResponse = response.openaiResponse;
+      if (response.anthropicResponse !== undefined) updateData.anthropicResponse = response.anthropicResponse;
+      if (response.deepseekResponse !== undefined) updateData.deepseekResponse = response.deepseekResponse;
+      if (response.moaResponse !== undefined) updateData.moaResponse = response.moaResponse;
+      if (response.similarQuestions !== undefined) updateData.similarQuestions = response.similarQuestions;
+      
       // Update the existing response
       const updatedResponse = await this.updateExcelRequirementResponse(id, updateData);
       
@@ -259,7 +266,12 @@ export class DatabaseStorage implements IStorage {
         category: response.category || '',
         finalResponse: '', // Temporary value, will be updated below
         modelProvider: response.modelProvider || null,
-        rating: response.rating || null
+        rating: response.rating || null,
+        openaiResponse: response.openaiResponse || null,
+        anthropicResponse: response.anthropicResponse || null,
+        deepseekResponse: response.deepseekResponse || null,
+        moaResponse: response.moaResponse || null,
+        similarQuestions: response.similarQuestions || ''
       };
       
       // Ensure finalResponse is never empty for new records
