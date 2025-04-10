@@ -998,43 +998,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Add direct test endpoint as a cleaner alternative
   app.post("/api/test-field-mapping", async (req: Request, res: Response) => {
     try {
-      // Execute our field mapping test script and return the output
-      const scriptPath = path.resolve(process.cwd(), 'server/test_field_mapping.js');
-      
-      if (!fs.existsSync(scriptPath)) {
-        return res.status(500).json({
-          success: false,
-          error: `Test script not found at: ${scriptPath}`
-        });
-      }
-      
-      const nodeProcess = spawn('node', [scriptPath]);
-      
-      let stdout = '';
-      let stderr = '';
-      
-      nodeProcess.stdout.on('data', (data) => {
-        stdout += data.toString();
-      });
-      
-      nodeProcess.stderr.on('data', (data) => {
-        stderr += data.toString();
-      });
-      
-      nodeProcess.on('close', (code) => {
-        if (code !== 0) {
+      // Import our field mapping module directly here
+      // This will be cleaner than spawning a separate process
+      import('./field_mapping_fix.js')
+        .then(({ mapPythonResponseToDbFields }) => {
+          // Sample responses to test
+          const testResponses = [
+            {
+              provider: "openai",
+              input: {
+                provider: "openai",
+                generated_response: "This is a generated response from OpenAI",
+                openai_response: "This is the OpenAI response field content",
+                similar_responses: []
+              }
+            },
+            {
+              provider: "anthropic",
+              input: {
+                provider: "anthropic",
+                generated_response: "This is a generated response from Anthropic",
+                anthropic_response: "This is the Anthropic response field content",
+                similar_responses: []
+              }
+            },
+            {
+              provider: "moa",
+              input: {
+                provider: "moa",
+                generated_response: "This is a combined MOA response",
+                openai_response: "This is the OpenAI part of MOA",
+                anthropic_response: "This is the Anthropic part of MOA",
+                similar_responses: []
+              }
+            }
+          ];
+          
+          // Process each test and collect results
+          const results = testResponses.map(test => {
+            const mapped = mapPythonResponseToDbFields(test.input, test.provider);
+            return {
+              provider: test.provider,
+              input: test.input,
+              output: mapped
+            };
+          });
+          
+          return res.json({
+            success: true,
+            message: "Field mapping tests completed successfully",
+            results
+          });
+        })
+        .catch(error => {
+          console.error("Error importing field mapping module:", error);
           return res.status(500).json({
             success: false,
-            error: stderr || `Process exited with code ${code}`
+            error: `Failed to import field mapping module: ${error instanceof Error ? error.message : String(error)}`
           });
-        }
-        
-        return res.json({
-          success: true,
-          message: "Field mapping test completed successfully",
-          output: stdout
         });
-      });
     } catch (error) {
       console.error("Error testing field mapping:", error);
       return res.status(500).json({

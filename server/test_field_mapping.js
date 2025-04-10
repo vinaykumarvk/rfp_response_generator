@@ -1,4 +1,4 @@
-// Test script for field mapping
+// Test script for field mapping - using ESM
 import { mapPythonResponseToDbFields } from './field_mapping_fix.js';
 
 // Sample OpenAI response

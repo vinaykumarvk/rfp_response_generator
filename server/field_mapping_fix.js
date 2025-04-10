@@ -21,7 +21,7 @@
  * @param {string} provider - The model provider name ('openai', 'anthropic', 'deepseek', 'moa')
  * @returns {Object} Object with mapped field names ready for database
  */
-function mapPythonResponseToDbFields(pythonOutput, provider) {
+export function mapPythonResponseToDbFields(pythonOutput, provider) {
   // Start with empty values for all fields
   const mappedFields = {
     finalResponse: null,
@@ -110,7 +110,4 @@ function mapPythonResponseToDbFields(pythonOutput, provider) {
   return mappedFields;
 }
 
-// Export the utility function
-module.exports = {
-  mapPythonResponseToDbFields
-};
+// In ES modules, we use named exports above instead of module.exports
