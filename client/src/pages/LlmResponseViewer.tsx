@@ -128,6 +128,53 @@ export default function LlmResponseViewer() {
     );
   };
 
+  const SimilarResponseCard = ({ item }: { item: SimilarResponse }) => {
+    const [isResponseVisible, setIsResponseVisible] = useState(false);
+    
+    return (
+      <Card className="flex flex-col h-full">
+        <CardHeader className="pb-2">
+          <div className="font-bold mb-2">Category: {item.category}</div>
+          <div className="text-base mb-2">{item.text || 'Unnamed Response'}</div>
+          <CardDescription className="text-xs">
+            Score: {(item.score * 100).toFixed(2)}%
+            {item.reference && ` | Ref: ${item.reference}`}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="pt-0">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="w-full flex items-center justify-between"
+            onClick={() => setIsResponseVisible(!isResponseVisible)}
+          >
+            <span>Response</span>
+            <svg 
+              xmlns="http://www.w3.org/2000/svg" 
+              width="16" 
+              height="16" 
+              viewBox="0 0 24 24" 
+              fill="none" 
+              stroke="currentColor" 
+              strokeWidth="2" 
+              strokeLinecap="round" 
+              strokeLinejoin="round" 
+              className={`transition-transform ${isResponseVisible ? 'rotate-180' : ''}`}
+            >
+              <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
+          </Button>
+          
+          {isResponseVisible && (
+            <div className="whitespace-pre-wrap text-sm mt-3 border p-3 rounded-md bg-slate-50 dark:bg-slate-800">
+              {item.response}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    );
+  };
+
   const renderSimilarResponses = () => {
     if (!apiResponse) return <p>No response yet</p>;
     if (apiResponse.error) return <p className="text-red-500">{apiResponse.error}</p>;
@@ -138,18 +185,7 @@ export default function LlmResponseViewer() {
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {apiResponse.similar_responses.map((item, index) => (
-          <Card key={index} className="flex flex-col h-full">
-            <CardHeader>
-              <CardTitle className="text-base">{item.text || 'Unnamed Response'}</CardTitle>
-              <CardDescription>
-                Score: {(item.score * 100).toFixed(2)}% | Category: {item.category} 
-                {item.reference && ` | Ref: ${item.reference}`}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="flex-grow">
-              <div className="whitespace-pre-wrap text-sm">{item.response}</div>
-            </CardContent>
-          </Card>
+          <SimilarResponseCard key={index} item={item} />
         ))}
       </div>
     );
