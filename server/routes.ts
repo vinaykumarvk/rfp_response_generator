@@ -886,171 +886,143 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Add a new endpoint for testing LLM connectivity
   app.post("/api/test-llm", async (req: Request, res: Response) => {
     try {
-      const { requirement, provider = "openai" } = req.body;
+      const { requirement_text, model_provider = "openai" } = req.body;
       
-      if (!requirement) {
-        return res.status(400).json({ message: "Requirement text is required" });
+      if (!requirement_text) {
+        return res.status(400).json({ error: "Missing requirement_text parameter" });
       }
       
-      console.log(`Testing LLM connectivity with requirement: "${requirement}" and provider: ${provider}`);
+      // Call the Python script to process the requirement
+      const pythonProcess = spawn("python3", [
+        path.join(process.cwd(), "server", "rfp_response_generator.py"),
+        "--requirement", requirement_text,
+        "--model", model_provider
+      ]);
       
-      // Special fast-path for test_connection_only mode
-      if (requirement === "test_connection_only") {
-        console.log("Using fast-path test_connection_only mode");
-      }
+      let stdout = "";
+      let stderr = "";
       
-      // Use Python script to test connectivity
-      const scriptPath = path.resolve(process.cwd(), 'server/rfp_response_generator.py');
-      console.log(`Using Python script at: ${scriptPath}`);
+      pythonProcess.stdout.on("data", (data) => {
+        stdout += data.toString();
+      });
       
-      if (!fs.existsSync(scriptPath)) {
-        console.error(`Python script not found at: ${scriptPath}`);
-        return res.status(500).json({
-          error: `Python script not found at: ${scriptPath}`,
-          message: "Script file not found"
+      pythonProcess.stderr.on("data", (data) => {
+        stderr += data.toString();
+      });
+      
+      // Set a timeout for the process
+      const timeout = setTimeout(() => {
+        pythonProcess.kill();
+        res.status(500).json({ 
+          error: "Process timed out after 30 seconds", 
+          stdout: stdout.substring(0, 500)
         });
-      }
+      }, 30000);
       
-      console.log(`Spawning Python process with args: [${scriptPath}, ${requirement}, ${provider}]`);
-      
-      return new Promise<void>((resolve, reject) => {
-        // Spawn Python process with the correct parameters
-        const pythonProcess = spawn('python3', [scriptPath, requirement, provider]);
+      pythonProcess.on("close", (code) => {
+        clearTimeout(timeout);
         
-        let stdout = '';
-        let stderr = '';
+        if (code !== 0) {
+          console.error(`Process exited with code ${code}`);
+          console.error("STDERR:", stderr);
+          return res.status(500).json({ 
+            error: `Processing failed with exit code ${code}`, 
+            stderr 
+          });
+        }
         
-        // Collect stdout data
-        pythonProcess.stdout.on('data', (data) => {
-          stdout += data.toString();
-          console.log(`Python stdout chunk: ${data.toString().substring(0, 100)}...`);
-        });
+        // Extract meaningful parts from the output
+        let responseData: Record<string, any> = {};
         
-        // Collect stderr data
-        pythonProcess.stderr.on('data', (data) => {
-          stderr += data.toString();
-          console.log(`Python stderr: ${data.toString()}`);
-        });
+        // Try to extract the final response
+        let finalResponse = "";
         
-        // Handle process close
-        pythonProcess.on('close', async (code) => {
-          console.log(`Python process exited with code ${code}`);
-          
-          if (code !== 0) {
-            console.error(`Error output: ${stderr}`);
-            res.status(500).json({ 
-              message: "Failed to test LLM connectivity", 
-              error: stderr || "Python process exited with non-zero code",
-              stdout: stdout,
-              stderr: stderr
-            });
-            resolve();
-            return;
-          }
-          
-          // Try to find valid JSON in the output
-          try {
-            console.log("===== TEST LLM RAW OUTPUT FROM PYTHON =====");
-            console.log(stdout);
-            console.log("===== END RAW OUTPUT =====");
+        // Look for OpenAI response
+        const openaiMatch = stdout.match(/openai_response["\s:]+([^"]+)/);
+        if (openaiMatch && openaiMatch[1]) {
+          responseData.openai_response = openaiMatch[1].trim();
+          finalResponse = responseData.openai_response;
+        }
+        
+        // Look for Anthropic response
+        const anthropicMatch = stdout.match(/anthropic_response["\s:]+([^"]+)/);
+        if (anthropicMatch && anthropicMatch[1]) {
+          responseData.anthropic_response = anthropicMatch[1].trim();
+          if (!finalResponse) finalResponse = responseData.anthropic_response;
+        }
+        
+        // Look for the generated response
+        const generatedMatch = stdout.match(/generated_response["\s:]+([^"]+)/);
+        if (generatedMatch && generatedMatch[1]) {
+          responseData.generated_response = generatedMatch[1].trim();
+          finalResponse = responseData.generated_response;
+        }
+        
+        // Try to extract similar responses
+        try {
+          // Find the start of the similar_responses array
+          const startIndex = stdout.indexOf('"similar_responses"');
+          if (startIndex !== -1) {
+            const arrayStart = stdout.indexOf('[', startIndex);
+            let arrayEnd = -1;
+            let bracketCount = 1;
             
-            // Check if the output contains any JSON
-            let jsonStr = stdout.trim();
-            
-            // Handle Python print statements before the JSON
-            const lastOpenBrace = jsonStr.lastIndexOf('{');
-            const lastCloseBrace = jsonStr.lastIndexOf('}');
-            
-            if (lastOpenBrace !== -1 && lastCloseBrace !== -1 && lastOpenBrace < lastCloseBrace) {
-              // Extract what looks like JSON
-              jsonStr = jsonStr.substring(lastOpenBrace, lastCloseBrace + 1);
-              console.log("Extracted potential JSON:", jsonStr);
+            // Find the matching closing bracket for the array
+            for (let i = arrayStart + 1; i < stdout.length; i++) {
+              if (stdout[i] === '[') bracketCount++;
+              if (stdout[i] === ']') bracketCount--;
+              if (bracketCount === 0) {
+                arrayEnd = i;
+                break;
+              }
             }
             
-            // Try to parse the JSON
-            let result;
+            if (arrayEnd !== -1) {
+              const arrayStr = stdout.substring(arrayStart, arrayEnd + 1);
+              try {
+                responseData.similar_responses = JSON.parse(arrayStr);
+              } catch (e) {
+                console.error("Failed to parse similar_responses array:", e);
+                responseData.similar_responses = [];
+              }
+            }
+          } else {
+            responseData.similar_responses = [];
+          }
+        } catch (e) {
+          console.error("Error extracting similar_responses:", e);
+          responseData.similar_responses = [];
+        }
+        
+        // If all else fails, try to find a complete JSON object
+        if (Object.keys(responseData).length === 0) {
+          const jsonMatch = stdout.match(/(\{[\s\S]*\})/);
+          if (jsonMatch && jsonMatch[1]) {
             try {
-              result = JSON.parse(jsonStr);
+              responseData = JSON.parse(jsonMatch[1]);
             } catch (e) {
-              // If parsing fails, return a fallback response
-              const jsonError = e as Error;
-              console.error("Failed to parse JSON from Python output:", jsonError);
-              console.error("Attempted to parse:", jsonStr);
-              
-              const errorDetails = stderr || stdout;
-              res.status(200).json({
-                error: "Failed to parse response from Python script: " + jsonError.message,
-                generated_response: "Error: The Python script did not return valid JSON. See logs for details.",
-                pythonLogs: errorDetails,
-                stdout: stdout,
-                stderr: stderr
-              });
-              resolve();
-              return;
+              console.error("Failed to parse complete JSON:", e);
+              responseData.error = "Failed to extract structured data from output";
+              responseData.raw = stdout.substring(0, 500); // Truncate long output
             }
-            
-            // Add logs to help with debugging
-            if (result.error) {
-              console.error("Error from Python:", result.error);
-            }
-            
-            // Successful response
-            res.json({
-              ...result,
-              pythonLogs: stderr
-            });
-            
-            resolve();
-          } catch (error) {
-            console.error("Error handling Python output:", error);
-            console.error("Raw stdout:", stdout);
-            console.error("Raw stderr:", stderr);
-            
-            res.status(500).json({ 
-              message: "Failed to process Python output", 
-              error: String(error),
-              pythonLogs: stderr,
-              stdout: stdout
-            });
-            resolve();
+          } else {
+            responseData.error = "No structured data found in output";
+            responseData.raw = stdout.substring(0, 500); // Truncate long output
           }
-        });
+        }
         
-        // Handle process error
-        pythonProcess.on('error', (error) => {
-          console.error(`Failed to start Python process: ${error}`);
-          res.status(500).json({ 
-            message: "Failed to start Python process", 
-            error: String(error)
-          });
-          resolve();
-        });
-        
-        // Set a timeout to kill the process if it takes too long
-        const timeoutMs = 30000; // 30 seconds
-        const timeout = setTimeout(() => {
-          console.error(`Python process timed out after ${timeoutMs}ms`);
-          pythonProcess.kill();
-          res.status(500).json({
-            message: "Python process timed out",
-            error: `Process did not complete within ${timeoutMs}ms`,
-            stdout: stdout,
-            stderr: stderr
-          });
-          resolve();
-        }, timeoutMs);
-        
-        // Clear the timeout when the process completes
-        pythonProcess.on('close', () => {
-          clearTimeout(timeout);
-        });
+        res.status(200).json(responseData);
       });
-    } catch (error) {
-      console.error("Error in test-llm endpoint:", error);
-      return res.status(500).json({ 
-        message: "Failed to test LLM connectivity", 
-        error: String(error)
+      
+      pythonProcess.on("error", (error) => {
+        clearTimeout(timeout);
+        console.error("Failed to start Python process:", error);
+        res.status(500).json({ error: `Failed to start Python process: ${error.message}` });
       });
+      
+    } catch (error: any) {
+      console.error("Error processing LLM request:", error);
+      res.status(500).json({ error: error.message || "Unknown error occurred" });
     }
   });
 

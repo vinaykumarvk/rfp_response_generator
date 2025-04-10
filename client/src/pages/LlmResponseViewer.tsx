@@ -1,0 +1,204 @@
+import { useState } from 'react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { useToast } from "@/hooks/use-toast";
+
+type SimilarResponse = {
+  text: string;
+  score: number;
+  category: string;
+  requirement: string;
+  response: string;
+  reference: string;
+};
+
+type ApiResponse = {
+  similar_responses?: SimilarResponse[];
+  openai_response?: string;
+  anthropic_response?: string;
+  deepseek_response?: string;
+  generated_response?: string;
+  error?: string;
+};
+
+export default function LlmResponseViewer() {
+  const [isLoading, setIsLoading] = useState(false);
+  const [requirement, setRequirement] = useState("How do you perform portfolio rebalancing?");
+  const [apiResponse, setApiResponse] = useState<ApiResponse | null>(null);
+  const { toast } = useToast();
+
+  const handleSubmit = async () => {
+    if (!requirement.trim()) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Please enter a requirement",
+      });
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const response = await fetch('/api/test-llm', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ requirement_text: requirement, model_provider: 'openai' }),
+      });
+
+      const responseText = await response.text();
+      console.log('Raw response:', responseText);
+
+      let jsonResponse;
+      try {
+        // Try to parse the entire response as JSON first
+        jsonResponse = JSON.parse(responseText);
+      } catch (err) {
+        // If parsing fails, try to extract the JSON object
+        try {
+          // Look for a complete JSON object in the response
+          const match = responseText.match(/\{[\s\S]*\}/);
+          if (match) {
+            jsonResponse = JSON.parse(match[0]);
+          } else {
+            throw new Error('Could not find JSON object in response');
+          }
+        } catch (extractErr) {
+          // Create a simple error response object
+          jsonResponse = { 
+            error: `Failed to parse response: ${responseText.substring(0, 100)}...` 
+          };
+        }
+      }
+      
+      setApiResponse(jsonResponse);
+    } catch (error: any) {
+      console.error('Error:', error);
+      setApiResponse({ error: error?.message || "Unknown error occurred" });
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to fetch response",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const renderFinalResponse = () => {
+    if (!apiResponse) return <p>No response yet</p>;
+    if (apiResponse.error) return <p className="text-red-500">{apiResponse.error}</p>;
+
+    // Priority order: generated_response > openai_response > anthropic_response > deepseek_response
+    const finalResponse = apiResponse.generated_response || 
+                          apiResponse.openai_response || 
+                          apiResponse.anthropic_response || 
+                          apiResponse.deepseek_response;
+
+    if (!finalResponse) return <p>No response content available</p>;
+
+    return (
+      <div className="whitespace-pre-wrap markdown-content">
+        {finalResponse}
+      </div>
+    );
+  };
+
+  const renderSimilarResponses = () => {
+    if (!apiResponse) return <p>No response yet</p>;
+    if (apiResponse.error) return <p className="text-red-500">{apiResponse.error}</p>;
+    if (!apiResponse.similar_responses || apiResponse.similar_responses.length === 0) {
+      return <p>No similar responses found</p>;
+    }
+
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {apiResponse.similar_responses.map((item, index) => (
+          <Card key={index} className="flex flex-col h-full">
+            <CardHeader>
+              <CardTitle>{item.text || 'Unnamed Response'}</CardTitle>
+              <CardDescription>
+                Score: {(item.score * 100).toFixed(2)}% | Category: {item.category}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex-grow">
+              <Accordion type="single" collapsible>
+                <AccordionItem value="response">
+                  <AccordionTrigger>Response</AccordionTrigger>
+                  <AccordionContent>
+                    <div className="whitespace-pre-wrap">{item.response}</div>
+                  </AccordionContent>
+                </AccordionItem>
+                <AccordionItem value="details">
+                  <AccordionTrigger>Details</AccordionTrigger>
+                  <AccordionContent>
+                    <div className="space-y-2">
+                      <div><strong>Requirement:</strong> {item.requirement}</div>
+                      <div><strong>Reference:</strong> {item.reference}</div>
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+              </Accordion>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    );
+  };
+
+  return (
+    <div className="container mx-auto py-8 px-4">
+      <h1 className="text-2xl font-bold mb-6">LLM Response Viewer</h1>
+      
+      <Card className="mb-8">
+        <CardHeader>
+          <CardTitle>Query</CardTitle>
+          <CardDescription>Enter your requirement to test the LLM response</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Textarea 
+            value={requirement}
+            onChange={(e) => setRequirement(e.target.value)}
+            placeholder="Enter your requirement here..."
+            className="min-h-[100px]"
+          />
+        </CardContent>
+        <CardFooter>
+          <Button 
+            onClick={handleSubmit} 
+            disabled={isLoading}
+            className="w-full md:w-auto"
+          >
+            {isLoading ? 'Generating...' : 'Generate Response'}
+          </Button>
+        </CardFooter>
+      </Card>
+
+      {apiResponse && (
+        <Card>
+          <CardHeader>
+            <CardTitle>LLM Response</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Tabs defaultValue="final" className="w-full">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="final">Final Response</TabsTrigger>
+                <TabsTrigger value="similar">Similar Questions</TabsTrigger>
+              </TabsList>
+              <TabsContent value="final" className="mt-4 p-4 border rounded-md">
+                {renderFinalResponse()}
+              </TabsContent>
+              <TabsContent value="similar" className="mt-4">
+                {renderSimilarResponses()}
+              </TabsContent>
+            </Tabs>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}
