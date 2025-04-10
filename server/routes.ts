@@ -648,19 +648,178 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 }
               }
               
-              // Return status indicating phase 1 is complete and synthesis is ready if we have enough responses
-              return res.status(200).json({
-                message: "MOA phase 1 complete, ready for synthesis",
-                response: updatedResponse,
-                references: references,
-                phase: 1,
-                synthesisReady: result.synthesis_ready || false,
-                modelResponses: {
-                  openaiResponse: openaiResponse,
-                  anthropicResponse: anthropicResponse,
-                  deepseekResponse: deepseekResponse
+              // Check if we should auto-trigger Phase 2
+              const autoTriggerPhase2 = !req.body.noAutoPhase2 && (result.synthesis_ready || false);
+              
+              if (autoTriggerPhase2) {
+                console.log("Auto-triggering MOA Phase 2 synthesis...");
+                
+                try {
+                  // Instead of returning the response, we'll trigger Phase 2 immediately
+                  const scriptPath = path.resolve(process.cwd(), 'server/moa_synthesis.py');
+                  
+                  // Create a temporary synthesis input file
+                  const synthInput = {
+                    requirement_text: requirement,
+                    model_responses: {
+                      openaiResponse: openaiResponse,
+                      anthropicResponse: anthropicResponse,
+                      deepseekResponse: deepseekResponse
+                    },
+                    requirement_id: requirementId
+                  };
+                  
+                  const tempFilePath = path.resolve(process.cwd(), `server/temp_files/moa_synthesis_${Date.now()}.json`);
+                  fs.mkdirSync(path.dirname(tempFilePath), { recursive: true });
+                  fs.writeFileSync(tempFilePath, JSON.stringify(synthInput, null, 2));
+                  
+                  // Execute Phase 2 synthesis
+                  const phase2Process = spawn('python3', [
+                    scriptPath, 
+                    requirement,
+                    tempFilePath
+                  ]);
+                  
+                  let phase2Stdout = '';
+                  let phase2Stderr = '';
+                  
+                  // Collect output
+                  phase2Process.stdout.on('data', (data) => {
+                    phase2Stdout += data.toString();
+                  });
+                  
+                  phase2Process.stderr.on('data', (data) => {
+                    phase2Stderr += data.toString();
+                  });
+                  
+                  // Handle process completion
+                  await new Promise<void>((resolve, reject) => {
+                    phase2Process.on('close', async (code) => {
+                      if (code !== 0) {
+                        console.error(`Phase 2 process exited with code ${code}: ${phase2Stderr}`);
+                        
+                        // Even if Phase 2 fails, we'll still return the Phase 1 results
+                        res.status(200).json({
+                          message: "MOA phase 1 complete, but phase 2 synthesis failed",
+                          response: updatedResponse,
+                          references: references,
+                          phase: 1,
+                          synthesisReady: true,
+                          modelResponses: {
+                            openaiResponse: openaiResponse,
+                            anthropicResponse: anthropicResponse,
+                            deepseekResponse: deepseekResponse
+                          },
+                          error: phase2Stderr
+                        });
+                        resolve();
+                        return;
+                      }
+                      
+                      try {
+                        // Parse Phase 2 result
+                        const phase2Result = JSON.parse(phase2Stdout.trim());
+                        
+                        // Update the response with the synthesized content
+                        const moaResponse = phase2Result.moa_response || phase2Result.generated_response;
+                        
+                        if (moaResponse) {
+                          // Update response with synthesized content
+                          const synthesizedResponse = await storage.updateExcelRequirementResponse(Number(requirementId), {
+                            moaResponse: moaResponse,
+                            finalResponse: moaResponse,
+                            modelProvider: "moa" // Explicitly set the modelProvider to "moa"
+                          });
+                          
+                          console.log(`Successfully completed phases 1 and 2 for requirement ID ${requirementId}`);
+                          
+                          // Return complete response with both phases
+                          res.status(200).json({
+                            message: "MOA phases 1 and 2 completed successfully",
+                            response: synthesizedResponse,
+                            references: references,
+                            phase: 2
+                          });
+                        } else {
+                          console.error("No MOA response found in Phase 2 output");
+                          
+                          // Return Phase 1 results if Phase 2 didn't produce a response
+                          res.status(200).json({
+                            message: "MOA phase 1 complete, but phase 2 didn't produce a response",
+                            response: updatedResponse,
+                            references: references,
+                            phase: 1,
+                            synthesisReady: true,
+                            modelResponses: {
+                              openaiResponse: openaiResponse,
+                              anthropicResponse: anthropicResponse,
+                              deepseekResponse: deepseekResponse
+                            }
+                          });
+                        }
+                      } catch (error) {
+                        console.error("Error processing Phase 2 output:", error);
+                        
+                        // Return Phase 1 results if Phase 2 processing failed
+                        res.status(200).json({
+                          message: "MOA phase 1 complete, but phase 2 processing failed",
+                          response: updatedResponse,
+                          references: references,
+                          phase: 1,
+                          synthesisReady: true,
+                          modelResponses: {
+                            openaiResponse: openaiResponse,
+                            anthropicResponse: anthropicResponse,
+                            deepseekResponse: deepseekResponse
+                          },
+                          error: String(error)
+                        });
+                      }
+                      
+                      resolve();
+                    });
+                    
+                    phase2Process.on('error', (error) => {
+                      console.error(`Error launching Phase 2 process: ${error}`);
+                      reject(error);
+                    });
+                  });
+                  
+                  // No need to return anything here as the response is handled in the callback
+                  return;
+                } catch (error) {
+                  console.error("Error in auto Phase 2 processing:", error);
+                  
+                  // If auto-Phase 2 fails, fallback to returning Phase 1 results
+                  return res.status(200).json({
+                    message: "MOA phase 1 complete, auto-phase 2 failed",
+                    response: updatedResponse,
+                    references: references,
+                    phase: 1,
+                    synthesisReady: true,
+                    modelResponses: {
+                      openaiResponse: openaiResponse,
+                      anthropicResponse: anthropicResponse,
+                      deepseekResponse: deepseekResponse
+                    },
+                    error: String(error)
+                  });
                 }
-              });
+              } else {
+                // Standard Phase 1 response when not auto-triggering Phase 2
+                return res.status(200).json({
+                  message: "MOA phase 1 complete, ready for synthesis",
+                  response: updatedResponse,
+                  references: references,
+                  phase: 1,
+                  synthesisReady: result.synthesis_ready || false,
+                  modelResponses: {
+                    openaiResponse: openaiResponse,
+                    anthropicResponse: anthropicResponse,
+                    deepseekResponse: deepseekResponse
+                  }
+                });
+              }
             }
             
             // IMPORTANT FIX: Debug the raw fields from Python to see what model-specific responses exist
