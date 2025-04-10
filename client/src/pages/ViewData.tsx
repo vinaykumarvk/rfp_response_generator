@@ -37,7 +37,8 @@ import {
   ArrowDown,
   Calendar,
   Hash,
-  Tag
+  Tag,
+  Hand
 } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useToast } from '@/hooks/use-toast';
@@ -867,43 +868,38 @@ export default function ViewData() {
                                 </Badge>
                               )}
                               
-                              {/* Category display */}
-                              <Badge variant="outline" className="text-[10px] sm:text-xs bg-slate-50 text-slate-700 dark:bg-slate-800 dark:text-slate-200 border-slate-200 dark:border-slate-700">
-                                {row.category}
-                              </Badge>
+                              {/* Category display and timestamp */}
+                              <div className="flex items-center justify-between w-full">
+                                <Badge variant="outline" className="text-[10px] sm:text-xs bg-slate-50 text-slate-700 dark:bg-slate-800 dark:text-slate-200 border-slate-200 dark:border-slate-700">
+                                  {row.category}
+                                </Badge>
+                                
+                                {row.timestamp && (
+                                  <div className="text-[9px] sm:text-[10px] text-slate-500 dark:text-slate-400">
+                                    {(() => {
+                                      try {
+                                        return formatDistanceToNow(new Date(row.timestamp), { addSuffix: true });
+                                      } catch (e) {
+                                        return String(row.timestamp);
+                                      }
+                                    })()}
+                                  </div>
+                                )}
+                              </div>
                             </div>
                             
-                            {/* Requirement text */}
-                            <div className="text-sm sm:text-base font-medium text-slate-800 dark:text-slate-100 mb-2 line-clamp-3">
+                            {/* Requirement text with hover interaction */}
+                            <div 
+                              className={`relative text-sm sm:text-base font-medium text-slate-800 dark:text-slate-100 line-clamp-3 cursor-pointer transition-all duration-200 ${!row.finalResponse ? 'opacity-70' : ''}`}
+                              onClick={() => row.finalResponse && handleViewResponse(row)}
+                            >
                               {row.requirement}
-                            </div>
-                            
-                            {/* Footer with timestamp and action buttons */}
-                            <div className="flex justify-between items-center mt-3 pt-2 border-t border-slate-100 dark:border-slate-700">
-                              {row.timestamp ? (
-                                <div className="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400">
-                                  {(() => {
-                                    try {
-                                      return format(new Date(row.timestamp), 'MMM d, yyyy');
-                                    } catch (e) {
-                                      return String(row.timestamp);
-                                    }
-                                  })()}
-                                </div>
-                              ) : (
-                                <div className="text-[10px] sm:text-xs text-slate-400">No timestamp</div>
-                              )}
                               
-                              <Button 
-                                variant="ghost" 
-                                size="sm"
-                                onClick={() => handleViewResponse(row)}
-                                className="h-7 sm:h-8 text-xs sm:text-sm px-2 sm:px-3"
-                                disabled={!row.finalResponse}
-                              >
-                                <Eye className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
-                                View
-                              </Button>
+                              {row.finalResponse && (
+                                <div className="absolute inset-0 bg-gradient-to-r from-transparent to-white/80 dark:to-black/80 opacity-0 hover:opacity-100 transition-opacity duration-200 flex items-center justify-end pr-4">
+                                  <Hand className="h-5 w-5 text-primary" />
+                                </div>
+                              )}
                             </div>
                           </div>
                         </div>
