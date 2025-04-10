@@ -564,8 +564,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   console.log("- deepseek_response:", result.deepseek_response ? 'Present' : 'Not present');
                   console.log("- generated_response:", result.generated_response ? 'Present' : 'Not present');
                   
-                  // Ensure we have the correct model response based on provider
-                  let finalResponse = result.generated_response || '';
+                  // For single model selection, use the model-specific response as the final response
+                  // For MOA, use the generated response (already combined)
+                  let finalResponse = '';
+                  let modelResponse = '';
+                  
+                  // Determine which model response to use based on provider
+                  if (provider === "openai" && result.openai_response) {
+                    modelResponse = result.openai_response;
+                  } else if (provider === "anthropic" && result.anthropic_response) {
+                    modelResponse = result.anthropic_response;
+                  } else if (provider === "deepseek" && result.deepseek_response) {
+                    modelResponse = result.deepseek_response;
+                  } else if (provider === "moa") {
+                    // For MOA, use the generated response directly
+                    modelResponse = result.generated_response || '';
+                  } else {
+                    // Fallback to generated response
+                    modelResponse = result.generated_response || '';
+                  }
+                  
+                  // For single model, finalResponse should be the same as the model response
+                  finalResponse = modelResponse;
                   
                   // Handle empty response case
                   if (!finalResponse || finalResponse.trim() === '') {
@@ -575,19 +595,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   
                   // Prepare model specific responses based on provider
                   const openaiResponse = provider === "openai" ? 
-                    (result.openai_response || finalResponse) : 
+                    modelResponse : 
                     (result.openai_response || null);
                     
                   const anthropicResponse = provider === "anthropic" ? 
-                    (result.anthropic_response || finalResponse) : 
+                    modelResponse : 
                     (result.anthropic_response || null);
                     
                   const deepseekResponse = provider === "deepseek" ? 
-                    (result.deepseek_response || finalResponse) : 
+                    modelResponse : 
                     (result.deepseek_response || null);
                   
                   const moaResponse = provider === "moa" ? 
-                    finalResponse : 
+                    modelResponse : 
                     (result.moa_response || null);
                   
                   console.log(`Using ${provider} provider - setting corresponding response field`);
