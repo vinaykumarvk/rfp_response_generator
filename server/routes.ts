@@ -650,95 +650,158 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     }
                   }
                   
-                  // SIMPLIFIED DIRECT APPROACH FOR MODEL RESPONSES
-                  // Directly map the generated response into the appropriate model field
+                  // USING FIELD MAPPING UTILITY FOR CONSISTENT NAMING
+                  // Use our field mapping utility to handle Python response consistently
+                  console.log("Preparing fields for mapping...");
                   
-                  // First, ensure we have the generated response
-                  const aiGeneratedResponse = result.generated_response || '';
+                  // First, gather all the model-specific responses from the result
+                  const pythonResults = {
+                    // Use only the data needed for field mapping
+                    generated_response: result.generated_response || '',
+                    openai_response: result.openai_response || '',
+                    anthropic_response: result.anthropic_response || '',
+                    deepseek_response: result.deepseek_response || '',
+                    moa_response: result.moa_response || ''
+                  };
                   
-                  if (!aiGeneratedResponse) {
-                    console.log("WARNING: No generated_response available in result");
-                  } else {
-                    console.log(`SUCCESS: Got generated_response (${aiGeneratedResponse.length} chars)`);
+                  // Log what we found in the Python output
+                  console.log("PYTHON OUTPUT FIELDS FOUND:");
+                  for (const [key, value] of Object.entries(pythonResults)) {
+                    if (value) {
+                      console.log(`- ${key}: Present (${value.length} chars)`);
+                    } else {
+                      console.log(`- ${key}: Not present`);
+                    }
                   }
                   
-                  // Reset all response fields from above code
-                  finalResponse = '';
-                  openaiResponse = null;
-                  anthropicResponse = null;
-                  deepseekResponse = null;
-                  moaResponse = null;
-                  
-                  // Always set finalResponse to the generated response
-                  finalResponse = aiGeneratedResponse;
-                  
-                  // Also set the model-specific response based on the provider
-                  if (provider === "openai") {
-                    console.log("Setting openaiResponse directly from generated_response");
-                    openaiResponse = aiGeneratedResponse;
-                  } else if (provider === "anthropic") {
-                    console.log("Setting anthropicResponse directly from generated_response");
-                    anthropicResponse = aiGeneratedResponse;
-                  } else if (provider === "deepseek") {
-                    console.log("Setting deepseekResponse directly from generated_response");
-                    deepseekResponse = aiGeneratedResponse;
-                  } else if (provider === "moa") {
-                    console.log("Setting moaResponse directly from generated_response");
-                    moaResponse = aiGeneratedResponse;
+                  // Create a simple field mapping function that we can use without imports
+                  // This is a simplified version of our field_mapping_fix.js module
+                  function mapFieldsDirectly(pythonOutput, provider) {
+                    console.log("Mapping fields directly for provider:", provider);
+                    
+                    // Create the mapped fields object with default nulls
+                    const mappedFields = {
+                      finalResponse: null,
+                      openaiResponse: null,
+                      anthropicResponse: null,
+                      deepseekResponse: null,
+                      moaResponse: null
+                    };
+                    
+                    // Set finalResponse from generated_response if available
+                    if (pythonOutput.generated_response) {
+                      mappedFields.finalResponse = pythonOutput.generated_response;
+                      console.log(`Using generated_response as finalResponse (${pythonOutput.generated_response.length} chars)`);
+                    }
+                    
+                    // Map model-specific responses based on provider
+                    switch (provider) {
+                      case "openai":
+                        if (pythonOutput.openai_response) {
+                          mappedFields.openaiResponse = pythonOutput.openai_response;
+                          console.log(`Setting openai_response to openaiResponse (${pythonOutput.openai_response.length} chars)`);
+                          
+                          // Use as finalResponse if not already set
+                          if (!mappedFields.finalResponse) {
+                            mappedFields.finalResponse = pythonOutput.openai_response;
+                            console.log("Using openai_response as finalResponse");
+                          }
+                        }
+                        break;
+                        
+                      case "anthropic":
+                        if (pythonOutput.anthropic_response) {
+                          mappedFields.anthropicResponse = pythonOutput.anthropic_response;
+                          console.log(`Setting anthropic_response to anthropicResponse (${pythonOutput.anthropic_response.length} chars)`);
+                          
+                          // Use as finalResponse if not already set
+                          if (!mappedFields.finalResponse) {
+                            mappedFields.finalResponse = pythonOutput.anthropic_response;
+                            console.log("Using anthropic_response as finalResponse");
+                          }
+                        }
+                        break;
+                        
+                      case "deepseek":
+                        if (pythonOutput.deepseek_response) {
+                          mappedFields.deepseekResponse = pythonOutput.deepseek_response;
+                          console.log(`Setting deepseek_response to deepseekResponse (${pythonOutput.deepseek_response.length} chars)`);
+                          
+                          // Use as finalResponse if not already set
+                          if (!mappedFields.finalResponse) {
+                            mappedFields.finalResponse = pythonOutput.deepseek_response;
+                            console.log("Using deepseek_response as finalResponse");
+                          }
+                        }
+                        break;
+                        
+                      case "moa":
+                        // For MOA, set all available responses
+                        if (pythonOutput.openai_response) {
+                          mappedFields.openaiResponse = pythonOutput.openai_response;
+                          console.log(`Setting openai_response in MOA (${pythonOutput.openai_response.length} chars)`);
+                        }
+                        
+                        if (pythonOutput.anthropic_response) {
+                          mappedFields.anthropicResponse = pythonOutput.anthropic_response;
+                          console.log(`Setting anthropic_response in MOA (${pythonOutput.anthropic_response.length} chars)`);
+                        }
+                        
+                        if (pythonOutput.generated_response) {
+                          mappedFields.moaResponse = pythonOutput.generated_response;
+                          console.log(`Setting generated_response to moaResponse (${pythonOutput.generated_response.length} chars)`);
+                        }
+                        
+                        // Ensure finalResponse is set
+                        if (!mappedFields.finalResponse && (mappedFields.openaiResponse || mappedFields.anthropicResponse)) {
+                          // Create a combined response if none exists
+                          const combinedResponse = `## Combined MOA Response\n\n${mappedFields.openaiResponse ? `### OpenAI:\n${mappedFields.openaiResponse}\n\n` : ''}${mappedFields.anthropicResponse ? `### Anthropic:\n${mappedFields.anthropicResponse}` : ''}`;
+                          mappedFields.finalResponse = combinedResponse;
+                          mappedFields.moaResponse = combinedResponse;
+                          console.log("Created combined response for MOA from individual responses");
+                        }
+                        break;
+                    }
+                    
+                    // Log the final mapped fields
+                    console.log("MAPPED FIELDS (After direct mapping):");
+                    for (const [key, value] of Object.entries(mappedFields)) {
+                      if (value) {
+                        console.log(`- ${key}: Present (${value.length} chars)`);
+                      } else {
+                        console.log(`- ${key}: Not present`);
+                      }
+                    }
+                    
+                    return mappedFields;
                   }
                   
-                  // Debug log what we're going to save
-                  console.log("DIRECT FIELD VALUES - About to save:");
-                  console.log("- finalResponse:", finalResponse ? `Present (${finalResponse.length} chars)` : "Not present");
-                  console.log("- openaiResponse:", openaiResponse ? `Present (${openaiResponse.length} chars)` : "Not present");
-                  console.log("- anthropicResponse:", anthropicResponse ? `Present (${anthropicResponse.length} chars)` : "Not present");
-                  console.log("- deepseekResponse:", deepseekResponse ? `Present (${deepseekResponse.length} chars)` : "Not present");
-                  console.log("- moaResponse:", moaResponse ? `Present (${moaResponse.length} chars)` : "Not present");
+                  // Perform the field mapping
+                  const mappedFields = mapFieldsDirectly(pythonResults, provider);
                   
-                  // Create the response object with simplified field mapping
+                  // Create the response object with field mapped values
                   const responseToSave = {
                     // Core fields
                     requirement: requirement,
-                    finalResponse: finalResponse,
-                    openaiResponse: openaiResponse,
-                    anthropicResponse: anthropicResponse,
-                    deepseekResponse: deepseekResponse,
-                    moaResponse: moaResponse,
+                    finalResponse: mappedFields.finalResponse || '', // Ensure we always have something here
+                    openaiResponse: mappedFields.openaiResponse,
+                    anthropicResponse: mappedFields.anthropicResponse,
+                    deepseekResponse: mappedFields.deepseekResponse,
+                    moaResponse: mappedFields.moaResponse,
                     category: existingRequirement?.category || '',
                     timestamp: new Date().toISOString(),
                     modelProvider: provider
                   };
                   
                   // Log the entire object being saved
-                  console.log("Full response object prepared for saving:", responseToSave);
-                  
-                  const savedData = await storage.createResponseWithReferences(
-                    {
-                      ...responseToSave,
-                      
-                      // Store similar questions as JSON string if available
-                      similarQuestions: result.similar_responses ? JSON.stringify(result.similar_responses) : '',
-                      
-                      // Store RFP identification fields
-                      rfpName: rfpName || existingRequirement?.rfpName || '',
-                      requirementId: existingRequirement?.requirementId || '',
-                      uploadedBy: uploadedBy || existingRequirement?.uploadedBy || '',
-                      
-                      // If there was an existing requirement, preserve other fields
-                      ...(existingRequirement || {})
-                    },
-                    referenceData
-                  );
-                  
-                  console.log("=== REFERENCES SAVED SUCCESSFULLY ===");
-                  console.log("Saved response:", JSON.stringify(savedData.response, null, 2));
-                  console.log("Saved references count:", savedData.references.length);
-                  
-                  if (savedData.response) {
-                    result.saved = true;
-                    result.updatedResponse = savedData.response;
-                    result.savedReferences = savedData.references;
-                  }
+                  console.log("Response object prepared for saving:", {
+                    requirement: responseToSave.requirement.substring(0, 50) + "...",
+                    finalResponse: responseToSave.finalResponse ? responseToSave.finalResponse.substring(0, 50) + "..." : "Not set",
+                    openaiResponse: responseToSave.openaiResponse ? `Present (${responseToSave.openaiResponse.length} chars)` : "Not set",
+                    anthropicResponse: responseToSave.anthropicResponse ? `Present (${responseToSave.anthropicResponse.length} chars)` : "Not set",
+                    deepseekResponse: responseToSave.deepseekResponse ? `Present (${responseToSave.deepseekResponse.length} chars)` : "Not set",
+                    moaResponse: responseToSave.moaResponse ? `Present (${responseToSave.moaResponse.length} chars)` : "Not set"
+                  });
                 } catch (error) {
                   console.error("Failed to save references:", error);
                   result.saveError = error instanceof Error 
