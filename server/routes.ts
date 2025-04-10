@@ -382,8 +382,149 @@ export async function registerRoutes(app: Express): Promise<Server> {
         provider = "openai", 
         requirementId,
         rfpName,
-        uploadedBy
+        uploadedBy,
+        phase = 1, // Default to phase 1 for new requests
+        modelResponses = null // Used in phase 2 for synthesis
       } = req.body;
+      
+      console.log(`Response generation request - Provider: ${provider}, Phase: ${phase}`);
+      
+      // Path for phase 2 of MOA (synthesis)
+      if (provider === "moa" && phase === 2 && modelResponses) {
+        try {
+          console.log("Executing MOA Phase 2 - Synthesis");
+          // Phase 2: Synthesize existing model responses
+          // Launch Python script with a special flag for synthesis
+          const scriptPath = path.resolve(process.cwd(), 'server/moa_synthesis.py');
+          
+          // Create a temporary synthesis input file
+          const synthInput = {
+            requirement_text: requirement,
+            model_responses: modelResponses,
+            requirement_id: requirementId
+          };
+          
+          const tempFilePath = path.resolve(process.cwd(), `server/temp_files/moa_synthesis_${Date.now()}.json`);
+          fs.mkdirSync(path.dirname(tempFilePath), { recursive: true });
+          fs.writeFileSync(tempFilePath, JSON.stringify(synthInput, null, 2));
+          
+          return new Promise<void>((resolve, reject) => {
+            // Spawn Python process for synthesis
+            const process = spawn('python3', [
+              scriptPath, 
+              requirement,
+              tempFilePath
+            ]);
+            
+            let stdout = '';
+            let stderr = '';
+            
+            // Collect data from stdout
+            process.stdout.on('data', (data) => {
+              stdout += data.toString();
+            });
+            
+            // Collect error output
+            process.stderr.on('data', (data) => {
+              stderr += data.toString();
+              console.log(`Python synthesis stderr: ${data}`);
+            });
+            
+            // Handle process completion
+            process.on('close', async (code) => {
+              console.log(`Python synthesis process exited with code ${code}`);
+              
+              // Clean up temp file
+              try {
+                fs.unlinkSync(tempFilePath);
+              } catch (e) {
+                console.error("Error removing temp file:", e);
+              }
+              
+              if (code !== 0) {
+                console.error(`Error: Python synthesis script exited with code ${code}`);
+                console.error(`Stderr: ${stderr}`);
+                res.status(500).json({ 
+                  message: "Error generating synthesized response", 
+                  error: stderr || "Unknown error"
+                });
+                return resolve();
+              }
+              
+              try {
+                // Parse the result from the Python script
+                const result = JSON.parse(stdout.trim());
+                
+                if (result.error) {
+                  console.error("Error in Python synthesis response:", result.error);
+                  return res.status(500).json({ 
+                    message: "Error generating synthesized response", 
+                    error: result.error
+                  });
+                }
+                
+                // Get the existing requirement by ID
+                const existingRequirement = await storage.getExcelRequirementResponse(Number(requirementId));
+                
+                if (!existingRequirement) {
+                  console.error(`Requirement with ID ${requirementId} not found`);
+                  return res.status(404).json({ message: "Requirement not found" });
+                }
+                
+                // Get today's date for the response timestamp
+                const timestamp = new Date();
+                
+                // Update only the moaResponse and finalResponse fields
+                const updatedResponse = await storage.updateExcelRequirementResponse(Number(requirementId), {
+                  moaResponse: result.moa_response || result.generated_response,
+                  finalResponse: result.moa_response || result.generated_response,
+                  timestamp: timestamp
+                });
+                
+                if (!updatedResponse) {
+                  console.error(`Failed to update synthesized response for requirement ID ${requirementId}`);
+                  return res.status(500).json({ message: "Failed to update synthesized response" });
+                }
+                
+                console.log(`Successfully updated synthesized response for requirement ID ${requirementId}`);
+                
+                // Return the updated response
+                return res.status(200).json({
+                  message: "MOA synthesis completed successfully",
+                  response: updatedResponse,
+                  phase: 2
+                });
+                
+              } catch (error) {
+                console.error("Error parsing Python synthesis output:", error);
+                console.error("Raw stdout:", stdout);
+                return res.status(500).json({ 
+                  message: "Error parsing response from Python synthesis script", 
+                  error: String(error)
+                });
+              }
+            });
+            
+            // Handle process error
+            process.on('error', (error) => {
+              console.error(`Error spawning Python synthesis process: ${error}`);
+              res.status(500).json({ 
+                message: "Error spawning Python synthesis process", 
+                error: error.message
+              });
+              resolve();
+            });
+          });
+          
+          return; // Return early for phase 2 processing
+        } catch (error) {
+          console.error("Error in MOA synthesis phase:", error);
+          return res.status(500).json({ 
+            message: "Error in MOA synthesis phase", 
+            error: String(error)
+          });
+        }
+      }
       
       if (!requirement) {
         return res.status(400).json({ message: "Requirement text is required" });
@@ -431,6 +572,99 @@ export async function registerRoutes(app: Express): Promise<Server> {
             
             // Parse the output as JSON
             const result = JSON.parse(stdout);
+            
+            // Handle MOA Phase 1 response specially
+            if (provider === "moa" && result.phase === 1) {
+              console.log("Processing MOA Phase 1 response");
+              
+              // Get the existing requirement by ID
+              const existingRequirement = await storage.getExcelRequirementResponse(Number(requirementId));
+              
+              if (!existingRequirement) {
+                console.error(`Requirement with ID ${requirementId} not found for MOA Phase 1`);
+                return res.status(404).json({ message: "Requirement not found" });
+              }
+              
+              // For MOA Phase 1, we want to store the individual responses
+              const openaiResponse = result.openai_response || null;
+              const anthropicResponse = result.anthropic_response || null;
+              const deepseekResponse = result.deepseek_response || null;
+              
+              // Get today's date for the response timestamp
+              const timestamp = new Date();
+              
+              // Log the model-specific responses
+              console.log("MOA Phase 1 responses prepared for saving:");
+              console.log("- openaiResponse:", openaiResponse ? "Present (Length: " + openaiResponse.length + ")" : "Not present");
+              console.log("- anthropicResponse:", anthropicResponse ? "Present (Length: " + anthropicResponse.length + ")" : "Not present");
+              console.log("- deepseekResponse:", deepseekResponse ? "Present (Length: " + deepseekResponse.length + ")" : "Not present");
+              
+              // Update the response in the database - don't set finalResponse yet for MOA phase 1
+              const updatedResponse = await storage.updateExcelRequirementResponse(Number(requirementId), {
+                requirement: existingRequirement.requirement,
+                category: existingRequirement.category,
+                rfpName: rfpName || existingRequirement.rfpName,
+                uploadedBy: uploadedBy || existingRequirement.uploadedBy,
+                openaiResponse: openaiResponse,
+                anthropicResponse: anthropicResponse,
+                deepseekResponse: deepseekResponse,
+                // Don't set moaResponse or finalResponse yet for phase 1
+                modelProvider: provider,
+                timestamp: timestamp,
+                rating: null  // Reset rating for the new response
+              });
+              
+              if (!updatedResponse) {
+                console.error(`Failed to update MOA phase 1 responses for requirement ID ${requirementId}`);
+                return res.status(500).json({ message: "Failed to update MOA phase 1 responses" });
+              }
+              
+              console.log(`Successfully updated MOA phase 1 responses for requirement ID ${requirementId}`);
+              
+              // Process similar responses for references
+              let references: ReferenceResponse[] = [];
+              if (result.similar_responses && Array.isArray(result.similar_responses)) {
+                // Process and save references
+                const referenceData = result.similar_responses.map((item: any) => ({
+                  responseId: Number(requirementId),
+                  category: item.category || '',
+                  requirement: item.requirement || '',
+                  response: item.response || '',
+                  reference: item.reference || '',
+                  score: item.score || 0,
+                  timestamp: new Date()
+                }));
+                
+                // Save references
+                try {
+                  // Delete any existing references first
+                  await storage.deleteReferenceResponsesByResponseId(Number(requirementId));
+                  
+                  // Create new references if we have any
+                  if (referenceData.length > 0) {
+                    references = await storage.createReferenceResponses(referenceData);
+                  }
+                  
+                  console.log(`Saved ${references.length} references for MOA phase 1`);
+                } catch (error) {
+                  console.error("Error saving references for MOA phase 1:", error);
+                }
+              }
+              
+              // Return status indicating phase 1 is complete and synthesis is ready if we have enough responses
+              return res.status(200).json({
+                message: "MOA phase 1 complete, ready for synthesis",
+                response: updatedResponse,
+                references: references,
+                phase: 1,
+                synthesisReady: result.synthesis_ready || false,
+                modelResponses: {
+                  openaiResponse: openaiResponse,
+                  anthropicResponse: anthropicResponse,
+                  deepseekResponse: deepseekResponse
+                }
+              });
+            }
             
             // IMPORTANT FIX: Debug the raw fields from Python to see what model-specific responses exist
             console.log("===== MODEL-SPECIFIC RESPONSE DEBUG =====");
