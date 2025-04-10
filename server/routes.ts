@@ -473,11 +473,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   return res.status(404).json({ message: "Requirement not found" });
                 }
                 
-                // Update the moaResponse, finalResponse, and model_provider fields
+                // Update the moaResponse, finalResponse, and modelProvider fields
                 const updatedResponse = await storage.updateExcelRequirementResponse(Number(requirementId), {
                   moaResponse: result.moa_response || result.generated_response,
                   finalResponse: result.moa_response || result.generated_response,
-                  model_provider: "moa" // Explicitly set the model_provider to "moa"
+                  modelProvider: "moa" // Explicitly set the modelProvider to "moa"
                 });
                 
                 if (!updatedResponse) {
@@ -1772,7 +1772,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Add a new endpoint for testing LLM connectivity
   app.post("/api/test-llm", async (req: Request, res: Response) => {
     try {
-      const { requirement_text, model_provider = "openai" } = req.body;
+      const { requirement_text, modelProvider = "openai" } = req.body;
       
       if (!requirement_text) {
         return res.status(400).json({ error: "Missing requirement_text parameter" });
@@ -1782,7 +1782,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const pythonProcess = spawn("python3", [
         path.join(process.cwd(), "server", "rfp_response_generator.py"),
         requirement_text,
-        model_provider
+        modelProvider
       ]);
       
       let stdout = "";
