@@ -1774,12 +1774,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       console.log("Running MOA response test...");
       
-      // Import the test script (dynamically to avoid TypeScript errors)
-      const testModule = await import('./test_moa_responses.js');
-      const { testMoaResponses } = testModule;
+      // Import the test script
+      const moaTest = require('./moa_test');
       
       // Run the test
-      const results = await testMoaResponses();
+      const results = await moaTest.testMoaResponses();
       
       // Return the results
       return res.status(200).json({
@@ -1796,12 +1795,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       console.log("Generating a test MOA response...");
       
-      // Import the test script (dynamically to avoid TypeScript errors)
-      const testModule = await import('./test_moa_responses.js');
-      const { generateTestMoaResponse } = testModule;
+      // Import the test script
+      const moaTest = require('./moa_test');
       
       // Run the test generation
-      const results = await generateTestMoaResponse();
+      const results = await moaTest.generateTestMoaResponse();
       
       // Return the results
       return res.status(200).json({
