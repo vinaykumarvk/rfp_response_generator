@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -67,18 +67,37 @@ export default function ViewData() {
     queryKey: ['/api/excel-requirements'],
   });
   
+  // Extract unique RFP names and categories
+  const uniqueRfpNames = useMemo(() => {
+    const names = excelData
+      .map(item => item.rfpName || '')
+      .filter((value, index, self) => 
+        value && self.indexOf(value) === index
+      );
+    return names.sort();
+  }, [excelData]);
+  
+  const uniqueCategories = useMemo(() => {
+    const categories = excelData
+      .map(item => item.category)
+      .filter((value, index, self) => 
+        value && self.indexOf(value) === index
+      );
+    return categories.sort();
+  }, [excelData]);
+  
   // Apply filters to the data
   const filteredData = excelData.filter(row => {
     // Filter by RFP name
     if (filters.rfpName && row.rfpName) {
-      if (!row.rfpName.toLowerCase().includes(filters.rfpName.toLowerCase())) {
+      if (row.rfpName !== filters.rfpName) {
         return false;
       }
     }
     
     // Filter by category
     if (filters.category && row.category) {
-      if (!row.category.toLowerCase().includes(filters.category.toLowerCase())) {
+      if (row.category !== filters.category) {
         return false;
       }
     }
@@ -247,24 +266,38 @@ export default function ViewData() {
             <div className="flex flex-col md:flex-row gap-4 items-end">
               <div className="space-y-1 flex-1">
                 <Label htmlFor="filter-rfp">RFP Name</Label>
-                <Input
-                  id="filter-rfp"
-                  placeholder="Filter by RFP name..."
+                <Select
                   value={filters.rfpName}
-                  onChange={(e) => setFilters({...filters, rfpName: e.target.value})}
-                  className="max-w-xs"
-                />
+                  onValueChange={(value) => setFilters({...filters, rfpName: value})}
+                >
+                  <SelectTrigger id="filter-rfp" className="max-w-xs">
+                    <SelectValue placeholder="Select RFP name" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">All</SelectItem>
+                    {uniqueRfpNames.map(name => (
+                      <SelectItem key={name} value={name}>{name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               
               <div className="space-y-1 flex-1">
                 <Label htmlFor="filter-category">Category</Label>
-                <Input
-                  id="filter-category"
-                  placeholder="Filter by category..."
+                <Select
                   value={filters.category}
-                  onChange={(e) => setFilters({...filters, category: e.target.value})}
-                  className="max-w-xs"
-                />
+                  onValueChange={(value) => setFilters({...filters, category: value})}
+                >
+                  <SelectTrigger id="filter-category" className="max-w-xs">
+                    <SelectValue placeholder="Select category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">All</SelectItem>
+                    {uniqueCategories.map(category => (
+                      <SelectItem key={category} value={category}>{category}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               
               <div className="space-y-1 flex-1">
@@ -348,22 +381,20 @@ export default function ViewData() {
                           <div className="flex-1">
                             <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between mb-4">
                               <div>
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-2 mb-1">
                                   <div className="font-medium text-slate-800 dark:text-slate-100">{row.category}</div>
                                   {row.finalResponse && (
                                     <span className="inline-flex text-green-600 dark:text-green-400">
                                       <Check className="h-4 w-4" />
                                     </span>
                                   )}
-                                </div>
-                                <div className="text-sm text-slate-600 dark:text-slate-300 mb-3">{row.requirement}</div>
-                                <div className="flex flex-wrap gap-2 mb-3">
                                   {row.rfpName && (
-                                    <span className="text-xs bg-blue-50 text-blue-600 dark:bg-blue-900 dark:text-blue-300 px-2 py-1 rounded-full">
+                                    <span className="text-xs bg-blue-50 text-blue-600 dark:bg-blue-900 dark:text-blue-300 px-2 py-1 rounded-full ml-auto">
                                       RFP: {row.rfpName}
                                     </span>
                                   )}
                                 </div>
+                                <div className="text-sm text-slate-600 dark:text-slate-300 mb-2">{row.requirement}</div>
                               </div>
                               
                               <div className="flex sm:flex-col items-center sm:items-end mt-3 sm:mt-0">
@@ -391,15 +422,13 @@ export default function ViewData() {
                               </div>
                             </div>
                             
-                            {row.finalResponse ? (
+                            {row.finalResponse && (
                               <div className="mt-3 p-3 bg-slate-50 dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700">
                                 <h4 className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Response:</h4>
                                 <div className="text-sm text-slate-700 dark:text-slate-200 line-clamp-3">
                                   {row.finalResponse}
                                 </div>
                               </div>
-                            ) : (
-                              <div className="text-sm text-slate-400 dark:text-slate-500 italic mt-3">No response generated yet</div>
                             )}
                           </div>
                         </div>
