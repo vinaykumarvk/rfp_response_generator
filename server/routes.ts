@@ -1606,7 +1606,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { provider = "openai" } = req.body;
       
       // Use the direct test Python module
-      const scriptPath = path.resolve(process.cwd(), 'server/direct_test.py');
+      const scriptPath = path.join(__dirname, 'direct_test.py');
       
       if (!fs.existsSync(scriptPath)) {
         return res.status(500).json({
@@ -1686,7 +1686,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { provider = "openai" } = req.body;
       
       // Use the simplified Python test module
-      const scriptPath = path.resolve(process.cwd(), 'server/api_test.py');
+      const scriptPath = path.join(__dirname, 'api_test.py');
       
       if (!fs.existsSync(scriptPath)) {
         return res.status(500).json({
@@ -1780,7 +1780,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Call the Python script to process the requirement (positional arguments)
       const pythonProcess = spawn("python3", [
-        path.join(process.cwd(), "server", "rfp_response_generator.py"),
+        path.join(__dirname, "rfp_response_generator.py"),
         requirement_text,
         modelProvider
       ]);
