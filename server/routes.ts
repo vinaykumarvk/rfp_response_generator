@@ -405,7 +405,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.log("Executing MOA Phase 2 - Synthesis");
           // Phase 2: Synthesize existing model responses
           // Launch Python script with a special flag for synthesis
-          const scriptPath = path.join(__dirname, 'moa_synthesis.py');
+          const scriptPath = path.join(getDirPath(), 'moa_synthesis.py');
           
           // Create a temporary synthesis input file
           const synthInput = {
@@ -414,7 +414,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             requirement_id: requirementId
           };
           
-          const tempFilePath = path.join(__dirname, `temp_files/moa_synthesis_${Date.now()}.json`);
+          const tempFilePath = path.join(getDirPath(), `temp_files/moa_synthesis_${Date.now()}.json`);
           fs.mkdirSync(path.dirname(tempFilePath), { recursive: true });
           fs.writeFileSync(tempFilePath, JSON.stringify(synthInput, null, 2));
           
@@ -1614,7 +1614,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { provider = "openai" } = req.body;
       
       // Use the direct test Python module
-      const scriptPath = path.join(__dirname, 'direct_test.py');
+      const scriptPath = path.join(getDirPath(), 'direct_test.py');
       
       if (!fs.existsSync(scriptPath)) {
         return res.status(500).json({
@@ -1694,7 +1694,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { provider = "openai" } = req.body;
       
       // Use the simplified Python test module
-      const scriptPath = path.join(__dirname, 'api_test.py');
+      const scriptPath = path.join(getDirPath(), 'api_test.py');
       
       if (!fs.existsSync(scriptPath)) {
         return res.status(500).json({
@@ -2063,7 +2063,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Call the Python script to process the requirement (positional arguments)
       const pythonProcess = spawn("python3", [
-        path.join(__dirname, "rfp_response_generator.py"),
+        path.join(getDirPath(), "rfp_response_generator.py"),
         requirement_text,
         modelProvider
       ]);
