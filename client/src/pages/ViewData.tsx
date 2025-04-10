@@ -30,7 +30,13 @@ import {
   Atom,
   Bot,
   Brain,
-  Network
+  Network,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  Calendar,
+  Hash,
+  Tag
 } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useToast } from '@/hooks/use-toast';
@@ -580,6 +586,46 @@ export default function ViewData() {
           )}
           
           <CardContent className="p-4">
+            {/* Sorting options */}
+            {!loading && filteredData.length > 0 && (
+              <div className="mb-4 flex flex-wrap gap-2 items-center">
+                <div className="text-sm font-medium">Sort by:</div>
+                <Button 
+                  variant={sortConfig.key === 'id' ? 'default' : 'outline'} 
+                  size="sm" 
+                  onClick={() => requestSort('id')}
+                  className="h-8"
+                >
+                  ID {sortConfig.key === 'id' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                </Button>
+                <Button 
+                  variant={sortConfig.key === 'timestamp' ? 'default' : 'outline'} 
+                  size="sm" 
+                  onClick={() => requestSort('timestamp')}
+                  className="h-8"
+                >
+                  Date {sortConfig.key === 'timestamp' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                </Button>
+                <Button 
+                  variant={sortConfig.key === 'rfpName' ? 'default' : 'outline'} 
+                  size="sm" 
+                  onClick={() => requestSort('rfpName')}
+                  className="h-8"
+                >
+                  RFP Name {sortConfig.key === 'rfpName' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                </Button>
+                <Button 
+                  variant={sortConfig.key === 'category' ? 'default' : 'outline'} 
+                  size="sm" 
+                  onClick={() => requestSort('category')}
+                  className="h-8"
+                >
+                  Category {sortConfig.key === 'category' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                </Button>
+              </div>
+            )}
+            
+            {/* Content display */}
             {loading ? (
               <div className="space-y-4">
                 <Skeleton className="h-40 w-full" />
