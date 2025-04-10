@@ -217,6 +217,23 @@ export class DatabaseStorage implements IStorage {
     console.log("Response to save:", JSON.stringify(response, null, 2));
     console.log("References count:", references.length);
     
+    // DEBUG: Direct check of all model-specific fields in the incoming response
+    console.log("DIRECT MODEL FIELD CHECK IN STORAGE:");
+    console.log("- openaiResponse:", (response.openaiResponse !== undefined && response.openaiResponse !== null) ? 
+                `Present (length: ${response.openaiResponse.length})` : "Not present");
+    console.log("- anthropicResponse:", (response.anthropicResponse !== undefined && response.anthropicResponse !== null) ? 
+                `Present (length: ${response.anthropicResponse.length})` : "Not present");
+    console.log("- deepseekResponse:", (response.deepseekResponse !== undefined && response.deepseekResponse !== null) ?
+                `Present (length: ${response.deepseekResponse.length})` : "Not present");
+    console.log("- moaResponse:", (response.moaResponse !== undefined && response.moaResponse !== null) ?
+                `Present (length: ${response.moaResponse.length})` : "Not present");
+    
+    // Also check for underscored name versions in case they're being provided differently
+    console.log("- openai_response:", (response as any).openai_response ? `Present` : "Not present");
+    console.log("- anthropic_response:", (response as any).anthropic_response ? `Present` : "Not present");
+    console.log("- deepseek_response:", (response as any).deepseek_response ? `Present` : "Not present");
+    console.log("- moa_response:", (response as any).moa_response ? `Present` : "Not present");
+    
     let responseRecord: ExcelRequirementResponse;
     
     // Check if this is an update to an existing response (has an id)

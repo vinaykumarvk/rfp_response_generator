@@ -635,6 +635,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   console.log("- openai_response:", result.openai_response ? "Present and length " + result.openai_response.length : "Not present");
                   console.log("- generated_response:", result.generated_response ? "Present and length " + result.generated_response.length : "Not present");
                   
+                  // Print the COMPLETE result object to identify all available fields
+                  console.log("COMPLETE RESULT OBJECT DUMP:");
+                  for (const key in result) {
+                    try {
+                      const value = result[key];
+                      if (typeof value === 'string') {
+                        console.log(`${key}: ${value.substring(0, 50)}... (${value.length} chars)`);
+                      } else {
+                        console.log(`${key}: ${JSON.stringify(value)}`);
+                      }
+                    } catch (e) {
+                      console.log(`${key}: [Error stringifying]`, e);
+                    }
+                  }
+                  
                   // For OpenAI provider, let's use a more direct approach
                   let directOpenaiResponse = null;
                   let directAnthropicResponse = null;
@@ -753,6 +768,101 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Add extended echo endpoint for testing that also handles file operations
+  // Create a test endpoint for directly testing the storage system with model responses
+  app.post("/api/test-storage", async (req: Request, res: Response) => {
+    try {
+      const { openaiResponse, anthropicResponse, deepseekResponse, moaResponse, requirementId } = req.body;
+      
+      if (!requirementId) {
+        return res.status(400).json({
+          success: false,
+          error: "Missing requirementId parameter"
+        });
+      }
+      
+      // Find the existing requirement to update
+      const existingRequirements = await storage.getExcelRequirementResponses();
+      const existingRequirement = existingRequirements.find(r => r.id === parseInt(requirementId));
+      
+      if (!existingRequirement) {
+        return res.status(404).json({
+          success: false,
+          error: `Requirement with ID ${requirementId} not found`
+        });
+      }
+      
+      console.log("TEST ENDPOINT - Found requirement:", existingRequirement.id);
+      
+      // Determine which model to use based on what was provided
+      let modelProvider = null;
+      let finalResponse = '';
+      
+      if (openaiResponse) {
+        modelProvider = "openai";
+        finalResponse = openaiResponse;
+        console.log("TEST - Using OpenAI response");
+      } else if (anthropicResponse) {
+        modelProvider = "anthropic";
+        finalResponse = anthropicResponse;
+        console.log("TEST - Using Anthropic response");
+      } else if (deepseekResponse) {
+        modelProvider = "deepseek";
+        finalResponse = deepseekResponse;
+        console.log("TEST - Using Deepseek response");
+      } else if (moaResponse) {
+        modelProvider = "moa";
+        finalResponse = moaResponse;
+        console.log("TEST - Using MOA response");
+      } else {
+        return res.status(400).json({
+          success: false,
+          error: "At least one model response must be provided"
+        });
+      }
+      
+      // Create simple update object with ONLY the necessary fields
+      const updateData = {
+        id: existingRequirement.id,
+        requirement: existingRequirement.requirement,
+        finalResponse,
+        openaiResponse: openaiResponse || null,
+        anthropicResponse: anthropicResponse || null,
+        deepseekResponse: deepseekResponse || null,
+        moaResponse: moaResponse || null,
+        modelProvider
+      };
+      
+      console.log("TEST - Direct storage update with:", {
+        id: updateData.id,
+        modelProvider: updateData.modelProvider,
+        finalResponseLength: updateData.finalResponse?.length || 0,
+        openaiResponseLength: updateData.openaiResponse?.length || 0, 
+        anthropicResponseLength: updateData.anthropicResponse?.length || 0,
+        deepseekResponseLength: updateData.deepseekResponse?.length || 0,
+        moaResponseLength: updateData.moaResponse?.length || 0
+      });
+
+      // Use storage directly without any intermediate processing
+      const result = await storage.createResponseWithReferences(
+        updateData,
+        [] // No references for this test
+      );
+      
+      return res.json({
+        success: true,
+        message: "Storage test completed successfully",
+        updatedResponse: result.response
+      });
+      
+    } catch (error) {
+      console.error("Error in test-storage endpoint:", error);
+      return res.status(500).json({
+        success: false, 
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
+
   app.post("/api/echo", async (req: Request, res: Response) => {
     try {
       const { action } = req.body;
