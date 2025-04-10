@@ -129,8 +129,18 @@ export default function TestAbortController() {
       variant: "default"
     });
     
-    // This is the key part - calling abort() on the controller
-    abortControllerRef.current.abort();
+    try {
+      // This is the key part - calling abort() on the controller
+      // Check that abort method exists and is a function before calling it
+      if (abortControllerRef.current && typeof abortControllerRef.current.abort === 'function') {
+        abortControllerRef.current.abort();
+      } else {
+        addLog("Error: AbortController doesn't have an abort method");
+      }
+    } catch (error) {
+      addLog(`Error aborting request: ${error}`);
+      console.error("Error aborting request:", error);
+    }
   };
   
   // Clear all logs and results

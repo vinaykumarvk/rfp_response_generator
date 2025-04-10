@@ -559,28 +559,18 @@ export default function GenerateResponse() {
                 ));
                 
                 successCount++;
+                
+                // Clear the interval and set progress to 100%
+                clearInterval(progressInterval);
+                setMoaPhaseProgress(100);
               } catch (error) {
                 console.error("Error in Phase 2:", error);
                 failCount++;
+                
+                // Clear the interval even if error occurs
+                clearInterval(progressInterval);
+                setMoaPhaseProgress(100);
               }
-              
-              // Clear the interval and set progress to 100%
-              clearInterval(progressInterval);
-              setMoaPhaseProgress(100);
-              
-              // Update the requirements list with the new response
-              setRequirements(prev => prev.map(req => 
-                req.id === requirement.id ? { 
-                  ...req, 
-                  finalResponse: phase2Result.generated_response || phase2Result.moa_response,
-                  openaiResponse: phase1Result.modelResponses?.openaiResponse || req.openaiResponse,
-                  anthropicResponse: phase1Result.modelResponses?.anthropicResponse || req.anthropicResponse,
-                  deepseekResponse: phase1Result.modelResponses?.deepseekResponse || req.deepseekResponse,
-                  moaResponse: phase2Result.moa_response
-                } : req
-              ));
-              
-              successCount++;
             } else {
               // If synthesis isn't ready, consider it a failure
               failCount++;
