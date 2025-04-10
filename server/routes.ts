@@ -397,7 +397,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.log("Executing MOA Phase 2 - Synthesis");
           // Phase 2: Synthesize existing model responses
           // Launch Python script with a special flag for synthesis
-          const scriptPath = path.resolve(process.cwd(), 'server/moa_synthesis.py');
+          const scriptPath = path.join(__dirname, 'moa_synthesis.py');
           
           // Create a temporary synthesis input file
           const synthInput = {
@@ -406,7 +406,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             requirement_id: requirementId
           };
           
-          const tempFilePath = path.resolve(process.cwd(), `server/temp_files/moa_synthesis_${Date.now()}.json`);
+          const tempFilePath = path.join(__dirname, `temp_files/moa_synthesis_${Date.now()}.json`);
           fs.mkdirSync(path.dirname(tempFilePath), { recursive: true });
           fs.writeFileSync(tempFilePath, JSON.stringify(synthInput, null, 2));
           
@@ -530,7 +530,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Use Python script to generate response
-      const scriptPath = path.resolve(process.cwd(), 'server/rfp_response_generator.py');
+      const scriptPath = path.join(__dirname, 'rfp_response_generator.py');
       
       return new Promise<void>((resolve, reject) => {
         // Spawn Python process
@@ -656,7 +656,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 
                 try {
                   // Instead of returning the response, we'll trigger Phase 2 immediately
-                  const scriptPath = path.resolve(process.cwd(), 'server/moa_synthesis.py');
+                  const scriptPath = path.join(__dirname, 'moa_synthesis.py');
                   
                   // Create a temporary synthesis input file
                   const synthInput = {
@@ -669,7 +669,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     requirement_id: requirementId
                   };
                   
-                  const tempFilePath = path.resolve(process.cwd(), `server/temp_files/moa_synthesis_${Date.now()}.json`);
+                  const tempFilePath = path.join(__dirname, `temp_files/moa_synthesis_${Date.now()}.json`);
                   fs.mkdirSync(path.dirname(tempFilePath), { recursive: true });
                   fs.writeFileSync(tempFilePath, JSON.stringify(synthInput, null, 2));
                   
