@@ -18,6 +18,8 @@ import {
   MoreHorizontal, 
   Sparkles,
   CheckSquare,
+  Activity,
+  Zap,
   Square,
   Check,
   Filter,
@@ -395,6 +397,30 @@ export default function ViewData() {
                                   )}
                                 </div>
                                 <div className="text-sm text-slate-600 dark:text-slate-300 mb-2">{row.requirement}</div>
+                                
+                                {/* New columns for generation mode and processing status */}
+                                <div className="flex gap-3 mt-2 mb-1">
+                                  {/* Generation Mode */}
+                                  <div className="flex items-center">
+                                    <Zap className="h-3.5 w-3.5 text-amber-500 mr-1" />
+                                    <span className="text-xs text-slate-500 font-medium">Mode:</span>
+                                    <span className="text-xs ml-1">
+                                      {row.openaiResponse && !row.anthropicResponse && !row.deepseekResponse ? 'OpenAI' : 
+                                       row.anthropicResponse && !row.openaiResponse && !row.deepseekResponse ? 'Anthropic' :
+                                       row.deepseekResponse && !row.openaiResponse && !row.anthropicResponse ? 'Deepseek' :
+                                       row.moaResponse ? 'MOA' : 'Not Processed'}
+                                    </span>
+                                  </div>
+                                  
+                                  {/* Processing Status */}
+                                  <div className="flex items-center">
+                                    <Activity className="h-3.5 w-3.5 text-blue-500 mr-1" />
+                                    <span className="text-xs text-slate-500 font-medium">Status:</span>
+                                    <span className={`text-xs ml-1 ${row.finalResponse ? 'text-green-600' : 'text-amber-500'}`}>
+                                      {row.finalResponse ? 'Response Generated' : 'Not Generated'}
+                                    </span>
+                                  </div>
+                                </div>
                               </div>
                               
                               <div className="flex sm:flex-col items-center sm:items-end mt-3 sm:mt-0">
