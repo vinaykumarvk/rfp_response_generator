@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import ReactMarkdown from 'react-markdown';
@@ -8,6 +8,7 @@ import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, Di
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Badge } from '@/components/ui/badge';
 import { 
   MessageSquare, 
   ArrowLeft, 
@@ -817,10 +818,13 @@ export default function ViewData() {
                 {filteredData.map((row: ExcelRequirementResponse, index: number) => {
                   const isSelected = row.id ? selectedItems.includes(row.id) : false;
                   return (
-                    <Card key={row.id || index} className={`overflow-hidden border ${isSelected ? 'border-blue-400 dark:border-blue-600' : 'border-slate-200 dark:border-slate-700'}`}>
-                      <CardContent className="p-4">
+                    <Card 
+                      key={row.id || index} 
+                      className={`overflow-hidden border relative transition-all duration-200 ${isSelected ? 'border-blue-400 dark:border-blue-600 shadow-md' : 'border-slate-200 dark:border-slate-700'}`}
+                    >
+                      <CardContent className="p-3 sm:p-4">
                         <div className="flex items-start">
-                          <div className="mr-3 pt-1">
+                          <div className="mr-2 sm:mr-3 pt-1">
                             {row.id && (
                               <Checkbox 
                                 id={`select-${row.id}`}
@@ -830,78 +834,54 @@ export default function ViewData() {
                             )}
                           </div>
                           
-                          <div className="flex-1">
-                            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between mb-4">
-                              <div>
-                                <div className="flex items-center gap-2 mb-1">
-                                  <div className="font-medium text-slate-800 dark:text-slate-100">{row.category}</div>
-                                  {row.finalResponse && (
-                                    <span className="inline-flex text-green-600 dark:text-green-400">
-                                      <Check className="h-4 w-4" />
-                                    </span>
-                                  )}
-                                  {row.rfpName && (
-                                    <span className="text-xs bg-blue-50 text-blue-600 dark:bg-blue-900 dark:text-blue-300 px-2 py-1 rounded-full ml-auto">
-                                      RFP: {row.rfpName}
-                                    </span>
-                                  )}
-                                </div>
-                                <div className="text-sm text-slate-600 dark:text-slate-300 mb-2">{row.requirement}</div>
-                                
-                                {/* New columns for generation mode and processing status */}
-                                <div className="flex gap-3 mt-2 mb-1">
-                                  {/* Generation Mode */}
-                                  <div className="flex items-center">
-                                    <Zap className="h-3.5 w-3.5 text-amber-500 mr-1" />
-                                    <span className="text-xs text-slate-500 font-medium">Mode:</span>
-                                    <span className="text-xs ml-1">
-                                      {row.openaiResponse && !row.anthropicResponse && !row.deepseekResponse ? 'OpenAI' : 
-                                       row.anthropicResponse && !row.openaiResponse && !row.deepseekResponse ? 'Anthropic' :
-                                       row.deepseekResponse && !row.openaiResponse && !row.anthropicResponse ? 'Deepseek' :
-                                       row.moaResponse ? 'MOA' : 'Not Processed'}
-                                    </span>
-                                  </div>
-                                  
-                                  {/* Processing Status */}
-                                  <div className="flex items-center">
-                                    <Activity className="h-3.5 w-3.5 text-blue-500 mr-1" />
-                                    <span className="text-xs text-slate-500 font-medium">Status:</span>
-                                    <span className={`text-xs ml-1 ${row.finalResponse ? 'text-green-600' : 'text-amber-500'}`}>
-                                      {row.finalResponse ? 'Response Generated' : 'Not Generated'}
-                                    </span>
-                                  </div>
-                                </div>
-                              </div>
+                          <div className="flex-1 min-w-0">
+                            {/* Mobile view categories and badges */}
+                            <div className="flex flex-wrap items-center gap-1.5 mb-2">
+                              {/* Status tag */}
+                              <Badge 
+                                variant="outline" 
+                                className={`text-[10px] sm:text-xs px-1.5 py-0 ${row.finalResponse 
+                                  ? "bg-green-50 text-green-600 dark:bg-green-900/30 dark:text-green-300 border-green-200 dark:border-green-800" 
+                                  : "bg-slate-50 text-slate-600 dark:bg-slate-900/50 dark:text-slate-300"}`}
+                              >
+                                {row.finalResponse ? 
+                                  <><Check className="h-3 w-3 mr-0.5" /> Generated</> : 
+                                  'Not Generated'}
+                              </Badge>
                               
-                              <div className="flex sm:flex-col items-center sm:items-end mt-3 sm:mt-0">
-                                {row.timestamp && (
-                                  <div className="text-xs text-slate-500 dark:text-slate-400 mb-2">
-                                    Generated: {(() => {
-                                      try {
-                                        return format(new Date(row.timestamp), 'MMM d, yyyy');
-                                      } catch (e) {
-                                        return String(row.timestamp);
-                                      }
-                                    })()}
-                                  </div>
-                                )}
-                                <Button 
-                                  variant="outline" 
-                                  size="sm"
-                                  onClick={() => handleViewResponse(row)}
-                                  className="h-8"
-                                  disabled={!row.finalResponse}
-                                >
-                                  <Eye className="h-4 w-4 mr-1" />
-                                  View Details
-                                </Button>
-                              </div>
+                              {/* RFP Badge */}
+                              {row.rfpName && (
+                                <Badge variant="outline" className="text-[10px] sm:text-xs bg-blue-50 dark:bg-blue-900/40 text-blue-600 dark:text-blue-300 border-blue-200 dark:border-blue-800">
+                                  {row.rfpName}
+                                </Badge>
+                              )}
+                              
+                              {/* Generation mode badge */}
+                              {(row.openaiResponse || row.anthropicResponse || row.deepseekResponse || row.moaResponse) && (
+                                <Badge variant="outline" className="text-[10px] sm:text-xs bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-300 border-amber-200 dark:border-amber-800">
+                                  {row.moaResponse ? 
+                                    <><Network className="h-3 w-3 mr-0.5" /> MOA</> : 
+                                    row.openaiResponse ? 'OpenAI' : 
+                                    row.anthropicResponse ? 'Anthropic' : 'Deepseek'
+                                  }
+                                </Badge>
+                              )}
+                              
+                              {/* Category display */}
+                              <Badge variant="outline" className="text-[10px] sm:text-xs">
+                                {row.category}
+                              </Badge>
                             </div>
                             
+                            {/* Requirement text */}
+                            <div className="text-sm sm:text-base font-medium text-slate-800 dark:text-slate-100 mb-2 line-clamp-3">
+                              {row.requirement}
+                            </div>
+                            
+                            {/* Response preview for mobile */}
                             {row.finalResponse && (
-                              <div className="mt-3 p-3 bg-slate-50 dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700">
-                                <h4 className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Response:</h4>
-                                <div className="text-sm text-slate-700 dark:text-slate-200 line-clamp-3 prose prose-sm max-w-none">
+                              <div className="mt-2 p-2 sm:p-3 bg-slate-50 dark:bg-slate-800/50 rounded-sm border border-slate-200 dark:border-slate-700">
+                                <div className="text-xs sm:text-sm text-slate-700 dark:text-slate-200 line-clamp-2 prose prose-sm max-w-none">
                                   <ReactMarkdown remarkPlugins={[remarkGfm]}>
                                     {row.finalResponse
                                       .replace(/\\n/g, '\n')
@@ -911,6 +891,34 @@ export default function ViewData() {
                                 </div>
                               </div>
                             )}
+                            
+                            {/* Footer with timestamp and action buttons */}
+                            <div className="flex justify-between items-center mt-3 pt-2 border-t border-slate-100 dark:border-slate-700">
+                              {row.timestamp ? (
+                                <div className="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400">
+                                  {(() => {
+                                    try {
+                                      return format(new Date(row.timestamp), 'MMM d, yyyy');
+                                    } catch (e) {
+                                      return String(row.timestamp);
+                                    }
+                                  })()}
+                                </div>
+                              ) : (
+                                <div className="text-[10px] sm:text-xs text-slate-400">No timestamp</div>
+                              )}
+                              
+                              <Button 
+                                variant="ghost" 
+                                size="sm"
+                                onClick={() => handleViewResponse(row)}
+                                className="h-7 sm:h-8 text-xs sm:text-sm px-2 sm:px-3"
+                                disabled={!row.finalResponse}
+                              >
+                                <Eye className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                                View
+                              </Button>
+                            </div>
                           </div>
                         </div>
                       </CardContent>
