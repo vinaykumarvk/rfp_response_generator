@@ -64,6 +64,9 @@ export default function GenerateResponse() {
   const [progressValue, setProgressValue] = useState(0);
   const [processedCount, setProcessedCount] = useState(0);
   const [totalToProcess, setTotalToProcess] = useState(0);
+  const [moaPhase, setMoaPhase] = useState<1 | 2 | null>(null); // Tracks MOA processing phase
+  const [moaPhaseProgress, setMoaPhaseProgress] = useState(0); // Progress within the current MOA phase
+  const [currentModelFetching, setCurrentModelFetching] = useState<string | null>(null); // Current model being fetched
   const [showReprocessModal, setShowReprocessModal] = useState(false);
   const [reprocessModelProvider, setReprocessModelProvider] = useState<string>("openai");
   const [reprocessUseModelMixture, setReprocessUseModelMixture] = useState<boolean>(false);
@@ -337,6 +340,11 @@ export default function GenerateResponse() {
     setProcessedCount(0);
     setProgressValue(0);
     
+    // Reset MOA phase tracking
+    setMoaPhase(null);
+    setMoaPhaseProgress(0);
+    setCurrentModelFetching(null);
+    
     try {
       let successCount = 0;
       let failCount = 0;
@@ -354,44 +362,133 @@ export default function GenerateResponse() {
         }
         
         try {
-          const response = await fetch("/api/generate-response", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              requirement: requirement.requirement,
-              provider: useModelMixture ? "moa" : modelProvider,
-              requirementId: requirement.id
-            })
-          });
-          
-          if (!response.ok) {
-            failCount++;
-          } else {
-            const result = await response.json();
+          // If using MOA, we need to handle the two-phase process
+          if (useModelMixture) {
+            // Phase 1: Collect responses from all models
+            setMoaPhase(1);
+            setCurrentModelFetching("OpenAI");
+            setMoaPhaseProgress(0);
             
-            if (result.error) {
-              failCount++;
-            } else {
+            const phase1Response = await fetch("/api/generate-response", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                requirement: requirement.requirement,
+                provider: "moa",
+                requirementId: requirement.id,
+                phase: 1
+              })
+            });
+            
+            if (!phase1Response.ok) {
+              throw new Error("Failed to generate responses in Phase 1");
+            }
+            
+            const phase1Result = await phase1Response.json();
+            
+            if (phase1Result.error) {
+              throw new Error(phase1Result.error);
+            }
+            
+            // Check if phase 1 completed successfully and synthesis is ready
+            if (phase1Result.phase === 1 && phase1Result.synthesisReady) {
+              // Update MOA phase progress
+              setCurrentModelFetching("Synthesis");
+              setMoaPhaseProgress(100);
+              
+              // Phase 2: Synthesize responses
+              setMoaPhase(2);
+              setMoaPhaseProgress(0);
+              
+              const phase2Response = await fetch("/api/generate-response", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  requirement: requirement.requirement,
+                  provider: "moa",
+                  requirementId: requirement.id,
+                  phase: 2,
+                  modelResponses: phase1Result.modelResponses
+                })
+              });
+              
+              if (!phase2Response.ok) {
+                throw new Error("Failed to synthesize responses in Phase 2");
+              }
+              
+              const phase2Result = await phase2Response.json();
+              
+              if (phase2Result.error) {
+                throw new Error(phase2Result.error);
+              }
+              
               // Update the requirements list with the new response
               setRequirements(prev => prev.map(req => 
                 req.id === requirement.id ? { 
                   ...req, 
-                  finalResponse: result.generated_response,
-                  openaiResponse: result.openai_response || req.openaiResponse,
-                  anthropicResponse: result.anthropic_response || req.anthropicResponse,
-                  deepseekResponse: result.deepseek_response || req.deepseekResponse
+                  finalResponse: phase2Result.generated_response || phase2Result.moa_response,
+                  openaiResponse: phase1Result.modelResponses?.openaiResponse || req.openaiResponse,
+                  anthropicResponse: phase1Result.modelResponses?.anthropicResponse || req.anthropicResponse,
+                  deepseekResponse: phase1Result.modelResponses?.deepseekResponse || req.deepseekResponse,
+                  moaResponse: phase2Result.moa_response
                 } : req
               ));
               
               successCount++;
+            } else {
+              // If synthesis isn't ready, consider it a failure
+              failCount++;
+            }
+          } else {
+            // Standard single-model processing
+            const response = await fetch("/api/generate-response", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                requirement: requirement.requirement,
+                provider: modelProvider,
+                requirementId: requirement.id
+              })
+            });
+            
+            if (!response.ok) {
+              failCount++;
+            } else {
+              const result = await response.json();
+              
+              if (result.error) {
+                failCount++;
+              } else {
+                // Update the requirements list with the new response
+                setRequirements(prev => prev.map(req => 
+                  req.id === requirement.id ? { 
+                    ...req, 
+                    finalResponse: result.generated_response,
+                    openaiResponse: result.openai_response || req.openaiResponse,
+                    anthropicResponse: result.anthropic_response || req.anthropicResponse,
+                    deepseekResponse: result.deepseek_response || req.deepseekResponse
+                  } : req
+                ));
+                
+                successCount++;
+              }
             }
           }
         } catch (error) {
           console.error(`Error generating response for requirement ${id}:`, error);
           failCount++;
         }
+        
+        // Reset MOA phase tracking for next item
+        setMoaPhase(null);
+        setMoaPhaseProgress(0);
+        setCurrentModelFetching(null);
         
         // Update progress after each item is processed
         const newProcessedCount = i + 1;
@@ -433,6 +530,9 @@ export default function GenerateResponse() {
       });
     } finally {
       setBatchGenerating(false);
+      setMoaPhase(null);
+      setMoaPhaseProgress(0);
+      setCurrentModelFetching(null);
     }
   };
   
