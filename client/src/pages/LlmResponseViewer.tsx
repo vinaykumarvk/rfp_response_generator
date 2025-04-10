@@ -113,8 +113,14 @@ export default function LlmResponseViewer() {
 
     if (!finalResponse) return <p>No response content available</p>;
 
+    // Clean up escaped characters first
+    let cleanedResponse = finalResponse
+      .replace(/\\n/g, "\n")
+      .replace(/\\"/g, '"')
+      .replace(/\\\\/g, '\\');
+
     // Format the response with markdown syntax
-    const formattedResponse = finalResponse
+    const formattedResponse = cleanedResponse
       // Format headings (# Heading -> <h1>Heading</h1>, etc.)
       .replace(/^### (.*$)/gm, '<h3>$1</h3>')
       .replace(/^## (.*$)/gm, '<h2>$1</h2>')
@@ -125,7 +131,10 @@ export default function LlmResponseViewer() {
       .replace(/\*(.*?)\*/g, '<em>$1</em>')
       // Format lists
       .replace(/^\d+\.\s+(.*$)/gm, '<li>$1</li>')
-      .replace(/^\*\s+(.*$)/gm, '<li>$1</li>')
+      .replace(/^\s*[-*]\s+(.*$)/gm, '<li>$1</li>')
+      // Wrap lists in ul/ol tags
+      .replace(/(<li>.*<\/li>)\n(<li>)/g, '$1$2')
+      .replace(/(<li>.*<\/li>)(?!\n<li>)/g, '<ul>$1</ul>')
       // Format paragraphs (double line breaks)
       .replace(/\n\n/g, '</p><p>')
       // Preserve line breaks within paragraphs
