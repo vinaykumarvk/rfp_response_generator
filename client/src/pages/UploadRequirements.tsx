@@ -9,7 +9,9 @@ import {
   AlertTriangle, 
   Check, 
   Plus, 
-  RefreshCw 
+  RefreshCw, 
+  FileInput, 
+  User
 } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
@@ -20,6 +22,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 import * as XLSX from 'xlsx';
 
 // Define the structure of our parsed Excel data
@@ -41,6 +44,8 @@ export default function UploadRequirements() {
   const [excelData, setExcelData] = useState<ExcelRow[]>([]);
   const [showDialog, setShowDialog] = useState(false);
   const [recordsAdded, setRecordsAdded] = useState<number | null>(null);
+  const [rfpName, setRfpName] = useState<string>("");
+  const [uploadedBy, setUploadedBy] = useState<string>("");
   
   // Reset the form when file upload is successful
   const resetForm = () => {
@@ -72,6 +77,22 @@ export default function UploadRequirements() {
       setUploadStatus({
         type: "error",
         message: "Please select a file first.",
+      });
+      return;
+    }
+    
+    if (!rfpName.trim()) {
+      setUploadStatus({
+        type: "error",
+        message: "Please enter an RFP name.",
+      });
+      return;
+    }
+    
+    if (!uploadedBy.trim()) {
+      setUploadStatus({
+        type: "error",
+        message: "Please enter your name in the 'Uploaded By' field.",
       });
       return;
     }
@@ -149,6 +170,17 @@ export default function UploadRequirements() {
       // Set the Excel data to display in the UI
       setExcelData(parsedData);
       
+      // Generate requirementId base for all rows
+      const requirementIdBase = rfpName.replace(/\s+/g, '_').toLowerCase();
+      
+      // Add rfpName, requirementId, and uploadedBy to each row
+      const enhancedData = parsedData.map((row, index) => ({
+        ...row,
+        rfpName: rfpName,
+        requirementId: `${requirementIdBase}_${(index + 1).toString().padStart(3, '0')}`,
+        uploadedBy: uploadedBy
+      }));
+      
       // Send the data to the backend to store in the database
       const response = await fetch("/api/analyze-excel", {
         method: "POST",
@@ -156,7 +188,7 @@ export default function UploadRequirements() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ 
-          data: parsedData,
+          data: enhancedData,
           replaceExisting: replaceExisting 
         })
       });
@@ -241,48 +273,86 @@ export default function UploadRequirements() {
             
             <CardContent className="px-6 py-5">
               <div className="space-y-6">
-                <div className="border-2 border-dashed border-slate-200 rounded-lg p-10 text-center">
-                  <div className="flex flex-col items-center justify-center space-y-4">
-                    <div className="h-14 w-14 bg-slate-100 rounded-full flex items-center justify-center">
-                      <Upload className="h-6 w-6 text-slate-500" />
+                <div className="space-y-6">
+                  {/* RFP Information Section */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="rfp-name">RFP Name</Label>
+                      <div className="relative">
+                        <FileInput className="absolute left-2 top-2.5 h-4 w-4 text-slate-500" />
+                        <Input
+                          id="rfp-name"
+                          value={rfpName}
+                          onChange={(e) => setRfpName(e.target.value)}
+                          className="pl-8"
+                          placeholder="Enter RFP name"
+                        />
+                      </div>
                     </div>
-                    <div>
-                      <h4 className="text-md font-medium text-slate-700">Upload Excel File</h4>
-                      <p className="text-sm text-slate-500 mt-1 max-w-md mx-auto">
-                        Upload a file containing requirements data with 'Category' and 'Requirement' columns.
-                      </p>
+                    <div className="space-y-2">
+                      <Label htmlFor="uploaded-by">Uploaded By</Label>
+                      <div className="relative">
+                        <User className="absolute left-2 top-2.5 h-4 w-4 text-slate-500" />
+                        <Input
+                          id="uploaded-by"
+                          value={uploadedBy}
+                          onChange={(e) => setUploadedBy(e.target.value)}
+                          className="pl-8"
+                          placeholder="Enter your name"
+                        />
+                      </div>
                     </div>
-                    <div className="mt-2">
-                      <Input
-                        id="file-upload"
-                        type="file"
-                        accept=".xlsx,.xls"
-                        onChange={handleFileChange}
-                        className="hidden"
-                      />
-                      <label htmlFor="file-upload">
-                        <Button type="button" variant="outline" className="cursor-pointer" asChild>
-                          <span>
-                            <FileText className="mr-2 h-4 w-4" />
-                            Select File
-                          </span>
-                        </Button>
-                      </label>
-                      <Button
-                        type="button"
-                        onClick={handleUpload}
-                        disabled={!file || isUploading}
-                        className="ml-3"
-                      >
-                        {isUploading ? "Processing..." : "Process File"}
-                      </Button>
-                    </div>
-                    <div className="text-sm">
-                      {file && (
-                        <p className="text-slate-600">
-                          <span className="font-medium">Selected file:</span> {file.name} ({(file.size / 1024).toFixed(2)} KB)
+                  </div>
+                
+                  {/* File Upload Section */}
+                  <div className="border-2 border-dashed border-slate-200 rounded-lg p-10 text-center">
+                    <div className="flex flex-col items-center justify-center space-y-4">
+                      <div className="h-14 w-14 bg-slate-100 rounded-full flex items-center justify-center">
+                        <Upload className="h-6 w-6 text-slate-500" />
+                      </div>
+                      <div>
+                        <h4 className="text-md font-medium text-slate-700">Upload Excel File</h4>
+                        <p className="text-sm text-slate-500 mt-1 max-w-md mx-auto">
+                          Upload a file containing requirements data with 'Category' and 'Requirement' columns.
                         </p>
-                      )}
+                      </div>
+                      <div className="mt-2">
+                        <Input
+                          id="file-upload"
+                          type="file"
+                          accept=".xlsx,.xls"
+                          onChange={handleFileChange}
+                          className="hidden"
+                        />
+                        <label htmlFor="file-upload">
+                          <Button type="button" variant="outline" className="cursor-pointer" asChild>
+                            <span>
+                              <FileText className="mr-2 h-4 w-4" />
+                              Select File
+                            </span>
+                          </Button>
+                        </label>
+                        <Button
+                          type="button"
+                          onClick={handleUpload}
+                          disabled={!file || isUploading || !rfpName || !uploadedBy}
+                          className="ml-3"
+                        >
+                          {isUploading ? "Processing..." : "Process File"}
+                        </Button>
+                      </div>
+                      <div className="text-sm">
+                        {file && (
+                          <p className="text-slate-600">
+                            <span className="font-medium">Selected file:</span> {file.name} ({(file.size / 1024).toFixed(2)} KB)
+                          </p>
+                        )}
+                        {(!rfpName || !uploadedBy) && file && (
+                          <p className="text-orange-500 mt-2">
+                            Please enter RFP name and uploader information to continue.
+                          </p>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>

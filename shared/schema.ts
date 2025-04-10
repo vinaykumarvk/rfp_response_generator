@@ -30,12 +30,26 @@ export const rfpResponses = pgTable("rfp_responses", {
 
 export const excelRequirementResponses = pgTable("excel_requirement_responses", {
   id: serial("id").primaryKey(),
+  // New fields for RFP identification
+  rfpName: text("rfp_name"),
+  requirementId: text("requirement_id"),
+  uploadedBy: text("uploaded_by"),
+  
+  // Existing fields
   category: text("category").notNull(),
   requirement: text("requirement").notNull(),
+  
+  // Response fields
   finalResponse: text("final_response"),
   openaiResponse: text("openai_response"),
   anthropicResponse: text("anthropic_response"),
   deepseekResponse: text("deepseek_response"),
+  moaResponse: text("moa_response"),
+  
+  // Similar questions (stored as JSON string)
+  similarQuestions: text("similar_questions"),
+  
+  // Metadata
   timestamp: timestamp("timestamp").defaultNow().notNull(),
   rating: integer("rating"),
   modelProvider: text("model_provider"),
