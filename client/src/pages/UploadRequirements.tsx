@@ -127,12 +127,64 @@ export default function UploadRequirements() {
               const data = new Uint8Array(e.target?.result as ArrayBuffer);
               const workbook = XLSX.read(data, { type: 'array' });
               
+              // Check if workbook has any sheets
+              if (workbook.SheetNames.length === 0) {
+                reject(new Error("The Excel file is empty. Please upload a file with data."));
+                return;
+              }
+              
               // Get the first worksheet
               const firstSheetName = workbook.SheetNames[0];
               const worksheet = workbook.Sheets[firstSheetName];
               
               // Convert to JSON
               const jsonData = XLSX.utils.sheet_to_json(worksheet) as Record<string, any>[];
+              
+              // Check if file has any records
+              if (jsonData.length === 0) {
+                reject(new Error("The Excel file contains no records. Please upload a file with data."));
+                return;
+              }
+              
+              // Validate required columns exist
+              const requiredColumns = ['Category', 'Requirement'];
+              const alternateColumns = [
+                ['category'], // alternates for Category
+                ['requirement', 'text', 'Text', 'content', 'Content'] // alternates for Requirement
+              ];
+              
+              // Check the first row to see what columns are available
+              const firstRow = jsonData[0];
+              const availableColumns = Object.keys(firstRow);
+              
+              // For each required column, check if it or its alternates exist
+              const missingColumns = requiredColumns.filter((col, index) => {
+                // Check main column name
+                if (availableColumns.includes(col)) return false;
+                
+                // Check alternate column names
+                const alternates = alternateColumns[index];
+                return !alternates.some(alt => availableColumns.includes(alt));
+              });
+              
+              if (missingColumns.length > 0) {
+                reject(new Error(`Required columns missing: ${missingColumns.join(', ')}. File must contain both 'Category' and 'Requirement' columns.`));
+                return;
+              }
+              
+              // Check if file has extra columns not in our schema
+              const allowedColumns = [
+                'Category', 'category', 
+                'Requirement', 'requirement', 'text', 'Text', 'content', 'Content',
+                'Response', 'response', 'finalResponse',
+                'Rating', 'rating'
+              ];
+              
+              const extraColumns = availableColumns.filter(col => !allowedColumns.includes(col));
+              if (extraColumns.length > 0) {
+                reject(new Error(`File contains extra columns: ${extraColumns.join(', ')}. Only 'Category' and 'Requirement' columns are supported.`));
+                return;
+              }
               
               // Map to our expected format
               const parsedData: ExcelRow[] = jsonData.map(row => ({
@@ -142,6 +194,13 @@ export default function UploadRequirements() {
                 rating: row.Rating || row.rating || undefined
                 // timestamp will be set automatically by the database
               }));
+              
+              // Check if any requirements are empty
+              const emptyRequirements = parsedData.some(row => !row.requirement || row.requirement.trim() === '');
+              if (emptyRequirements) {
+                reject(new Error("Some requirements are empty. Please ensure all rows have a requirement."));
+                return;
+              }
               
               resolve(parsedData);
             } catch (error) {
@@ -304,16 +363,65 @@ export default function UploadRequirements() {
                     </div>
                   </div>
                 
-                  {/* File Upload Section */}
-                  <div className="border-2 border-dashed border-slate-200 rounded-lg p-10 text-center">
+                  {/* File Upload Section with Drag & Drop */}
+                  <div 
+                    className={`border-2 border-dashed ${file ? 'border-blue-400 bg-blue-50' : 'border-slate-200'} rounded-lg p-10 text-center transition-colors duration-200 relative`}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      
+                      if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                        // Get the first file
+                        const droppedFile = e.dataTransfer.files[0];
+                        
+                        // Check if it's an Excel file
+                        if (droppedFile.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' || 
+                            droppedFile.type === 'application/vnd.ms-excel' ||
+                            droppedFile.name.endsWith('.xlsx') || 
+                            droppedFile.name.endsWith('.xls')) {
+                          
+                          // Create a new change event
+                          const fileInput = document.getElementById('file-upload') as HTMLInputElement;
+                          if (fileInput) {
+                            // Create a DataTransfer object
+                            const dataTransfer = new DataTransfer();
+                            dataTransfer.items.add(droppedFile);
+                            fileInput.files = dataTransfer.files;
+                            
+                            // Trigger the change event
+                            const event = new Event('change', { bubbles: true });
+                            fileInput.dispatchEvent(event);
+                          }
+                          
+                          // Set the file directly
+                          setFile(droppedFile);
+                          setUploadStatus({
+                            type: "success",
+                            message: `File "${droppedFile.name}" selected successfully.`,
+                          });
+                          setRecordsAdded(null);
+                        } else {
+                          // Not an Excel file
+                          setUploadStatus({
+                            type: "error",
+                            message: "Please upload only Excel files (.xlsx or .xls)",
+                          });
+                        }
+                      }
+                    }}
+                  >
                     <div className="flex flex-col items-center justify-center space-y-4">
-                      <div className="h-14 w-14 bg-slate-100 rounded-full flex items-center justify-center">
-                        <Upload className="h-6 w-6 text-slate-500" />
+                      <div className={`h-14 w-14 ${file ? 'bg-blue-100' : 'bg-slate-100'} rounded-full flex items-center justify-center transition-colors duration-200`}>
+                        <Upload className={`h-6 w-6 ${file ? 'text-blue-500' : 'text-slate-500'}`} />
                       </div>
                       <div>
                         <h4 className="text-md font-medium text-slate-700">Upload Excel File</h4>
                         <p className="text-sm text-slate-500 mt-1 max-w-md mx-auto">
-                          Upload a file containing requirements data with 'Category' and 'Requirement' columns.
+                          Drag & drop your Excel file here or click to browse. File must contain 'Category' and 'Requirement' columns.
                         </p>
                       </div>
                       <div className="mt-2">
