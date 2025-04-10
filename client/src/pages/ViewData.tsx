@@ -72,6 +72,12 @@ export default function ViewData() {
     generationMode: 'all', // 'all', 'openai', 'anthropic', 'deepseek', 'moa'
   });
   
+  // Sorting
+  const [sortConfig, setSortConfig] = useState({
+    key: 'timestamp',
+    direction: 'desc' as 'asc' | 'desc'
+  });
+  
   const isMobile = useIsMobile();
   const { toast } = useToast();
   
@@ -98,53 +104,100 @@ export default function ViewData() {
     return categories.sort();
   }, [excelData]);
   
+  // Function to handle sort request
+  const requestSort = (key: string) => {
+    let direction: 'asc' | 'desc' = 'asc';
+    if (sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+  };
+  
   // Apply filters to the data
-  const filteredData = excelData.filter(row => {
-    // Filter by RFP name
-    if (filters.rfpName && filters.rfpName !== 'all' && row.rfpName) {
-      if (row.rfpName !== filters.rfpName) {
-        return false;
+  const filteredData = useMemo(() => {
+    // First filter the data
+    const filtered = excelData.filter(row => {
+      // Filter by RFP name
+      if (filters.rfpName && filters.rfpName !== 'all' && row.rfpName) {
+        if (row.rfpName !== filters.rfpName) {
+          return false;
+        }
       }
-    }
+      
+      // Filter by category
+      if (filters.category && filters.category !== 'all' && row.category) {
+        if (row.category !== filters.category) {
+          return false;
+        }
+      }
+      
+      // Filter by response status
+      if (filters.hasResponse !== 'all') {
+        const hasResponse = !!row.finalResponse;
+        if ((filters.hasResponse === 'yes' && !hasResponse) || 
+            (filters.hasResponse === 'no' && hasResponse)) {
+          return false;
+        }
+      }
+      
+      // Filter by generation mode
+      if (filters.generationMode !== 'all' && filters.generationMode) {
+        // If openAI model was used to generate the response
+        if (filters.generationMode === 'openai' && !row.openaiResponse) {
+          return false;
+        }
+        // If Anthropic model was used
+        else if (filters.generationMode === 'anthropic' && !row.anthropicResponse) {
+          return false;
+        }
+        // If Deepseek model was used
+        else if (filters.generationMode === 'deepseek' && !row.deepseekResponse) {
+          return false;
+        }
+        // If MOA (Mixture of Agents) was used
+        else if (filters.generationMode === 'moa' && !row.moaResponse) {
+          return false;
+        }
+      }
+      
+      return true;
+    });
     
-    // Filter by category
-    if (filters.category && filters.category !== 'all' && row.category) {
-      if (row.category !== filters.category) {
-        return false;
+    // Sort the filtered data
+    return [...filtered].sort((a, b) => {
+      // Default to comparing by ID if key doesn't exist
+      if (!a[sortConfig.key as keyof ExcelRequirementResponse] || !b[sortConfig.key as keyof ExcelRequirementResponse]) {
+        return sortConfig.direction === 'asc' ? 
+          (a.id || 0) - (b.id || 0) : 
+          (b.id || 0) - (a.id || 0);
       }
-    }
-    
-    // Filter by response status
-    if (filters.hasResponse !== 'all') {
-      const hasResponse = !!row.finalResponse;
-      if ((filters.hasResponse === 'yes' && !hasResponse) || 
-          (filters.hasResponse === 'no' && hasResponse)) {
-        return false;
+      
+      // Handle timestamp specially since it needs date comparison
+      if (sortConfig.key === 'timestamp') {
+        const dateA = a.timestamp ? new Date(a.timestamp).getTime() : 0;
+        const dateB = b.timestamp ? new Date(b.timestamp).getTime() : 0;
+        return sortConfig.direction === 'asc' ? dateA - dateB : dateB - dateA;
       }
-    }
-    
-    // Filter by generation mode
-    if (filters.generationMode !== 'all' && filters.generationMode) {
-      // If openAI model was used to generate the response
-      if (filters.generationMode === 'openai' && !row.openaiResponse) {
-        return false;
+      
+      // Handle string comparisons
+      if (typeof a[sortConfig.key as keyof ExcelRequirementResponse] === 'string') {
+        const valueA = String(a[sortConfig.key as keyof ExcelRequirementResponse] || '').toLowerCase();
+        const valueB = String(b[sortConfig.key as keyof ExcelRequirementResponse] || '').toLowerCase();
+        
+        return sortConfig.direction === 'asc' ?
+          valueA.localeCompare(valueB) :
+          valueB.localeCompare(valueA);
       }
-      // If Anthropic model was used
-      else if (filters.generationMode === 'anthropic' && !row.anthropicResponse) {
-        return false;
-      }
-      // If Deepseek model was used
-      else if (filters.generationMode === 'deepseek' && !row.deepseekResponse) {
-        return false;
-      }
-      // If MOA (Mixture of Agents) was used
-      else if (filters.generationMode === 'moa' && !row.moaResponse) {
-        return false;
-      }
-    }
-    
-    return true;
-  });
+      
+      // Handle numeric values
+      const valA = a[sortConfig.key as keyof ExcelRequirementResponse] || 0;
+      const valB = b[sortConfig.key as keyof ExcelRequirementResponse] || 0;
+      
+      return sortConfig.direction === 'asc' ? 
+        Number(valA) - Number(valB) : 
+        Number(valB) - Number(valA);
+    });
+  }, [excelData, filters, sortConfig]);
   
   const handleViewResponse = (row: ExcelRequirementResponse) => {
     setSelectedResponse(row);
