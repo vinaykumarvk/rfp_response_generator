@@ -825,6 +825,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     moaResponse: mappedFields.moaResponse || null,
                     
                     // Metadata
+                    // Set current timestamp when a response is generated
                     timestamp: new Date().toISOString(),
                     modelProvider: provider,
                     
@@ -994,7 +995,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         anthropicResponse: anthropicResponse || null,
         deepseekResponse: deepseekResponse || null,
         moaResponse: moaResponse || null,
-        modelProvider
+        modelProvider,
+        // Set current timestamp when testing as well
+        timestamp: new Date().toISOString()
       };
       
       console.log("TEST - Direct storage update with:", {
