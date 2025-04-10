@@ -372,14 +372,204 @@ export default function ViewData() {
   };
   
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-50">View Uploaded Requirements</h1>
+    <div className="space-y-4 sm:space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <h1 className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-primary to-primary/70 text-transparent bg-clip-text">View Uploaded Requirements</h1>
+        
+        <Button 
+          size="sm" 
+          onClick={handleRefresh}
+          className="gap-1 self-end sm:self-auto"
+          variant="outline"
+        >
+          <RefreshCcw className="h-4 w-4" />
+          <span>{loading ? 'Refreshing...' : 'Refresh'}</span>
+        </Button>
       </div>
       
-      <div className="pt-2">
-        <Card>
-          <div className="flex justify-between items-center p-4 border-b border-slate-100 dark:border-slate-700">
+      <div className="pt-0 sm:pt-2">
+        <Card className="shadow-sm">
+          {/* Mobile UI - Header with compact controls */}
+          <div className="md:hidden flex flex-col border-b border-slate-100 dark:border-slate-700">
+            <div className="p-3 flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <Checkbox 
+                  id="select-all-mobile" 
+                  checked={selectAll}
+                  onCheckedChange={toggleSelectAll}
+                />
+                <label htmlFor="select-all-mobile" className="text-xs font-medium">
+                  Select All
+                </label>
+                <Badge variant="outline" className="ml-1">{filteredData.length} items</Badge>
+              </div>
+              
+              <div className="flex items-center space-x-1">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0" disabled={selectedItems.length === 0}>
+                      <Sparkles className="h-4 w-4" />
+                      <span className="sr-only">Generate</span>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-48">
+                    <DropdownMenuLabel>Generate With</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => handleBulkAction('generate-openai')} className="gap-2">
+                      <Atom className="h-4 w-4 text-blue-500" />
+                      <span>OpenAI</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleBulkAction('generate-anthropic')} className="gap-2">
+                      <Bot className="h-4 w-4 text-purple-500" />
+                      <span>Anthropic</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleBulkAction('generate-deepseek')} className="gap-2">
+                      <Brain className="h-4 w-4 text-amber-500" />
+                      <span>DeepSeek</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => handleBulkAction('generate-moa')} className="gap-2">
+                      <Network className="h-4 w-4 text-green-500" />
+                      <span>MOA</span>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                      <Filter className="h-4 w-4" />
+                      <span className="sr-only">Filter</span>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56">
+                    <DropdownMenuLabel>Filter Requirements</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <div className="p-3 space-y-3">
+                      <div className="space-y-1">
+                        <Label className="text-xs">RFP Name</Label>
+                        <Select
+                          value={filters.rfpName}
+                          onValueChange={(value) => setFilters({...filters, rfpName: value})}
+                        >
+                          <SelectTrigger className="h-8 text-xs">
+                            <SelectValue placeholder="Select RFP" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">All</SelectItem>
+                            {uniqueRfpNames.filter(name => name).map(name => (
+                              <SelectItem key={name} value={name}>{name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      
+                      <div className="space-y-1">
+                        <Label className="text-xs">Category</Label>
+                        <Select
+                          value={filters.category}
+                          onValueChange={(value) => setFilters({...filters, category: value})}
+                        >
+                          <SelectTrigger className="h-8 text-xs">
+                            <SelectValue placeholder="Select category" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">All</SelectItem>
+                            {uniqueCategories.filter(category => category).map(category => (
+                              <SelectItem key={category} value={category}>{category}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      
+                      <div className="space-y-1">
+                        <Label className="text-xs">Response Status</Label>
+                        <Select
+                          value={filters.hasResponse}
+                          onValueChange={(value) => setFilters({...filters, hasResponse: value})}
+                        >
+                          <SelectTrigger className="h-8 text-xs">
+                            <SelectValue placeholder="Response status" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">All</SelectItem>
+                            <SelectItem value="yes">Has Response</SelectItem>
+                            <SelectItem value="no">No Response</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        className="w-full text-xs h-8 mt-2"
+                        onClick={() => setFilters({
+                          rfpName: 'all',
+                          category: 'all',
+                          hasResponse: 'all',
+                          generationMode: 'all',
+                        })}
+                      >
+                        <X className="h-3 w-3 mr-1" />
+                        Clear Filters
+                      </Button>
+                    </div>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                      <ArrowUpDown className="h-4 w-4" />
+                      <span className="sr-only">Sort</span>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuLabel>Sort By</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => requestSort('id')} className="gap-2">
+                      <Hash className="h-4 w-4" />
+                      ID {sortConfig.key === 'id' && (
+                        sortConfig.direction === 'asc' ? <ArrowUp className="h-4 w-4 ml-auto" /> : <ArrowDown className="h-4 w-4 ml-auto" />
+                      )}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => requestSort('timestamp')} className="gap-2">
+                      <Calendar className="h-4 w-4" />
+                      Date {sortConfig.key === 'timestamp' && (
+                        sortConfig.direction === 'asc' ? <ArrowUp className="h-4 w-4 ml-auto" /> : <ArrowDown className="h-4 w-4 ml-auto" />
+                      )}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => requestSort('rfpName')} className="gap-2">
+                      <BookOpen className="h-4 w-4" />
+                      RFP Name {sortConfig.key === 'rfpName' && (
+                        sortConfig.direction === 'asc' ? <ArrowUp className="h-4 w-4 ml-auto" /> : <ArrowDown className="h-4 w-4 ml-auto" />
+                      )}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => requestSort('category')} className="gap-2">
+                      <Tag className="h-4 w-4" />
+                      Category {sortConfig.key === 'category' && (
+                        sortConfig.direction === 'asc' ? <ArrowUp className="h-4 w-4 ml-auto" /> : <ArrowDown className="h-4 w-4 ml-auto" />
+                      )}
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                
+                <Button 
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 w-8 p-0 text-red-600"
+                  onClick={() => handleBulkAction('delete')}
+                  disabled={selectedItems.length === 0}
+                >
+                  <Trash2 className="h-4 w-4" />
+                  <span className="sr-only">Delete</span>
+                </Button>
+              </div>
+            </div>
+          </div>
+          
+          {/* Desktop UI - Original controls */}
+          <div className="hidden md:flex justify-between items-center p-4 border-b border-slate-100 dark:border-slate-700">
             <div className="flex items-center space-x-4">
               <div>
                 <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-50">Requirements Data</h2>
@@ -455,21 +645,11 @@ export default function ViewData() {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
-              
-              <Button 
-                size="sm" 
-                onClick={handleRefresh}
-                className="gap-1"
-                variant="outline"
-              >
-                <RefreshCcw className="h-4 w-4" />
-                <span>{loading ? 'Refreshing...' : 'Refresh'}</span>
-              </Button>
             </div>
           </div>
           
-          {/* Filter Section */}
-          <div className="p-4 border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800">
+          {/* Desktop Filter Section */}
+          <div className="hidden md:block p-4 border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800">
             <div className="flex flex-col md:flex-row gap-4 items-end">
               <div className="space-y-1 flex-1">
                 <Label htmlFor="filter-rfp">RFP Name</Label>
