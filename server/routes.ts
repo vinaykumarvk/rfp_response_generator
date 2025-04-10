@@ -315,9 +315,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Convert Excel data to our database format
       const requirements = excelData.map(row => ({
+        // RFP identification fields
+        rfpName: row.rfpName || "",
+        requirementId: row.requirementId || "",
+        uploadedBy: row.uploadedBy || "",
+        
+        // Core requirement fields
         category: row.category || "Uncategorized",
         requirement: row.requirement || row.text || row.content || "",
-        finalResponse: ""  // Initially empty
+        
+        // Response fields - initially empty
+        finalResponse: "",
+        openaiResponse: "",
+        anthropicResponse: "",
+        deepseekResponse: "",
+        moaResponse: "",
+        
+        // Similar questions will be populated when responses are generated
+        similarQuestions: "",
+        
+        // Rating starts as null
+        rating: null
+        
         // timestamp is set by defaultNow() in the schema
       }));
       
@@ -358,7 +377,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Generate AI response for a requirement
   app.post("/api/generate-response", async (req: Request, res: Response) => {
     try {
-      const { requirement, provider = "openai", requirementId } = req.body;
+      const { 
+        requirement, 
+        provider = "openai", 
+        requirementId,
+        rfpName,
+        uploadedBy
+      } = req.body;
       
       if (!requirement) {
         return res.status(400).json({ message: "Requirement text is required" });
@@ -534,6 +559,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   // Use the combined operation to store both the response and its references
                   const savedData = await storage.createResponseWithReferences(
                     {
+                      // Core fields
                       requirement: requirement,
                       finalResponse: result.generated_response || "Response could not be generated. Please try again.",
                       openaiResponse: result.openai_response || null,
@@ -542,7 +568,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
                       category: existingRequirement?.category || '',
                       timestamp: new Date().toISOString(),
                       modelProvider: provider,
-                      // If there was an existing requirement, update it instead of creating a new one
+                      
+                      // Store MOA response if available
+                      moaResponse: provider === "moa" ? result.generated_response : (result.moa_response || null),
+                      
+                      // Store similar questions as JSON string if available
+                      similarQuestions: result.similar_responses ? JSON.stringify(result.similar_responses) : '',
+                      
+                      // Store RFP identification fields
+                      rfpName: rfpName || existingRequirement?.rfpName || '',
+                      requirementId: existingRequirement?.requirementId || '',
+                      uploadedBy: uploadedBy || existingRequirement?.uploadedBy || '',
+                      
+                      // If there was an existing requirement, preserve other fields
                       ...(existingRequirement || {})
                     },
                     referenceData
