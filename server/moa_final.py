@@ -60,14 +60,14 @@ def get_model_response(prompt, model_name):
 # Helper function that uses create_synthesized_response_prompt
 def create_synthesis_prompt(requirement, model_responses):
     """Create a synthesis prompt using the existing create_synthesized_response_prompt function"""
-    # Extract responses from the model_responses structure
-    responses = []
+    # Extract responses from the model_responses structure into a dictionary
+    responses = {}
     if model_responses.get("openai", {}).get("status") == "success":
-        responses.append(model_responses["openai"]["response"])
+        responses["openai"] = model_responses["openai"]["response"]
     if model_responses.get("anthropic", {}).get("status") == "success":
-        responses.append(model_responses["anthropic"]["response"])
+        responses["anthropic"] = model_responses["anthropic"]["response"]
     if model_responses.get("deepseek", {}).get("status") == "success":
-        responses.append(model_responses["deepseek"]["response"])
+        responses["deepseek"] = model_responses["deepseek"]["response"]
     
     # Use the existing function
     return create_synthesized_response_prompt(requirement, responses)
