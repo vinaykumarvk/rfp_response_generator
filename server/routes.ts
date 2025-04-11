@@ -652,74 +652,71 @@ export async function registerRoutes(app: Express): Promise<Server> {
             return;
           }
           
-          try {
-            console.log("===== RAW OUTPUT FROM PYTHON =====");
-            console.log(stdout);
-            console.log("===== END RAW OUTPUT =====");
+          // Helper function to process the result
+          const processResult = async (result: any) => {
+            console.log("Processing result:", JSON.stringify(result, null, 2).substring(0, 300) + "...");
             
-            // Clean the output - find the first '{' and the last '}' to extract only the JSON part
-            let jsonStart = stdout.indexOf('{');
-            let jsonEnd = stdout.lastIndexOf('}');
-            
-            if (jsonStart === -1 || jsonEnd === -1 || jsonEnd <= jsonStart) {
-              throw new Error("Invalid JSON structure in Python output");
+            // Handle errors in the response
+            if (result.error) {
+              console.error("Error in Python response:", result.error);
+              return res.status(500).json({ 
+                message: "Error generating response", 
+                error: result.error 
+              });
             }
-            
-            // Extract only the JSON part of the output
-            const jsonStr = stdout.substring(jsonStart, jsonEnd + 1);
-            console.log("Extracted JSON:", jsonStr.substring(0, 100) + "...");
-            
-            // Parse the cleaned output as JSON
-            const result = JSON.parse(jsonStr);
-            
-            // Handle MOA Phase 1 response specially
-            if (provider === "moa" && result.phase === 1) {
-              console.log("Processing MOA Phase 1 response");
-              
+
+            // For model-specific responses, store in the database
+            if (result.generated_response || result.openai_response || result.anthropic_response || result.deepseek_response) {
               // Get the existing requirement by ID
               const existingRequirement = await storage.getExcelRequirementResponse(Number(requirementId));
               
               if (!existingRequirement) {
-                console.error(`Requirement with ID ${requirementId} not found for MOA Phase 1`);
+                console.error(`Requirement with ID ${requirementId} not found`);
                 return res.status(404).json({ message: "Requirement not found" });
               }
               
-              // For MOA Phase 1, we want to store the individual responses
-              const openaiResponse = result.openai_response || null;
-              const anthropicResponse = result.anthropic_response || null;
-              const deepseekResponse = result.deepseek_response || null;
-              
-              // Get today's date for the response timestamp
-              const timestamp = new Date();
-              
-              // Log the model-specific responses
-              console.log("MOA Phase 1 responses prepared for saving:");
-              console.log("- openaiResponse:", openaiResponse ? "Present (Length: " + openaiResponse.length + ")" : "Not present");
-              console.log("- anthropicResponse:", anthropicResponse ? "Present (Length: " + anthropicResponse.length + ")" : "Not present");
-              console.log("- deepseekResponse:", deepseekResponse ? "Present (Length: " + deepseekResponse.length + ")" : "Not present");
-              
-              // Update the response in the database - don't set finalResponse yet for MOA phase 1
-              const updatedResponse = await storage.updateExcelRequirementResponse(Number(requirementId), {
+              // Determine which response to use and which fields to update
+              const finalResponse = result.generated_response || 
+                                    result.openai_response || 
+                                    result.anthropic_response || 
+                                    result.deepseek_response;
+                
+              // Create update object with all possible fields
+              const updateFields: Partial<ExcelRequirementResponse> = {
                 requirement: existingRequirement.requirement,
                 category: existingRequirement.category,
                 rfpName: rfpName || existingRequirement.rfpName,
                 uploadedBy: uploadedBy || existingRequirement.uploadedBy,
-                openaiResponse: openaiResponse,
-                anthropicResponse: anthropicResponse,
-                deepseekResponse: deepseekResponse,
-                // Don't set moaResponse or finalResponse yet for phase 1
+                finalResponse,
                 modelProvider: provider,
-                rating: null  // Reset rating for the new response
-              });
+                rating: null // Reset rating for the new response
+              };
               
-              if (!updatedResponse) {
-                console.error(`Failed to update MOA phase 1 responses for requirement ID ${requirementId}`);
-                return res.status(500).json({ message: "Failed to update MOA phase 1 responses" });
+              // Set model-specific response fields if available
+              if (result.openai_response) updateFields.openaiResponse = result.openai_response;
+              if (result.anthropic_response) updateFields.anthropicResponse = result.anthropic_response;
+              if (result.deepseek_response) updateFields.deepseekResponse = result.deepseek_response;
+              if (result.moa_response) {
+                updateFields.moaResponse = result.moa_response;
+                updateFields.finalResponse = result.moa_response; // For MOA, use the MOA response as final
               }
               
-              console.log(`Successfully updated MOA phase 1 responses for requirement ID ${requirementId}`);
+              console.log("Updating requirement response with fields:", 
+                Object.keys(updateFields).join(", "), 
+                "Final response length:", updateFields.finalResponse?.length || 0);
               
-              // Process similar responses for references
+              // Update the response in the database
+              const updatedResponse = await storage.updateExcelRequirementResponse(
+                Number(requirementId), 
+                updateFields
+              );
+              
+              if (!updatedResponse) {
+                console.error(`Failed to update response for requirement ID ${requirementId}`);
+                return res.status(500).json({ message: "Failed to update response" });
+              }
+              
+              // Process similar responses for references if available
               let references: ReferenceResponse[] = [];
               if (result.similar_responses && Array.isArray(result.similar_responses)) {
                 // Process and save references
@@ -741,203 +738,103 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   if (referenceData.length > 0) {
                     references = await storage.createReferenceResponses(referenceData);
                   }
-                  
-                  console.log(`Saved ${references.length} references for MOA phase 1`);
                 } catch (error) {
-                  console.error("Error saving references for MOA phase 1:", error);
+                  console.error("Error saving references:", error);
                 }
               }
               
-              // Check if we should auto-trigger Phase 2
-              const autoTriggerPhase2 = !req.body.noAutoPhase2 && (result.synthesis_ready || false);
+              // Return the updated response and references
+              return res.status(200).json({
+                message: `Response generated successfully with provider: ${provider}`,
+                response: updatedResponse,
+                references
+              });
+            }
+            
+            // Default handler for other types of results (like API tests)
+            return res.status(200).json(result);
+          };
+          
+          try {
+            console.log("===== RAW OUTPUT FROM PYTHON =====");
+            console.log(stdout);
+            console.log("===== END RAW OUTPUT =====");
+            
+            // Improved JSON extraction logic to handle multiple JSON objects
+            console.log("Improving JSON extraction logic to handle the specific Python output format");
+            
+            // Look for the generate_response_with_PROVIDER output which should be the last complete JSON object in the output
+            // First, try to parse the entire output as JSON (sometimes it works cleanly)
+            try {
+              const result = JSON.parse(stdout.trim());
+              console.log("Successfully parsed entire output as JSON");
+              return await processResult(result);
+            } catch (parseError) {
+              console.log("Could not parse entire output as JSON, trying extraction approach");
+            }
+            
+            // Find all potential JSON objects in the output
+            const jsonObjects = [];
+            let currentDepth = 0;
+            let startIndex = -1;
+            
+            for (let i = 0; i < stdout.length; i++) {
+              const char = stdout[i];
               
-              if (autoTriggerPhase2) {
-                console.log("Auto-triggering MOA Phase 2 synthesis...");
-                
-                try {
-                  // Instead of returning the response, we'll trigger Phase 2 immediately
-                  const scriptPath = path.join(getDirPath(), 'moa_synthesis.py');
-                  
-                  // Create a temporary synthesis input file
-                  const synthInput = {
-                    requirement_text: requirement,
-                    model_responses: {
-                      openaiResponse: openaiResponse,
-                      anthropicResponse: anthropicResponse,
-                      deepseekResponse: deepseekResponse
-                    },
-                    requirement_id: requirementId
-                  };
-                  
-                  const tempFilePath = path.join(getDirPath(), `temp_files/moa_synthesis_${Date.now()}.json`);
-                  fs.mkdirSync(path.dirname(tempFilePath), { recursive: true });
-                  fs.writeFileSync(tempFilePath, JSON.stringify(synthInput, null, 2));
-                  
-                  // We're using hardcoded API keys in the Python files
-                  console.log("Using hardcoded API keys in MOA Phase 2 Python file for deployment");
-                  
-                  // Spawn Python process with minimal environment variables
-                  const pythonEnv = { 
-                      ...process.env,
-                      // We're not passing API keys anymore since they're hardcoded in Python
-                      NODE_ENV: process.env.NODE_ENV || 'production',
-                      DEBUG_MODE: 'true',
-                      DEPLOYMENT_ENV: process.env.REPL_ID ? 'replit' : 'local',
-                      USING_HARDCODED_KEYS: 'true'
-                  };
-                  
-                  // Execute Phase 2 synthesis with env variables
-                  const phase2Process = spawn('python3', [
-                    scriptPath, 
-                    requirement,
-                    tempFilePath
-                  ], { env: pythonEnv });
-                  
-                  let phase2Stdout = '';
-                  let phase2Stderr = '';
-                  
-                  // Collect output
-                  phase2Process.stdout.on('data', (data) => {
-                    phase2Stdout += data.toString();
-                  });
-                  
-                  phase2Process.stderr.on('data', (data) => {
-                    phase2Stderr += data.toString();
-                  });
-                  
-                  // Handle process completion
-                  await new Promise<void>((resolve, reject) => {
-                    phase2Process.on('close', async (code) => {
-                      if (code !== 0) {
-                        console.error(`Phase 2 process exited with code ${code}: ${phase2Stderr}`);
-                        
-                        // Even if Phase 2 fails, we'll still return the Phase 1 results
-                        res.status(200).json({
-                          message: "MOA phase 1 complete, but phase 2 synthesis failed",
-                          response: updatedResponse,
-                          references: references,
-                          phase: 1,
-                          synthesisReady: true,
-                          modelResponses: {
-                            openaiResponse: openaiResponse,
-                            anthropicResponse: anthropicResponse,
-                            deepseekResponse: deepseekResponse
-                          },
-                          error: phase2Stderr
-                        });
-                        resolve();
-                        return;
-                      }
-                      
-                      try {
-                        console.log("Phase 2 stdout before parsing:", phase2Stdout.trim());
-                        
-                        // Parse Phase 2 result
-                        const phase2Result = JSON.parse(phase2Stdout.trim());
-                        console.log("Phase 2 result successfully parsed:", JSON.stringify(phase2Result, null, 2));
-                        
-                        // Update the response with the synthesized content
-                        const moaResponse = phase2Result.moa_response || phase2Result.generated_response;
-                        console.log("MOA response extracted:", moaResponse ? "Present" : "Not found");
-                        
-                        if (moaResponse) {
-                          // Update response with synthesized content
-                          const synthesizedResponse = await storage.updateExcelRequirementResponse(Number(requirementId), {
-                            moaResponse: moaResponse,
-                            finalResponse: moaResponse,
-                            modelProvider: "moa" // Explicitly set the modelProvider to "moa"
-                          });
-                          
-                          console.log(`Successfully completed phases 1 and 2 for requirement ID ${requirementId}`);
-                          
-                          // Return complete response with both phases
-                          res.status(200).json({
-                            message: "MOA phases 1 and 2 completed successfully",
-                            response: synthesizedResponse,
-                            references: references,
-                            phase: 2
-                          });
-                        } else {
-                          console.error("No MOA response found in Phase 2 output");
-                          
-                          // Return Phase 1 results if Phase 2 didn't produce a response
-                          res.status(200).json({
-                            message: "MOA phase 1 complete, but phase 2 didn't produce a response",
-                            response: updatedResponse,
-                            references: references,
-                            phase: 1,
-                            synthesisReady: true,
-                            modelResponses: {
-                              openaiResponse: openaiResponse,
-                              anthropicResponse: anthropicResponse,
-                              deepseekResponse: deepseekResponse
-                            }
-                          });
-                        }
-                      } catch (error) {
-                        console.error("Error processing Phase 2 output:", error);
-                        
-                        // Return Phase 1 results if Phase 2 processing failed
-                        res.status(200).json({
-                          message: "MOA phase 1 complete, but phase 2 processing failed",
-                          response: updatedResponse,
-                          references: references,
-                          phase: 1,
-                          synthesisReady: true,
-                          modelResponses: {
-                            openaiResponse: openaiResponse,
-                            anthropicResponse: anthropicResponse,
-                            deepseekResponse: deepseekResponse
-                          },
-                          error: String(error)
-                        });
-                      }
-                      
-                      resolve();
-                    });
-                    
-                    phase2Process.on('error', (error) => {
-                      console.error(`Error launching Phase 2 process: ${error}`);
-                      reject(error);
-                    });
-                  });
-                  
-                  // No need to return anything here as the response is handled in the callback
-                  return;
-                } catch (error) {
-                  console.error("Error in auto Phase 2 processing:", error);
-                  
-                  // If auto-Phase 2 fails, fallback to returning Phase 1 results
-                  return res.status(200).json({
-                    message: "MOA phase 1 complete, auto-phase 2 failed",
-                    response: updatedResponse,
-                    references: references,
-                    phase: 1,
-                    synthesisReady: true,
-                    modelResponses: {
-                      openaiResponse: openaiResponse,
-                      anthropicResponse: anthropicResponse,
-                      deepseekResponse: deepseekResponse
-                    },
-                    error: String(error)
-                  });
+              if (char === '{') {
+                if (currentDepth === 0) {
+                  startIndex = i;
                 }
-              } else {
-                // Standard Phase 1 response when not auto-triggering Phase 2
-                return res.status(200).json({
-                  message: "MOA phase 1 complete, ready for synthesis",
-                  response: updatedResponse,
-                  references: references,
-                  phase: 1,
-                  synthesisReady: result.synthesis_ready || false,
-                  modelResponses: {
-                    openaiResponse: openaiResponse,
-                    anthropicResponse: anthropicResponse,
-                    deepseekResponse: deepseekResponse
+                currentDepth++;
+              } else if (char === '}') {
+                currentDepth--;
+                
+                if (currentDepth === 0 && startIndex !== -1) {
+                  const potentialJson = stdout.substring(startIndex, i + 1);
+                  try {
+                    const parsed = JSON.parse(potentialJson);
+                    jsonObjects.push({
+                      json: parsed,
+                      startIndex
+                    });
+                  } catch (e) {
+                    // Not valid JSON, ignore
                   }
-                });
+                  
+                  startIndex = -1;
+                }
               }
             }
+            
+            if (jsonObjects.length === 0) {
+              throw new Error("No valid JSON objects found in Python output");
+            }
+            
+            // Use the last (most recent) JSON object that has a response field or generated_response field
+            // This is most likely the model response we want
+            const relevantObjects = jsonObjects.filter(obj => 
+              obj.json.generated_response || 
+              obj.json.response || 
+              obj.json.openai_response ||
+              obj.json.anthropic_response ||
+              obj.json.deepseek_response ||
+              obj.json.moa_response ||
+              obj.json.final_response
+            );
+            
+            if (relevantObjects.length === 0) {
+              throw new Error("No JSON objects with response data found in Python output");
+            }
+            
+            // Get the last relevant object (most recent in the output)
+            const lastRelevantObject = relevantObjects[relevantObjects.length - 1];
+            console.log(`Found ${relevantObjects.length} relevant JSON objects, using the last one`);
+            
+            // Use the extracted JSON
+            const result = lastRelevantObject.json;
+            
+            // Process the extracted result using our utility function
+            return await processResult(result);
             
             // IMPORTANT FIX: Debug the raw fields from Python to see what model-specific responses exist
             console.log("===== MODEL-SPECIFIC RESPONSE DEBUG =====");
