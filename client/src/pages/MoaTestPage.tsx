@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -21,18 +21,61 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 
+interface Requirement {
+  id: number;
+  requirement: string;
+  category: string;
+}
+
 export default function MoaTestPage() {
   const [requirement, setRequirement] = useState("Please describe your solution's financial reporting capabilities with examples of standard and custom reports.");
   const [provider, setProvider] = useState("moa");
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
+  const [requirements, setRequirements] = useState<Requirement[]>([]);
+  const [selectedRequirementId, setSelectedRequirementId] = useState<number | null>(null);
   const { toast } = useToast();
+
+  // Fetch available requirements on component mount
+  useEffect(() => {
+    const fetchRequirements = async () => {
+      try {
+        const response = await apiRequest("GET", "/api/excel-requirements");
+        const data = await response.json();
+        if (data && Array.isArray(data)) {
+          setRequirements(data);
+          if (data.length > 0) {
+            setSelectedRequirementId(data[0].id);
+            setRequirement(data[0].requirement);
+          }
+        }
+      } catch (error) {
+        console.error("Failed to fetch requirements:", error);
+        toast({
+          title: "Error",
+          description: "Failed to fetch requirements. Using sample requirement instead.",
+          variant: "destructive",
+        });
+      }
+    };
+
+    fetchRequirements();
+  }, [toast]);
 
   const handleTest = async () => {
     if (!requirement.trim()) {
       toast({
         title: "Error",
         description: "Please enter a requirement",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!selectedRequirementId) {
+      toast({
+        title: "Error",
+        description: "Please select a requirement from the list",
         variant: "destructive",
       });
       return;
@@ -47,6 +90,7 @@ export default function MoaTestPage() {
         "/api/simple-model-test",
         {
           provider,
+          requirementId: selectedRequirementId,
           text: requirement,
         }
       );
@@ -98,6 +142,35 @@ export default function MoaTestPage() {
                   </SelectContent>
                 </Select>
               </div>
+              
+              <div>
+                <label className="text-sm font-medium mb-1 block">
+                  Select Requirement
+                </label>
+                <Select 
+                  value={selectedRequirementId?.toString() || ""} 
+                  onValueChange={(value) => {
+                    const id = parseInt(value);
+                    setSelectedRequirementId(id);
+                    const selected = requirements.find(r => r.id === id);
+                    if (selected) {
+                      setRequirement(selected.requirement);
+                    }
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a requirement" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {requirements.map((req) => (
+                      <SelectItem key={req.id} value={req.id.toString()}>
+                        {req.category} - {req.requirement.substring(0, 40)}...
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
               <div>
                 <label className="text-sm font-medium mb-1 block">
                   Requirement Text
