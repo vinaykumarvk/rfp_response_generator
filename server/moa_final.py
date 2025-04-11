@@ -8,7 +8,7 @@ with proper timeout handling.
 import sys
 import time
 import json
-from rfp_response_generator_pg import prompt_gpt, create_rfp_prompt
+from rfp_response_generator_pg import prompt_gpt, create_rfp_prompt, create_synthesized_response_prompt
 
 def get_model_response(prompt, model_name):
     """
@@ -57,64 +57,20 @@ def get_model_response(prompt, model_name):
             "elapsed_time": elapsed_time
         }
 
+# Helper function that uses create_synthesized_response_prompt
 def create_synthesis_prompt(requirement, model_responses):
-    """
-    Create a prompt for synthesizing multiple model responses
+    """Create a synthesis prompt using the existing create_synthesized_response_prompt function"""
+    # Extract responses from the model_responses structure
+    responses = []
+    if model_responses.get("openai", {}).get("status") == "success":
+        responses.append(model_responses["openai"]["response"])
+    if model_responses.get("anthropic", {}).get("status") == "success":
+        responses.append(model_responses["anthropic"]["response"])
+    if model_responses.get("deepseek", {}).get("status") == "success":
+        responses.append(model_responses["deepseek"]["response"])
     
-    Args:
-        requirement: The RFP requirement text
-        model_responses: Dictionary of model results
-        
-    Returns:
-        List of message dictionaries for the synthesis prompt
-    """
-    system_message = """You are an expert AI Synthesizer specialized in creating optimal RFP (Request for Proposal) responses.
-Your task is to analyze multiple AI-generated responses to the same RFP requirement, critically evaluate the strengths and weaknesses of each,
-and then synthesize them into a single, cohesive, high-quality response.
-
-Focus on:
-1. Extracting the most accurate, relevant, and specific content from each response
-2. Ensuring technical accuracy and domain-appropriate terminology
-3. Maintaining a professional, confident tone
-4. Creating a coherent flow with proper transitions
-5. Providing specific details rather than generic statements
-6. Addressing all aspects of the requirement comprehensively
-7. Structuring the response in clear, readable paragraphs
-
-The final response should demonstrate deep expertise in the relevant domain, directly address the requirement,
-and be optimized for persuasiveness and clarity."""
-
-    # Format model responses for the prompt
-    openai_response = model_responses.get("openai", {}).get("response", "No response available from OpenAI model.")
-    anthropic_response = model_responses.get("anthropic", {}).get("response", "No response available from Anthropic model.")
-    
-    # DeepSeek is optional
-    deepseek_info = model_responses.get("deepseek", {})
-    if deepseek_info.get("status") == "success":
-        deepseek_response = deepseek_info.get("response", "")
-        deepseek_text = f"RESPONSE FROM MODEL 3 (DEEPSEEK):\n{deepseek_response}"
-    else:
-        # No DeepSeek response available
-        deepseek_text = "Note: Response from third model (DeepSeek) not available."
-
-    user_message = f"""I need you to synthesize the best possible RFP response by analyzing and combining elements from these AI-generated responses to the following requirement:
-
-REQUIREMENT: {requirement}
-
-RESPONSE FROM MODEL 1 (OPENAI):
-{openai_response}
-
-RESPONSE FROM MODEL 2 (ANTHROPIC):
-{anthropic_response}
-
-{deepseek_text}
-
-First, briefly analyze the strengths and weaknesses of each available response. Then, create a single synthesized response that incorporates the best elements from all available responses, addresses any gaps or inaccuracies, and forms a comprehensive answer to the requirement. The synthesized response should stand alone as a complete, professional RFP response."""
-
-    return [
-        {"role": "system", "content": system_message},
-        {"role": "user", "content": user_message}
-    ]
+    # Use the existing function
+    return create_synthesized_response_prompt(requirement, responses)
 
 def generate_moa_response(requirement, category="Wealth Management Software", previous_responses=""):
     """
@@ -159,7 +115,7 @@ def generate_moa_response(requirement, category="Wealth Management Software", pr
     # Phase 2: Synthesize responses (use OpenAI for synthesis)
     print(f"\n--- PHASE 2: SYNTHESIZING RESPONSES ---")
     
-    # Create synthesis prompt
+    # Create synthesis prompt using the helper function
     synthesis_prompt = create_synthesis_prompt(requirement, model_responses)
     
     # Generate synthesized response
