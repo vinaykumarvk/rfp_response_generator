@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { format, formatDistanceToNow } from 'date-fns';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { generateMarkdownContent, downloadMarkdownFile, sendEmailWithContent } from '@/lib/exportUtils';
+import { generateMarkdownContent, downloadMarkdownFile, sendEmailWithContent, downloadDocxFile } from '@/lib/exportUtils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -39,7 +39,8 @@ import {
   Calendar,
   Hash,
   Tag,
-  Hand
+  Hand,
+  FileText
 } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useToast } from '@/hooks/use-toast';
@@ -407,6 +408,44 @@ export default function ViewData() {
       });
     }
   };
+  
+  // Function to export selected items as DOCX
+  const handleExportToDocx = async () => {
+    // Get selected items data
+    const selectedData = excelData.filter(item => selectedItems.includes(item.id || 0));
+    
+    if (selectedData.length === 0) {
+      toast({
+        title: "No Data Found",
+        description: "Could not find data for the selected items",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    try {
+      // Create filename based on RFP name if all items are from the same RFP
+      const rfpNames = new Set(selectedData.map(item => item.rfpName || 'unnamed'));
+      const filename = rfpNames.size === 1 
+        ? `${Array.from(rfpNames)[0]}-responses.docx` 
+        : `rfp-responses-${new Date().toISOString().split('T')[0]}.docx`;
+      
+      // Download the DOCX file
+      await downloadDocxFile(selectedData, filename);
+      
+      toast({
+        title: "DOCX Export Successful",
+        description: `${selectedData.length} items exported to ${filename}`,
+      });
+    } catch (error) {
+      console.error('Error generating DOCX:', error);
+      toast({
+        title: "DOCX Export Failed",
+        description: "Failed to generate DOCX file: " + (error instanceof Error ? error.message : String(error)),
+        variant: "destructive"
+      });
+    }
+  };
 
   const handleBulkAction = (action: string) => {
     if (selectedItems.length === 0) {
@@ -433,6 +472,9 @@ export default function ViewData() {
         break;
       case 'print':
         handleExportToMarkdown();
+        break;
+      case 'docx':
+        handleExportToDocx();
         break;
       case 'mail':
         handleEmailMarkdown();
@@ -623,7 +665,11 @@ export default function ViewData() {
                       <DropdownMenuSeparator />
                       <DropdownMenuItem onClick={() => handleBulkAction('print')} className="gap-2">
                         <Printer className="h-4 w-4" />
-                        <span>Print Selected</span>
+                        <span>Export as Markdown</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleBulkAction('docx')} className="gap-2">
+                        <FileText className="h-4 w-4" />
+                        <span>Export as DOCX</span>
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => handleBulkAction('mail')} className="gap-2">
                         <Mail className="h-4 w-4" />
