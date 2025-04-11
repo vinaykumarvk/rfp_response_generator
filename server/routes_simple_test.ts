@@ -129,7 +129,7 @@ export async function addSimpleTestEndpoint(app: any) {
             
             // Provider and timestamp
             modelProvider: provider,
-            timestamp: new Date().toISOString()
+            timestamp: new Date()
           };
           
           // Save to database using direct reference to storage
