@@ -230,6 +230,9 @@ export default function MoaTestPage() {
                       {result.response || 
                        result.generated_response || 
                        result.moa_response || 
+                       (result.saved_data?.finalResponse) ||
+                       (result.model_output?.generated_response) ||
+                       (result.saved_data?.moaResponse) ||
                        "No response available"}
                     </pre>
                   </div>
@@ -248,7 +251,10 @@ export default function MoaTestPage() {
                     <TabsContent value="openai">
                       <div className="rounded-md bg-muted p-4">
                         <pre className="whitespace-pre-wrap">
-                          {result.openai_response || "No OpenAI response available"}
+                          {result.openai_response || 
+                           result.saved_data?.openaiResponse || 
+                           result.model_output?.openai_response || 
+                           "No OpenAI response available"}
                         </pre>
                       </div>
                     </TabsContent>
@@ -256,7 +262,10 @@ export default function MoaTestPage() {
                     <TabsContent value="anthropic">
                       <div className="rounded-md bg-muted p-4">
                         <pre className="whitespace-pre-wrap">
-                          {result.anthropic_response || "No Anthropic response available"}
+                          {result.anthropic_response || 
+                           result.saved_data?.anthropicResponse || 
+                           result.model_output?.anthropic_response || 
+                           "No Anthropic response available"}
                         </pre>
                       </div>
                     </TabsContent>
@@ -264,7 +273,10 @@ export default function MoaTestPage() {
                     <TabsContent value="deepseek">
                       <div className="rounded-md bg-muted p-4">
                         <pre className="whitespace-pre-wrap">
-                          {result.deepseek_response || "No DeepSeek response available"}
+                          {result.deepseek_response || 
+                           result.saved_data?.deepseekResponse || 
+                           result.model_output?.deepseek_response || 
+                           "No DeepSeek response available"}
                         </pre>
                       </div>
                     </TabsContent>
