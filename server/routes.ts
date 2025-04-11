@@ -456,29 +456,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
           fs.writeFileSync(tempFilePath, JSON.stringify(synthInput, null, 2));
           
           return new Promise<void>((resolve, reject) => {
-            // Spawn Python process for synthesis
-            const process = spawn('python3', [
+            // Enhanced debugging for environment variables in MOA synthesis
+            console.log(`Environment variables being passed to MOA synthesis Python script:`);
+            console.log(`- OPENAI_API_KEY: ${process.env.OPENAI_API_KEY ? 'Present (starts with ' + process.env.OPENAI_API_KEY.substring(0, 3) + '...)' : 'Not present'}`);
+            console.log(`- ANTHROPIC_API_KEY: ${process.env.ANTHROPIC_API_KEY ? 'Present (starts with ' + process.env.ANTHROPIC_API_KEY.substring(0, 3) + '...)' : 'Not present'}`);
+            console.log(`- DEEPSEEK_API_KEY: ${process.env.DEEPSEEK_API_KEY ? 'Present (starts with ' + process.env.DEEPSEEK_API_KEY.substring(0, 3) + '...)' : 'Not present'}`);
+            
+            // Spawn Python process with environment variables explicitly passed
+            const pythonEnv = { 
+                ...process.env,
+                OPENAI_API_KEY: process.env.OPENAI_API_KEY || '',
+                ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY || '',
+                DEEPSEEK_API_KEY: process.env.DEEPSEEK_API_KEY || '',
+                NODE_ENV: process.env.NODE_ENV || 'production'
+            };
+            
+            // Spawn Python process for synthesis with env variables
+            const synthesisProcess = spawn('python3', [
               scriptPath, 
               requirement,
               tempFilePath
-            ]);
+            ], { env: pythonEnv });
             
             let stdout = '';
             let stderr = '';
             
             // Collect data from stdout
-            process.stdout.on('data', (data) => {
+            synthesisProcess.stdout.on('data', (data) => {
               stdout += data.toString();
             });
             
             // Collect error output
-            process.stderr.on('data', (data) => {
+            synthesisProcess.stderr.on('data', (data) => {
               stderr += data.toString();
               console.log(`Python synthesis stderr: ${data}`);
             });
             
             // Handle process completion
-            process.on('close', async (code) => {
+            synthesisProcess.on('close', async (code) => {
               console.log(`Python synthesis process exited with code ${code}`);
               
               // Clean up temp file
@@ -733,12 +748,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   fs.mkdirSync(path.dirname(tempFilePath), { recursive: true });
                   fs.writeFileSync(tempFilePath, JSON.stringify(synthInput, null, 2));
                   
-                  // Execute Phase 2 synthesis
+                  // Enhanced debugging for environment variables in auto-triggered MOA Phase 2
+                  console.log(`Environment variables being passed to auto-triggered MOA synthesis Python script:`);
+                  console.log(`- OPENAI_API_KEY: ${process.env.OPENAI_API_KEY ? 'Present (starts with ' + process.env.OPENAI_API_KEY.substring(0, 3) + '...)' : 'Not present'}`);
+                  console.log(`- ANTHROPIC_API_KEY: ${process.env.ANTHROPIC_API_KEY ? 'Present (starts with ' + process.env.ANTHROPIC_API_KEY.substring(0, 3) + '...)' : 'Not present'}`);
+                  console.log(`- DEEPSEEK_API_KEY: ${process.env.DEEPSEEK_API_KEY ? 'Present (starts with ' + process.env.DEEPSEEK_API_KEY.substring(0, 3) + '...)' : 'Not present'}`);
+                  
+                  // Spawn Python process with environment variables explicitly passed
+                  const pythonEnv = { 
+                      ...process.env,
+                      OPENAI_API_KEY: process.env.OPENAI_API_KEY || '',
+                      ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY || '',
+                      DEEPSEEK_API_KEY: process.env.DEEPSEEK_API_KEY || '',
+                      NODE_ENV: process.env.NODE_ENV || 'production'
+                  };
+                  
+                  // Execute Phase 2 synthesis with env variables
                   const phase2Process = spawn('python3', [
                     scriptPath, 
                     requirement,
                     tempFilePath
-                  ]);
+                  ], { env: pythonEnv });
                   
                   let phase2Stdout = '';
                   let phase2Stderr = '';
