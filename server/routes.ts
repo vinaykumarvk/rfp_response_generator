@@ -2209,9 +2209,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         DEEPSEEK_API_KEY: process.env.DEEPSEEK_API_KEY ? `Present (${process.env.DEEPSEEK_API_KEY.substring(0, 5)}...)` : 'Not present'
       });
       
-      // Call the Python script to process the requirement (positional arguments)
+      // Call the PostgreSQL-based Python script to process the requirement (positional arguments)
       const pythonProcess = spawn("python3", [
-        path.join(getDirPath(), "rfp_response_generator.py"),
+        path.join(getDirPath(), "rfp_response_generator_pg.py"),
         requirement_text,
         modelProvider
       ], { env: pythonEnv });
@@ -2628,10 +2628,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const filesToCheck = [
         'rfp_embeddings.pkl',
         'attached_assets/previous_responses.xlsx',
-        'server/rfp_response_generator.py',
+        'server/rfp_response_generator_pg.py',
         'server/moa_synthesis.py',
         'server/direct_test.py',
         'server/api_test.py',
+        'server/pg_vector_search.py',
         '.env.production'
       ];
       

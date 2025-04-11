@@ -1,5 +1,22 @@
 # RFP Response Generator - Version History
 
+## Version 0.7 - April 11, 2025
+
+### PostgreSQL Vector Embedding Storage
+- Migrated from file-based embeddings storage to PostgreSQL database
+- Implemented pgvector extension for efficient vector similarity search
+- Created custom vector index for high-performance cosine similarity calculations
+- Eliminated reliance on large 135MB embeddings file for improved deployment
+- Added import script to migrate data from pickle file to PostgreSQL
+- Implemented vector search interface with PostgreSQL native operations
+
+### Technical Improvements
+- Unified database approach with all data now stored in PostgreSQL
+- Created more scalable architecture for handling large embedding collections
+- Enhanced similarity search performance with optimized database queries
+- Improved deployment reliability by removing large file dependencies
+- Added graceful fallback for environments without pgvector support
+
 ## Version 0.6 - April 11, 2025
 
 ### Deployment Optimization
