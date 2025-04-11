@@ -48,8 +48,14 @@ def load_pickle_embeddings():
         sys.stderr.write(f"Error loading embeddings from pickle file: {str(e)}\n")
         sys.exit(1)
 
-def import_embeddings_to_postgres():
-    """Import embeddings from pickle file to PostgreSQL."""
+def import_embeddings_to_postgres(max_embeddings=5000):
+    """
+    Import embeddings from pickle file to PostgreSQL.
+    
+    Args:
+        max_embeddings: Maximum number of embeddings to import, to manage resource usage
+                       Set to None to import all
+    """
     start_time = time.time()
     
     # Connect to the database
@@ -64,7 +70,15 @@ def import_embeddings_to_postgres():
         sys.stderr.write("No embeddings data found in pickle file\n")
         sys.exit(1)
     
-    sys.stderr.write(f"Found {len(points)} embeddings to import\n")
+    # Limit to max_embeddings if specified, but sample evenly from the dataset
+    total_points = len(points)
+    sys.stderr.write(f"Found {total_points} embeddings in pickle file\n")
+    
+    if max_embeddings and max_embeddings < total_points:
+        # Sample evenly for better representation
+        step = total_points // max_embeddings
+        points = [points[i] for i in range(0, total_points, step)][:max_embeddings]
+        sys.stderr.write(f"Limiting to {len(points)} representative embeddings\n")
     
     # Ensure the extension and table exist
     cursor.execute("CREATE EXTENSION IF NOT EXISTS vector;")
@@ -97,64 +111,94 @@ def import_embeddings_to_postgres():
         conn.commit()
         sys.stderr.write("Deleted existing embeddings.\n")
     
-    for i in range(0, len(points), batch_size):
-        batch = points[i:i+batch_size]
-        values = []
+    try:
+        # Create summary table for categories
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS embedding_categories (
+            category TEXT PRIMARY KEY,
+            count INTEGER DEFAULT 0
+        );
+        """)
         
-        for point in batch:
-            vector = point.get('vector', [])
-            payload = point.get('payload', {})
-            
-            # Extract fields from payload
-            category = payload.get('category', 'Unknown')
-            requirement = payload.get('requirement', '')
-            response = payload.get('response', '')
-            reference = payload.get('reference', '')
-            
-            # Convert payload to JSON string
-            payload_json = json.dumps(payload)
-            
-            # Convert vector to string representation for PostgreSQL
-            vector_str = f"[{','.join(str(x) for x in vector)}]"
-            
-            values.append((
-                category,
-                requirement, 
-                response,
-                reference,
-                payload_json,
-                vector_str
-            ))
+        # Start tracking unique categories
+        categories = set()
         
-        # Insert batch
-        execute_values(
-            cursor,
-            """
-            INSERT INTO embeddings 
-            (category, requirement, response, reference, payload, embedding)
-            VALUES %s
-            """,
-            values,
-            template="(%s, %s, %s, %s, %s, %s::vector)"
-        )
+        for i in range(0, len(points), batch_size):
+            batch = points[i:i+batch_size]
+            values = []
+            
+            for point in batch:
+                vector = point.get('vector', [])
+                payload = point.get('payload', {})
+                
+                # Extract fields from payload
+                category = payload.get('category', 'Unknown')
+                categories.add(category)
+                requirement = payload.get('requirement', '')
+                response = payload.get('response', '')
+                reference = payload.get('reference', '')
+                
+                # Convert payload to JSON string
+                payload_json = json.dumps(payload)
+                
+                # Convert vector to string representation for PostgreSQL
+                vector_str = f"[{','.join(str(x) for x in vector)}]"
+                
+                values.append((
+                    category,
+                    requirement, 
+                    response,
+                    reference,
+                    payload_json,
+                    vector_str
+                ))
+            
+            # Insert batch
+            execute_values(
+                cursor,
+                """
+                INSERT INTO embeddings 
+                (category, requirement, response, reference, payload, embedding)
+                VALUES %s
+                """,
+                values,
+                template="(%s, %s, %s, %s, %s, %s::vector)"
+            )
+            
+            # Commit after each batch
+            conn.commit()
+            
+            inserted_count += len(batch)
+            sys.stderr.write(f"Imported {inserted_count}/{total_count} embeddings ({inserted_count/total_count*100:.1f}%)\n")
         
-        # Commit after each batch
+        # Create index if it doesn't exist
+        cursor.execute("""
+        CREATE INDEX IF NOT EXISTS embeddings_vector_idx 
+        ON embeddings 
+        USING ivfflat (embedding vector_cosine_ops)
+        WITH (lists = 100);
+        """)
+        
+        # Create indexes for text searches as well
+        cursor.execute("CREATE INDEX IF NOT EXISTS embeddings_category_idx ON embeddings(category);")
+        cursor.execute("CREATE INDEX IF NOT EXISTS embeddings_requirement_idx ON embeddings USING gin(requirement gin_trgm_ops);")
+        
+        # Populate category statistics
+        for category in categories:
+            cursor.execute("""
+            INSERT INTO embedding_categories (category, count)
+            VALUES (%s, (SELECT COUNT(*) FROM embeddings WHERE category = %s))
+            ON CONFLICT (category) DO UPDATE 
+            SET count = (SELECT COUNT(*) FROM embeddings WHERE category = %s);
+            """, (category, category, category))
+        
         conn.commit()
-        
-        inserted_count += len(batch)
-        sys.stderr.write(f"Imported {inserted_count}/{total_count} embeddings ({inserted_count/total_count*100:.1f}%)\n")
-    
-    # Create index if it doesn't exist
-    cursor.execute("""
-    CREATE INDEX IF NOT EXISTS embeddings_vector_idx 
-    ON embeddings 
-    USING ivfflat (embedding vector_cosine_ops)
-    WITH (lists = 100);
-    """)
-    
-    conn.commit()
-    cursor.close()
-    conn.close()
+    except Exception as e:
+        sys.stderr.write(f"Error during import: {str(e)}\n")
+        conn.rollback()
+    finally:
+        cursor.close()
+        conn.close()
     
     end_time = time.time()
     duration = end_time - start_time
