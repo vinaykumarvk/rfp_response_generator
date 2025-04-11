@@ -40,7 +40,9 @@ import {
   Hash,
   Tag,
   Hand,
-  FileText
+  FileText,
+  ThumbsUp,
+  ThumbsDown
 } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useToast } from '@/hooks/use-toast';
@@ -74,6 +76,7 @@ export default function ViewData() {
   const [selectedItems, setSelectedItems] = useState<number[]>([]);
   const [selectAll, setSelectAll] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
+  const [isFeedbackSubmitting, setIsFeedbackSubmitting] = useState(false);
   
   // Filters
   const [filters, setFilters] = useState({
@@ -218,6 +221,53 @@ export default function ViewData() {
   
   const handleRefresh = () => {
     refetch();
+  };
+  
+  const handleFeedbackSubmit = async (responseId: number, feedback: 'positive' | 'negative') => {
+    if (!responseId) return;
+    
+    try {
+      setIsFeedbackSubmitting(true);
+      
+      const response = await fetch(`/api/excel-requirements/${responseId}/feedback`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ feedback }),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to submit feedback: ${response.status} ${response.statusText}`);
+      }
+      
+      const result = await response.json();
+      
+      // Update the selected response with new feedback
+      if (selectedResponse && selectedResponse.id === responseId) {
+        setSelectedResponse({
+          ...selectedResponse,
+          feedback: feedback
+        });
+      }
+      
+      // Refresh the data to get updated feedback
+      await refetch();
+      
+      toast({
+        title: "Feedback Submitted",
+        description: "Your feedback has been recorded successfully.",
+      });
+    } catch (error) {
+      console.error('Error submitting feedback:', error);
+      toast({
+        title: "Feedback Error",
+        description: `Failed to submit feedback: ${error instanceof Error ? error.message : String(error)}`,
+        variant: "destructive",
+      });
+    } finally {
+      setIsFeedbackSubmitting(false);
+    }
   };
   
   const toggleSelectItem = (id: number) => {
@@ -1001,6 +1051,34 @@ export default function ViewData() {
                 Back to List
               </Button>
             </DialogClose>
+            
+            {selectedResponse && selectedResponse.finalResponse && (
+              <div className="flex items-center space-x-2">
+                <span className="text-sm text-slate-500 mr-1">Feedback:</span>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={selectedResponse.feedback === 'positive' ? 'default' : 'outline'}
+                  className={`p-2 ${selectedResponse.feedback === 'positive' ? 'bg-green-600 hover:bg-green-700' : ''}`}
+                  onClick={() => handleFeedbackSubmit(selectedResponse.id || 0, 'positive')}
+                  disabled={isFeedbackSubmitting}
+                  title="I like this response"
+                >
+                  <ThumbsUp className="h-4 w-4" />
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={selectedResponse.feedback === 'negative' ? 'default' : 'outline'}
+                  className={`p-2 ${selectedResponse.feedback === 'negative' ? 'bg-red-600 hover:bg-red-700' : ''}`}
+                  onClick={() => handleFeedbackSubmit(selectedResponse.id || 0, 'negative')}
+                  disabled={isFeedbackSubmitting}
+                  title="I don't like this response"
+                >
+                  <ThumbsDown className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
