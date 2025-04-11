@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { format, formatDistanceToNow } from 'date-fns';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { generateMarkdownContent, downloadMarkdownFile, sendEmailWithContent } from '@/lib/exportUtils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -334,6 +335,70 @@ export default function ViewData() {
     }
   };
   
+  // Function to handle exporting selected items as markdown
+  const handleExportToMarkdown = () => {
+    // Get selected items data
+    const selectedData = excelData.filter(item => selectedItems.includes(item.id || 0));
+    
+    if (selectedData.length === 0) {
+      toast({
+        title: "No Data Found",
+        description: "Could not find data for the selected items",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    // Generate markdown content
+    const markdownContent = generateMarkdownContent(selectedData);
+    
+    // Create filename based on RFP name if all items are from the same RFP
+    const rfpNames = new Set(selectedData.map(item => item.rfpName || 'unnamed'));
+    const filename = rfpNames.size === 1 
+      ? `${Array.from(rfpNames)[0]}-responses.md` 
+      : `rfp-responses-${new Date().toISOString().split('T')[0]}.md`;
+    
+    // Download the file
+    downloadMarkdownFile(markdownContent, filename);
+    
+    toast({
+      title: "Export Successful",
+      description: `${selectedData.length} items exported to ${filename}`,
+    });
+  };
+  
+  // Function to email the markdown content
+  const handleEmailMarkdown = () => {
+    // Get selected items data
+    const selectedData = excelData.filter(item => selectedItems.includes(item.id || 0));
+    
+    if (selectedData.length === 0) {
+      toast({
+        title: "No Data Found",
+        description: "Could not find data for the selected items",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    // Generate markdown content
+    const markdownContent = generateMarkdownContent(selectedData);
+    
+    // Create a subject line based on RFP name if all items are from the same RFP
+    const rfpNames = new Set(selectedData.map(item => item.rfpName || 'unnamed'));
+    const subject = rfpNames.size === 1 
+      ? `RFP Responses for ${Array.from(rfpNames)[0]}` 
+      : `RFP Responses Export (${selectedData.length} items)`;
+    
+    // Open email client with the content
+    sendEmailWithContent(markdownContent, subject);
+    
+    toast({
+      title: "Email Client Opened",
+      description: "Email content prepared with RFP responses",
+    });
+  };
+
   const handleBulkAction = (action: string) => {
     if (selectedItems.length === 0) {
       toast({
@@ -358,12 +423,10 @@ export default function ViewData() {
         handleGenerateResponses('moa');
         break;
       case 'print':
-        console.log('Print items:', selectedItems);
-        alert(`Print ${selectedItems.length} selected items`);
+        handleExportToMarkdown();
         break;
       case 'mail':
-        console.log('Mail items:', selectedItems);
-        alert(`Email ${selectedItems.length} selected items`);
+        handleEmailMarkdown();
         break;
       case 'delete':
         console.log('Delete items:', selectedItems);
