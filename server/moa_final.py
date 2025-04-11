@@ -16,7 +16,7 @@ def get_model_response(prompt, model_name):
     
     Args:
         prompt: The prompt to send to the model
-        model_name: Name of the model to use ('openAI', 'anthropic', or 'deepseek')
+        model_name: Name of the model to use ('openai', 'anthropic', or 'deepseek')
         
     Returns:
         Dict containing response information
@@ -93,7 +93,7 @@ def generate_moa_response(requirement, category="Wealth Management Software", pr
     # Phase 1: Get responses from each model
     print(f"\n--- PHASE 1: GENERATING MODEL RESPONSES ---")
     model_responses = {}
-    models_to_try = ["openAI", "anthropic", "deepseek"]
+    models_to_try = ["openai", "anthropic", "deepseek"]
     
     for model in models_to_try:
         # Get response from this model
@@ -120,7 +120,7 @@ def generate_moa_response(requirement, category="Wealth Management Software", pr
     
     # Generate synthesized response
     print("Generating synthesized response with OpenAI...")
-    synthesis_result = get_model_response(synthesis_prompt, "openAI")
+    synthesis_result = get_model_response(synthesis_prompt, "openai")
     
     if synthesis_result["status"] == "success":
         final_response = synthesis_result["response"]
