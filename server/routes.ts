@@ -600,12 +600,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`- DEEPSEEK_API_KEY: ${process.env.DEEPSEEK_API_KEY ? 'Present (starts with ' + process.env.DEEPSEEK_API_KEY.substring(0, 3) + '...)' : 'Not present'}`);
       
       // Spawn Python process with environment variables explicitly passed
+      // Enhanced Python environment with diagnostics flag
+      console.log("Creating Python environment with following API keys:");
+      console.log(`- OPENAI_API_KEY: ${process.env.OPENAI_API_KEY ? 'Present (starts with ' + process.env.OPENAI_API_KEY.substring(0, 5) + '...)' : 'Not present'}`);
+      console.log(`- ANTHROPIC_API_KEY: ${process.env.ANTHROPIC_API_KEY ? 'Present (starts with ' + process.env.ANTHROPIC_API_KEY.substring(0, 5) + '...)' : 'Not present'}`);
+      console.log(`- DEEPSEEK_API_KEY: ${process.env.DEEPSEEK_API_KEY ? 'Present (starts with ' + process.env.DEEPSEEK_API_KEY.substring(0, 5) + '...)' : 'Not present'}`);
+      
       const pythonEnv = { 
         ...process.env,
         OPENAI_API_KEY: process.env.OPENAI_API_KEY || '',
         ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY || '',
         DEEPSEEK_API_KEY: process.env.DEEPSEEK_API_KEY || '',
-        NODE_ENV: process.env.NODE_ENV || 'production'
+        NODE_ENV: process.env.NODE_ENV || 'production',
+        DEBUG_MODE: 'true',
+        DEPLOYMENT_ENV: process.env.REPL_ID ? 'replit' : 'local'
       };
       
       // Spawn Python process 
@@ -760,7 +768,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
                       OPENAI_API_KEY: process.env.OPENAI_API_KEY || '',
                       ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY || '',
                       DEEPSEEK_API_KEY: process.env.DEEPSEEK_API_KEY || '',
-                      NODE_ENV: process.env.NODE_ENV || 'production'
+                      NODE_ENV: process.env.NODE_ENV || 'production',
+                      DEBUG_MODE: 'true',
+                      DEPLOYMENT_ENV: process.env.REPL_ID ? 'replit' : 'local'
                   };
                   
                   // Execute Phase 2 synthesis with env variables
