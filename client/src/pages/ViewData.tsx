@@ -1007,6 +1007,17 @@ export default function ViewData() {
                 <p className="text-slate-900 dark:text-slate-100">{selectedResponse.requirement}</p>
               </div>
               
+              <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-md mb-4">
+                <h4 className="text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">AI Model Used:</h4>
+                <p className="text-slate-900 dark:text-slate-100">
+                  {selectedResponse.modelProvider === "openai" ? "OpenAI" :
+                   selectedResponse.modelProvider === "anthropic" ? "Anthropic/Claude" :
+                   selectedResponse.modelProvider === "deepseek" ? "DeepSeek" :
+                   selectedResponse.modelProvider === "moa" ? "Mixture of Agents (MOA)" :
+                   selectedResponse.modelProvider || "Not specified"}
+                </p>
+              </div>
+              
               <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                 <TabsList className="grid w-full grid-cols-2 mb-6">
                   <TabsTrigger value="response" className="flex items-center gap-2">
