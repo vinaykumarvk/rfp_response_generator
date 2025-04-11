@@ -44,7 +44,7 @@ export default function MoaTestPage() {
     try {
       const response = await apiRequest(
         "POST",
-        "/api/model-specific-test",
+        "/api/simple-model-test",
         {
           provider,
           text: requirement,
