@@ -2,43 +2,67 @@
 """
 MOA (Mixture of Agents) Handler
 Modified to handle potential timeouts with DeepSeek API
+Includes a 3-minute timeout for DeepSeek API calls
 """
 
 import sys
 import time
 from rfp_response_generator_pg import prompt_gpt, create_rfp_prompt
 
-def get_model_response(prompt, model, timeout=25):
+def get_model_response(prompt, model):
     """
-    Get response from a specific model with timeout handling
+    Get response from a specific model with transparent error handling
     
     Args:
         prompt: The prompt to send to the model
         model: The model to use ('openAI', 'anthropic', or 'deepseek')
-        timeout: Timeout in seconds
         
     Returns:
-        Response text or error message
+        Dict with response details
     """
+    # Start timer
+    start_time = time.time()
+    
     try:
-        # Start timer
-        start_time = time.time()
-        
         # Call model
+        print(f"Requesting response from {model}...")
         response = prompt_gpt(prompt, llm=model)
         
         # Calculate elapsed time
         elapsed_time = time.time() - start_time
+        print(f"Response received from {model} in {elapsed_time:.2f}s")
         
+        # Check if DeepSeek timed out
+        if model.lower() == 'deepseek' and response.startswith("Error: DeepSeek API timed out"):
+            return {
+                "status": "timeout",
+                "error": "DeepSeek API timed out after 3 minutes",
+                "elapsed_time": elapsed_time
+            }
+        
+        # Check for other errors
+        if response.startswith("Error:"):
+            print(f"Error from {model}: {response}")
+            return {
+                "status": "error",
+                "error": response,
+                "elapsed_time": elapsed_time
+            }
+        
+        # Successful response
         return {
             "status": "success",
             "response": response,
             "elapsed_time": elapsed_time
         }
     except Exception as e:
+        # Handle any exceptions
+        elapsed_time = time.time() - start_time
+        print(f"Exception from {model}: {str(e)}")
         return {
             "status": "error",
-            "error": str(e)
+            "error": str(e),
+            "elapsed_time": elapsed_time
         }
 
 def create_synthesis_prompt(requirement, responses):
