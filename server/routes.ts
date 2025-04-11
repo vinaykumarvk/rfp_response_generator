@@ -15,6 +15,7 @@ import * as path from "path";
 import * as fs from "fs";
 import { fileURLToPath } from "url";
 import { dirname } from "path";
+import { sendEmail, createTempFile, fileToBase64Attachment } from "./email";
 
 // Helper function for getting the directory path in ES modules
 const getDirPath = () => {
