@@ -655,6 +655,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Helper function to process the result
           const processResult = async (result: any) => {
             console.log("Processing result:", JSON.stringify(result, null, 2).substring(0, 300) + "...");
+            console.log("Current provider:", provider);
             
             // Handle errors in the response
             if (result.error) {
@@ -704,6 +705,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
               console.log("Updating requirement response with fields:", 
                 Object.keys(updateFields).join(", "), 
                 "Final response length:", updateFields.finalResponse?.length || 0);
+              
+              // Debug specific fields
+              console.log("modelProvider field value:", updateFields.modelProvider);
+              console.log("Full update fields:", JSON.stringify({
+                finalResponse: updateFields.finalResponse ? `Present (${updateFields.finalResponse.length} chars)` : "Not present",
+                openaiResponse: updateFields.openaiResponse ? `Present (${updateFields.openaiResponse.length} chars)` : "Not present",
+                anthropicResponse: updateFields.anthropicResponse ? `Present (${updateFields.anthropicResponse.length} chars)` : "Not present",
+                deepseekResponse: updateFields.deepseekResponse ? `Present (${updateFields.deepseekResponse.length} chars)` : "Not present",
+                moaResponse: updateFields.moaResponse ? `Present (${updateFields.moaResponse.length} chars)` : "Not present",
+                modelProvider: updateFields.modelProvider
+              }, null, 2));
               
               // Update the response in the database
               const updatedResponse = await storage.updateExcelRequirementResponse(
