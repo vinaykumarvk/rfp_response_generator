@@ -565,7 +565,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             });
             
             // Handle process error
-            process.on('error', (error) => {
+            synthesisProcess.on('error', (error) => {
               console.error(`Error spawning Python synthesis process: ${error}`);
               res.status(500).json({ 
                 message: "Error spawning Python synthesis process", 
