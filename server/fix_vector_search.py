@@ -88,6 +88,85 @@ def test_existing_vector():
         cursor.close()
         conn.close()
 
+def test_random_vector():
+    """Test vector search using a random vector that should work better"""
+    import random
+    
+    print("\n=== Testing Vector Search with Random Vector ===\n")
+    
+    conn = get_database_connection()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    
+    try:
+        # Generate a random vector
+        # Use a fixed seed for reproducibility
+        random.seed(42)
+        
+        # Create normalized random vector
+        vec = [random.uniform(-1, 1) for _ in range(1536)]
+        magnitude = sum(x*x for x in vec) ** 0.5
+        vec = [x/magnitude for x in vec]
+        
+        # Format for PostgreSQL
+        vec_str = f"[{','.join(str(x) for x in vec)}]"
+        
+        print("Generated random vector with magnitude 1.0")
+        
+        # Try with TOP 5 without filtering by threshold
+        query = """
+        SELECT 
+            id, 
+            category, 
+            requirement,
+            1 - (embedding <=> %s::vector) as similarity 
+        FROM 
+            embeddings
+        ORDER BY 
+            embedding <=> %s::vector
+        LIMIT 5
+        """
+        
+        cursor.execute(query, (vec_str, vec_str))
+        results = cursor.fetchall()
+        
+        print(f"Random vector search returned {len(results)} results:")
+        for i, result in enumerate(results, 1):
+            print(f"{i}. [{result['category']}] {result['requirement'][:50]}... (score: {result['similarity']:.3f})")
+            
+        # Now extract a real embedding from the database and modify it slightly
+        # This should give us better results than pure random
+        cursor.execute("SELECT embedding FROM embeddings LIMIT 1")
+        real_vec = cursor.fetchone()['embedding']
+        
+        if real_vec:
+            print("\nTrying with a modified real vector...")
+            
+            # Convert to string, add a bit of noise
+            real_vec_list = eval(str(real_vec))
+            
+            # Add some noise
+            noisy_vec = [x + random.uniform(-0.05, 0.05) for x in real_vec_list]
+            
+            # Normalize again
+            magnitude = sum(x*x for x in noisy_vec) ** 0.5
+            noisy_vec = [x/magnitude for x in noisy_vec]
+            
+            # Format for PostgreSQL
+            noisy_vec_str = f"[{','.join(str(x) for x in noisy_vec)}]"
+            
+            cursor.execute(query, (noisy_vec_str, noisy_vec_str))
+            results = cursor.fetchall()
+            
+            print(f"Modified real vector search returned {len(results)} results:")
+            for i, result in enumerate(results, 1):
+                print(f"{i}. [{result['category']}] {result['requirement'][:50]}... (score: {result['similarity']:.3f})")
+        
+    except Exception as e:
+        print(f"Error during random vector test: {str(e)}")
+    finally:
+        cursor.close()
+        conn.close()
+
 def run_diagnostic_queries():
     """Run additional diagnostic queries to understand the database state"""
     conn = get_database_connection()
@@ -153,3 +232,6 @@ if __name__ == "__main__":
     print("\n=== Testing Vector Search with Existing Vector ===\n")
     # Test with an existing vector
     test_existing_vector()
+    
+    # Test with random vectors
+    test_random_vector()

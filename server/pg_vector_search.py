@@ -26,7 +26,7 @@ def get_database_connection():
         sys.stderr.write(f"Error connecting to database: {str(e)}\n")
         return None
 
-def find_similar_requirements_db(query_embedding, k=5, similarity_threshold=0.1):
+def find_similar_requirements_db(query_embedding, k=5, similarity_threshold=0.01):
     """
     Find similar requirements in PostgreSQL database using vector similarity search.
     
@@ -46,17 +46,31 @@ def find_similar_requirements_db(query_embedding, k=5, similarity_threshold=0.1)
             
         cursor = conn.cursor(cursor_factory=RealDictCursor)
         
+        # Validate and normalize the query embedding
+        if not query_embedding or len(query_embedding) == 0:
+            sys.stderr.write("Error: Empty query embedding vector\n")
+            return []
+            
+        # Normalize the vector for more consistent results
+        try:
+            magnitude = sum(x*x for x in query_embedding) ** 0.5
+            if magnitude > 0:
+                query_embedding = [x/magnitude for x in query_embedding]
+                sys.stderr.write("Query vector normalized successfully\n")
+        except Exception as e:
+            sys.stderr.write(f"Error normalizing query vector: {str(e)}\n")
+            # Continue with the original vector
+        
         # Convert embedding to string for PostgreSQL
         embedding_str = f"[{','.join(str(x) for x in query_embedding)}]"
         
-        # For random vectors, the similarity can be very low (0.01-0.05)
-        # Let's use an extremely low threshold to make sure we get results
-        effective_threshold = 0.001  # Use a very low threshold to ensure we get results
+        # Use a very low threshold to ensure we get results
+        # For random vectors, similarity scores can be negative or very small
+        effective_threshold = -1.0  # Allow negative similarities to ensure results
         
         sys.stderr.write(f"Searching with similarity threshold: {effective_threshold}\n")
         
         # Query for similar vectors using cosine similarity
-        # Note: We're using a different approach that works better with random vectors
         query = """
         SELECT 
             id,
@@ -73,21 +87,18 @@ def find_similar_requirements_db(query_embedding, k=5, similarity_threshold=0.1)
         LIMIT %s;
         """
         
-        # Execute query - note we're not filtering by threshold in SQL
-        # to ensure we get results
+        # Execute query without filtering by threshold to ensure results
         cursor.execute(query, (embedding_str, embedding_str, k))
         
         # Get results
-        all_results = cursor.fetchall()
+        results = cursor.fetchall()
         
-        sys.stderr.write(f"Query returned {len(all_results)} results\n")
+        sys.stderr.write(f"Query returned {len(results)} results\n")
         
-        # Always return the best matches regardless of threshold
-        # This ensures we always have results even with random vectors
-        results = all_results
-        
+        # Log result info for debugging
         if len(results) > 0:
             sys.stderr.write(f"Top similarity score: {results[0]['similarity']}\n")
+            sys.stderr.write(f"Lowest similarity score: {results[-1]['similarity']}\n")
         
         sys.stderr.write(f"Returning {len(results)} results\n")
         
