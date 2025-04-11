@@ -46,8 +46,20 @@ export async function addSimpleTestEndpoint(app: any) {
       
       console.log(`SIMPLE TEST: Running ${provider} test`);
       
-      // Spawn the Python process
-      const pythonProcess = spawn('python3', [scriptPath, provider]);
+      // Prepare environment variables for Python process
+      const env = {
+        ...process.env,
+        // Explicitly pass API keys and other environment variables
+        'OPENAI_API_KEY': process.env.OPENAI_API_KEY || '',
+        'ANTHROPIC_API_KEY': process.env.ANTHROPIC_API_KEY || '',
+        'DEEPSEEK_API_KEY': process.env.DEEPSEEK_API_KEY || '',
+        'DEBUG_MODE': 'true', // Enable verbose debugging
+      };
+      
+      console.log(`SIMPLE TEST: Explicitly passing environment variables to Python process`);
+      
+      // Spawn the Python process with environment variables
+      const pythonProcess = spawn('python3', [scriptPath, provider], { env });
       
       let stdout = '';
       let stderr = '';

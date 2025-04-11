@@ -4,12 +4,20 @@ import { setupVite, serveStatic, log } from "./vite";
 import { addModelTestEndpoint } from "./routes_model_test";
 import { addSimpleTestEndpoint } from "./routes_simple_test";
 
-// Debug API keys availability
+// Enhanced API keys and environment configuration check
 console.log("=== API KEYS AVAILABILITY CHECK ===");
-console.log("OpenAI API Key available:", process.env.OPENAI_API_KEY ? "Yes (starts with " + process.env.OPENAI_API_KEY.substring(0, 3) + "...)" : "No");
-console.log("Anthropic API Key available:", process.env.ANTHROPIC_API_KEY ? "Yes (starts with " + process.env.ANTHROPIC_API_KEY.substring(0, 3) + "...)" : "No");
+console.log("OpenAI API Key available:", process.env.OPENAI_API_KEY ? "Yes (starts with " + process.env.OPENAI_API_KEY.substring(0, 5) + "...)" : "No");
+console.log("Anthropic API Key available:", process.env.ANTHROPIC_API_KEY ? "Yes (starts with " + process.env.ANTHROPIC_API_KEY.substring(0, 5) + "...)" : "No");
+console.log("DeepSeek API Key available:", process.env.DEEPSEEK_API_KEY ? "Yes (starts with " + (process.env.DEEPSEEK_API_KEY ? process.env.DEEPSEEK_API_KEY.substring(0, 5) : "") + "...)" : "No");
 console.log("DATABASE_URL available:", process.env.DATABASE_URL ? "Yes" : "No");
+console.log("Current NODE_ENV:", process.env.NODE_ENV || "development");
+console.log("Runtime environment:", process.env.REPL_ID ? "Replit" : "Other");
 console.log("==================================");
+
+// Check for SendGrid API key
+if (!process.env.SENDGRID_API_KEY) {
+  console.log("SENDGRID_API_KEY is not set. Email functionality will not work.");
+}
 
 const app = express();
 app.use(express.json());

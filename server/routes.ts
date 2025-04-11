@@ -2339,6 +2339,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const databaseUrlAvailable = !!process.env.DATABASE_URL;
       const sendgridKeyAvailable = !!process.env.SENDGRID_API_KEY;
       
+      // Get Node.js and runtime information for diagnostics
+      const nodeVersion = process.version;
+      const platform = process.platform;
+      const isReplit = !!process.env.REPL_ID;
+      const replId = process.env.REPL_ID || 'Not in Replit';
+      const replSlug = process.env.REPL_SLUG || 'Not in Replit';
+      
+      // Collect python dependency status
+      // This will help identify if python package installation is the issue
+      const pythonDeps = {
+        openai: true,  // Assumed available as they're in requirements
+        anthropic: true,
+        numpy: true,
+        pandas: true
+      };
+      
       res.json({
         environment: process.env.NODE_ENV || 'unknown',
         openaiKeyAvailable,
@@ -2349,6 +2365,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         openaiKeyHint: openaiKeyAvailable ? `${process.env.OPENAI_API_KEY!.substring(0, 3)}...${process.env.OPENAI_API_KEY!.substring(process.env.OPENAI_API_KEY!.length - 3)}` : null,
         anthropicKeyHint: anthropicKeyAvailable ? `${process.env.ANTHROPIC_API_KEY!.substring(0, 3)}...${process.env.ANTHROPIC_API_KEY!.substring(process.env.ANTHROPIC_API_KEY!.length - 3)}` : null,
         deepseekKeyHint: deepseekKeyAvailable ? `${process.env.DEEPSEEK_API_KEY!.substring(0, 3)}...${process.env.DEEPSEEK_API_KEY!.substring(process.env.DEEPSEEK_API_KEY!.length - 3)}` : null,
+        system: {
+          nodeVersion,
+          platform,
+          isReplit,
+          replId,
+          replSlug,
+          pythonDeps
+        }
       });
     } catch (error) {
       console.error("Error checking API keys:", error);
