@@ -444,6 +444,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Launch Python script with a special flag for synthesis
           const scriptPath = path.join(getDirPath(), 'moa_synthesis.py');
           
+          // Ensure API keys are directly passed to the child process
+          const env = { 
+            ...process.env,
+            OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+            ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
+            DEEPSEEK_API_KEY: process.env.DEEPSEEK_API_KEY
+          };
+          
           // Create a temporary synthesis input file
           const synthInput = {
             requirement_text: requirement,
