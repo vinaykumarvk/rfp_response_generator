@@ -599,21 +599,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`- ANTHROPIC_API_KEY: ${process.env.ANTHROPIC_API_KEY ? 'Present (starts with ' + process.env.ANTHROPIC_API_KEY.substring(0, 3) + '...)' : 'Not present'}`);
       console.log(`- DEEPSEEK_API_KEY: ${process.env.DEEPSEEK_API_KEY ? 'Present (starts with ' + process.env.DEEPSEEK_API_KEY.substring(0, 3) + '...)' : 'Not present'}`);
       
-      // Spawn Python process with environment variables explicitly passed
-      // Enhanced Python environment with diagnostics flag
-      console.log("Creating Python environment with following API keys:");
-      console.log(`- OPENAI_API_KEY: ${process.env.OPENAI_API_KEY ? 'Present (starts with ' + process.env.OPENAI_API_KEY.substring(0, 5) + '...)' : 'Not present'}`);
-      console.log(`- ANTHROPIC_API_KEY: ${process.env.ANTHROPIC_API_KEY ? 'Present (starts with ' + process.env.ANTHROPIC_API_KEY.substring(0, 5) + '...)' : 'Not present'}`);
-      console.log(`- DEEPSEEK_API_KEY: ${process.env.DEEPSEEK_API_KEY ? 'Present (starts with ' + process.env.DEEPSEEK_API_KEY.substring(0, 5) + '...)' : 'Not present'}`);
+      // We're using hardcoded API keys in the Python files, so we don't need to pass them as environment variables
+      console.log("Using hardcoded API keys in Python files for deployment");
       
       const pythonEnv = { 
         ...process.env,
-        OPENAI_API_KEY: process.env.OPENAI_API_KEY || '',
-        ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY || '',
-        DEEPSEEK_API_KEY: process.env.DEEPSEEK_API_KEY || '',
+        // We're not passing API keys anymore since they're hardcoded in Python
         NODE_ENV: process.env.NODE_ENV || 'production',
         DEBUG_MODE: 'true',
-        DEPLOYMENT_ENV: process.env.REPL_ID ? 'replit' : 'local'
+        DEPLOYMENT_ENV: process.env.REPL_ID ? 'replit' : 'local',
+        USING_HARDCODED_KEYS: 'true'
       };
       
       // Spawn Python process 
@@ -768,21 +763,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   fs.mkdirSync(path.dirname(tempFilePath), { recursive: true });
                   fs.writeFileSync(tempFilePath, JSON.stringify(synthInput, null, 2));
                   
-                  // Enhanced debugging for environment variables in auto-triggered MOA Phase 2
-                  console.log(`Environment variables being passed to auto-triggered MOA synthesis Python script:`);
-                  console.log(`- OPENAI_API_KEY: ${process.env.OPENAI_API_KEY ? 'Present (starts with ' + process.env.OPENAI_API_KEY.substring(0, 3) + '...)' : 'Not present'}`);
-                  console.log(`- ANTHROPIC_API_KEY: ${process.env.ANTHROPIC_API_KEY ? 'Present (starts with ' + process.env.ANTHROPIC_API_KEY.substring(0, 3) + '...)' : 'Not present'}`);
-                  console.log(`- DEEPSEEK_API_KEY: ${process.env.DEEPSEEK_API_KEY ? 'Present (starts with ' + process.env.DEEPSEEK_API_KEY.substring(0, 3) + '...)' : 'Not present'}`);
+                  // We're using hardcoded API keys in the Python files
+                  console.log("Using hardcoded API keys in MOA Phase 2 Python file for deployment");
                   
-                  // Spawn Python process with environment variables explicitly passed
+                  // Spawn Python process with minimal environment variables
                   const pythonEnv = { 
                       ...process.env,
-                      OPENAI_API_KEY: process.env.OPENAI_API_KEY || '',
-                      ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY || '',
-                      DEEPSEEK_API_KEY: process.env.DEEPSEEK_API_KEY || '',
+                      // We're not passing API keys anymore since they're hardcoded in Python
                       NODE_ENV: process.env.NODE_ENV || 'production',
                       DEBUG_MODE: 'true',
-                      DEPLOYMENT_ENV: process.env.REPL_ID ? 'replit' : 'local'
+                      DEPLOYMENT_ENV: process.env.REPL_ID ? 'replit' : 'local',
+                      USING_HARDCODED_KEYS: 'true'
                   };
                   
                   // Execute Phase 2 synthesis with env variables
