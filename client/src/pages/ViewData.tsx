@@ -154,23 +154,28 @@ export default function ViewData() {
         }
       }
       
-      // Filter by generation mode
+      // Filter by generation mode/model provider
       if (filters.generationMode !== 'all' && filters.generationMode) {
-        // If openAI model was used to generate the response
-        if (filters.generationMode === 'openai' && !row.openaiResponse) {
-          return false;
-        }
-        // If Anthropic model was used
-        else if (filters.generationMode === 'anthropic' && !row.anthropicResponse) {
-          return false;
-        }
-        // If Deepseek model was used
-        else if (filters.generationMode === 'deepseek' && !row.deepseekResponse) {
-          return false;
-        }
-        // If MOA (Mixture of Agents) was used
-        else if (filters.generationMode === 'moa' && !row.moaResponse) {
-          return false;
+        // First try using the modelProvider field (preferred approach)
+        if (row.modelProvider) {
+          if (row.modelProvider !== filters.generationMode) {
+            return false;
+          }
+        } 
+        // Fallback to the legacy approach for backward compatibility
+        else {
+          if (filters.generationMode === 'openai' && !row.openaiResponse) {
+            return false;
+          }
+          else if (filters.generationMode === 'anthropic' && !row.anthropicResponse) {
+            return false;
+          }
+          else if (filters.generationMode === 'deepseek' && !row.deepseekResponse) {
+            return false;
+          }
+          else if (filters.generationMode === 'moa' && !row.moaResponse) {
+            return false;
+          }
         }
       }
       
@@ -917,13 +922,22 @@ export default function ViewData() {
                                 </Badge>
                               )}
                               
-                              {/* Generation mode badge */}
-                              {(row.openaiResponse || row.anthropicResponse || row.deepseekResponse || row.moaResponse) && (
-                                <Badge variant="outline" className="text-[10px] sm:text-xs bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-200 border-amber-200 dark:border-amber-800">
-                                  {row.moaResponse ? 
+                              {/* Model Provider badge */}
+                              {row.finalResponse && (
+                                <Badge variant="outline" className={`text-[10px] sm:text-xs 
+                                  ${row.modelProvider === 'openai' ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-200 border-blue-200 dark:border-blue-800' : 
+                                    row.modelProvider === 'anthropic' ? 'bg-purple-50 text-purple-700 dark:bg-purple-950 dark:text-purple-200 border-purple-200 dark:border-purple-800' : 
+                                    row.modelProvider === 'deepseek' ? 'bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-200 border-amber-200 dark:border-amber-800' : 
+                                    row.modelProvider === 'moa' ? 'bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-200 border-green-200 dark:border-green-800' : 
+                                    'bg-slate-50 text-slate-700 dark:bg-slate-800 dark:text-slate-200 border-slate-200 dark:border-slate-700'
+                                  }`}
+                                >
+                                  {row.modelProvider === 'moa' ? 
                                     <><Network className="h-3 w-3 mr-0.5" /> MOA</> : 
-                                    row.openaiResponse ? 'OpenAI' : 
-                                    row.anthropicResponse ? 'Anthropic' : 'Deepseek'
+                                    row.modelProvider === 'openai' ? 'OpenAI' : 
+                                    row.modelProvider === 'anthropic' ? 'Anthropic' : 
+                                    row.modelProvider === 'deepseek' ? 'DeepSeek' : 
+                                    'Model'
                                   }
                                 </Badge>
                               )}
