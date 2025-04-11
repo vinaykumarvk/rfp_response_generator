@@ -2511,6 +2511,97 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Python environment validator endpoint
+  app.get("/api/validate-python-env", async (_req: Request, res: Response) => {
+    try {
+      const pythonScript = path.join(process.cwd(), "server", "deployment_validator.py");
+      
+      if (!fs.existsSync(pythonScript)) {
+        return res.status(404).json({ 
+          error: "Python validator script not found", 
+          path: pythonScript 
+        });
+      }
+      
+      const pythonProcess = spawn("python3", [pythonScript]);
+      let stdout = "";
+      let stderr = "";
+      
+      pythonProcess.stdout.on("data", (data) => {
+        stdout += data.toString();
+      });
+      
+      pythonProcess.stderr.on("data", (data) => {
+        stderr += data.toString();
+      });
+      
+      pythonProcess.on("close", (code) => {
+        if (code !== 0) {
+          return res.status(500).json({
+            error: "Python validator failed",
+            code,
+            stderr
+          });
+        }
+        
+        try {
+          const results = JSON.parse(stdout);
+          res.json(results);
+        } catch (e) {
+          res.status(500).json({
+            error: "Failed to parse Python validator output",
+            stdout,
+            parseError: String(e)
+          });
+        }
+      });
+    } catch (error) {
+      console.error("Error running Python validator:", error);
+      res.status(500).json({ 
+        message: "Error running Python validator", 
+        error: String(error) 
+      });
+    }
+  });
+  
+  // Shell script deployment verification endpoint
+  app.get("/api/shell-verify", async (_req: Request, res: Response) => {
+    try {
+      const scriptPath = path.join(process.cwd(), "server", "deploy_checks.sh");
+      
+      if (!fs.existsSync(scriptPath)) {
+        return res.status(404).json({ 
+          error: "Deployment verification script not found", 
+          path: scriptPath 
+        });
+      }
+      
+      const exec = promisify(execCallback);
+      const { stdout, stderr } = await exec(`bash ${scriptPath}`);
+      
+      // Parse the output to extract key information
+      const summary = {
+        timestamp: new Date().toISOString(),
+        success: stdout.includes("All basic deployment requirements are met"),
+        output: stdout,
+        errors: stderr || null,
+        missingFiles: (stdout.match(/Warning: (\d+) critical files are missing/)?.[1] || "0"),
+        missingModules: (stdout.match(/Warning: (\d+) Python modules are missing/)?.[1] || "0"),
+        missingKeys: (stdout.match(/Warning: (\d+) API keys are not set/)?.[1] || "0"),
+        embeddingsValid: stdout.includes("Embeddings file is valid pickle"),
+        dbConnectionSuccess: stdout.includes("Database connection successful")
+      };
+      
+      res.json(summary);
+    } catch (error) {
+      console.error("Error running deployment verification script:", error);
+      res.status(500).json({ 
+        message: "Error running deployment verification script", 
+        error: String(error) 
+      });
+    }
+  });
+  
   // Comprehensive deployment check endpoint
   app.get("/api/deployment-check", async (_req: Request, res: Response) => {
     try {

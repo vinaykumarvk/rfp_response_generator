@@ -1,89 +1,188 @@
 #!/bin/bash
-# Deployment Environment Checker Script
-# This script performs essential checks on the deployment environment 
-# and installs any missing required packages
+#
+# Deployment Environment Verification and Fixes
+# This script checks the deployment environment and fixes common issues.
+#
 
-echo "====== DEPLOYMENT ENVIRONMENT CHECKER ======"
-echo "Running system checks..."
+echo "=== RFP Response Generator Deployment Verification Script ==="
+echo "Running checks on $(date)"
+echo "Current directory: $(pwd)"
 
-# Check Python version
-echo -e "\n1. Checking Python version:"
-python3 --version
+# Set colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+NC='\033[0m' # No Color
 
-# Check Python dependencies
-echo -e "\n2. Checking Python dependencies:"
-PIP_DEPS=("openai" "anthropic" "numpy" "pandas" "scikit-learn" "gdown" "joblib" "openpyxl")
+# ---------- Check for critical files ----------
+echo -e "\n${YELLOW}Checking for critical files...${NC}"
 
-# Create a function to check and install a dependency
-check_and_install() {
-  local pkg=$1
-  echo -n "Checking for $pkg... "
-  if python3 -c "import $pkg" 2>/dev/null; then
-    echo "✓ Found"
-  else
-    echo "✗ Missing. Installing..."
-    pip3 install $pkg
-    if python3 -c "import $pkg" 2>/dev/null; then
-      echo "  ✓ Successfully installed $pkg"
-    else
-      echo "  ✗ Failed to install $pkg"
-    fi
-  fi
-}
-
-# Check and install all dependencies
-for pkg in "${PIP_DEPS[@]}"; do
-  check_and_install $pkg
-done
-
-# Check critical files
-echo -e "\n3. Checking for critical files:"
-CRITICAL_FILES=(
-  "rfp_embeddings.pkl" 
-  "attached_assets/previous_responses.xlsx" 
-  "server/rfp_response_generator.py" 
-  "server/moa_synthesis.py"
+declare -A files=(
+  ["rfp_embeddings.pkl"]="Main embeddings file (135MB)"
+  ["attached_assets/previous_responses.xlsx"]="Previous responses Excel file"
+  ["server/rfp_response_generator.py"]="Main Python generator script"
+  ["server/moa_synthesis.py"]="MOA synthesis script"
+  ["server/deployment_validator.py"]="Deployment validator script"
 )
 
-for file in "${CRITICAL_FILES[@]}"; do
-  echo -n "Checking for $file... "
-  if [ -f "$file" ]; then
-    echo "✓ Found"
+missing_files=0
+for file in "${!files[@]}"; do
+  if [[ -f "$file" ]]; then
+    size=$(du -h "$file" | cut -f1)
+    echo -e "✅ ${GREEN}Found${NC}: $file ($size) - ${files[$file]}"
   else
-    echo "✗ Missing"
+    echo -e "❌ ${RED}Missing${NC}: $file - ${files[$file]}"
+    missing_files=$((missing_files + 1))
   fi
 done
 
-# Check API keys
-echo -e "\n4. Checking API key availability:"
-echo -n "OpenAI API Key... "
-if grep -q "OPENAI_API_KEY" server/rfp_response_generator.py; then
-  echo "✓ Found in rfp_response_generator.py"
+if [[ $missing_files -gt 0 ]]; then
+  echo -e "${RED}Warning: $missing_files critical files are missing!${NC}"
 else
-  echo "✗ Missing"
+  echo -e "${GREEN}All critical files are present.${NC}"
 fi
 
-echo -n "Anthropic API Key... "
-if grep -q "ANTHROPIC_API_KEY" server/rfp_response_generator.py; then
-  echo "✓ Found in rfp_response_generator.py"
+# ---------- Check Python environment ----------
+echo -e "\n${YELLOW}Checking Python environment...${NC}"
+
+# Check Python version
+python_version=$(python3 --version 2>&1)
+if [[ $? -eq 0 ]]; then
+  echo -e "✅ ${GREEN}Python detected${NC}: $python_version"
 else
-  echo "✗ Missing"
+  echo -e "❌ ${RED}Python not found!${NC}"
+  exit 1
 fi
 
-echo -n "DeepSeek API Key... "
-if grep -q "DEEPSEEK_API_KEY" server/rfp_response_generator.py; then
-  echo "✓ Found in rfp_response_generator.py"
+# Check critical Python modules
+declare -A modules=(
+  ["openai"]="OpenAI API client"
+  ["anthropic"]="Anthropic API client"
+  ["pandas"]="Data manipulation library"
+  ["numpy"]="Numerical computation library"
+  ["sklearn"]="Machine learning library"
+  ["openpyxl"]="Excel file handling"
+)
+
+missing_modules=0
+for module in "${!modules[@]}"; do
+  if python3 -c "import $module" &>/dev/null; then
+    # Try to get version
+    version=$(python3 -c "import $module; print(getattr($module, '__version__', 'unknown'))" 2>/dev/null)
+    echo -e "✅ ${GREEN}Module installed${NC}: $module $version - ${modules[$module]}"
+  else
+    echo -e "❌ ${RED}Module missing${NC}: $module - ${modules[$module]}"
+    missing_modules=$((missing_modules + 1))
+  fi
+done
+
+if [[ $missing_modules -gt 0 ]]; then
+  echo -e "${RED}Warning: $missing_modules Python modules are missing!${NC}"
+  echo "Run: pip install openai anthropic pandas numpy scikit-learn openpyxl"
 else
-  echo "✗ Missing"
+  echo -e "${GREEN}All required Python modules are installed.${NC}"
 fi
 
-# Check database configuration
-echo -e "\n5. Checking database configuration:"
-if [ -n "$DATABASE_URL" ]; then
-  echo "✓ DATABASE_URL environment variable is set"
+# ---------- Check embeddings file ----------
+echo -e "\n${YELLOW}Checking embeddings file integrity...${NC}"
+
+if [[ -f "rfp_embeddings.pkl" ]]; then
+  filesize=$(du -m "rfp_embeddings.pkl" | cut -f1)
+  
+  if [[ $filesize -lt 100 ]]; then
+    echo -e "⚠️ ${YELLOW}Warning${NC}: embeddings file seems too small ($filesize MB). Expected ~135MB."
+  else
+    echo -e "✅ ${GREEN}Embeddings file size looks good${NC}: $filesize MB"
+  fi
+  
+  # Attempt to validate pickle integrity
+  python3 -c "import pickle; pickle.load(open('rfp_embeddings.pkl', 'rb'))" &>/dev/null
+  if [[ $? -eq 0 ]]; then
+    echo -e "✅ ${GREEN}Embeddings file is valid pickle${NC}"
+  else
+    echo -e "❌ ${RED}Embeddings file is corrupted${NC}. Cannot load pickle."
+  fi
 else
-  echo "✗ DATABASE_URL environment variable is missing"
+  echo -e "${RED}Embeddings file not found!${NC}"
 fi
 
-echo -e "\n====== DEPLOYMENT CHECK COMPLETE ======"
-echo "Review any issues above and fix them before proceeding with deployment."
+# ---------- Check API keys environment variables ----------
+echo -e "\n${YELLOW}Checking API keys environment variables...${NC}"
+
+# Array of required keys
+declare -A api_keys=(
+  ["OPENAI_API_KEY"]="OpenAI API"
+  ["ANTHROPIC_API_KEY"]="Anthropic API"
+  ["DEEPSEEK_API_KEY"]="DeepSeek API"
+)
+
+missing_keys=0
+for key in "${!api_keys[@]}"; do
+  if [[ -n "${!key}" ]]; then
+    # Show first few characters of the key
+    value="${!key}"
+    prefix="${value:0:5}..."
+    echo -e "✅ ${GREEN}Found${NC}: $key ($prefix) - ${api_keys[$key]}"
+  else
+    echo -e "❌ ${RED}Missing${NC}: $key - ${api_keys[$key]}"
+    missing_keys=$((missing_keys + 1))
+  fi
+done
+
+if [[ $missing_keys -gt 0 ]]; then
+  echo -e "${RED}Warning: $missing_keys API keys are missing!${NC}"
+  echo "Make sure to set them in the deployment environment or .env.production file."
+else
+  echo -e "${GREEN}All required API keys are set.${NC}"
+fi
+
+# ---------- Check database connection ----------
+echo -e "\n${YELLOW}Checking database connection...${NC}"
+
+if [[ -n "$DATABASE_URL" ]]; then
+  echo -e "✅ ${GREEN}Database URL is set${NC}"
+  
+  # Extract database name from URL (simple approach)
+  dbname=$(echo "$DATABASE_URL" | sed -r 's/.*\/([^?]*).*/\1/')
+  echo "Database name appears to be: $dbname"
+  
+  # Try a simple connection test
+  if command -v pg_isready &>/dev/null; then
+    pg_isready
+    if [[ $? -eq 0 ]]; then
+      echo -e "✅ ${GREEN}Database connection successful${NC}"
+    else
+      echo -e "❌ ${RED}Database connection failed${NC}"
+    fi
+  else
+    echo -e "ℹ️ ${YELLOW}pg_isready not available, skipping connection test${NC}"
+  fi
+else
+  echo -e "❌ ${RED}DATABASE_URL is not set!${NC}"
+fi
+
+# ---------- Final Summary ----------
+echo -e "\n${YELLOW}==== Deployment Verification Summary =====${NC}"
+
+if [[ $missing_files -gt 0 || $missing_modules -gt 0 || $missing_keys -gt 0 ]]; then
+  echo -e "${RED}⚠️ There are issues that need to be addressed before deployment!${NC}"
+  
+  if [[ $missing_files -gt 0 ]]; then
+    echo -e "- ${RED}$missing_files critical files are missing${NC}"
+  fi
+  
+  if [[ $missing_modules -gt 0 ]]; then
+    echo -e "- ${RED}$missing_modules Python modules are missing${NC}"
+  fi
+  
+  if [[ $missing_keys -gt 0 ]]; then
+    echo -e "- ${RED}$missing_keys API keys are not set${NC}"
+  fi
+  
+  echo -e "\nPlease fix these issues before deploying."
+else
+  echo -e "${GREEN}✅ All basic deployment requirements are met.${NC}"
+  echo -e "You may proceed with deployment!"
+fi
+
+echo -e "\n${YELLOW}Verification completed at $(date)${NC}"
