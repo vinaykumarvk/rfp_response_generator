@@ -11,7 +11,8 @@ import {
   Menu,
   X,
   FileText,
-  Terminal
+  Terminal,
+  TerminalSquare
 } from 'lucide-react';
 import intellectLogo from '@assets/intellect_logo.png';
 import { Button } from '@/components/ui/button';
@@ -48,6 +49,12 @@ export default function Sidebar() {
       icon: <BookOpen className="h-5 w-5" />,
       path: '/llm-response-viewer',
       active: location === '/llm-response-viewer'
+    },
+    {
+      title: 'MOA Test Tool',
+      icon: <Terminal className="h-5 w-5" />,
+      path: '/moa-test',
+      active: location === '/moa-test'
     }
   ];
 

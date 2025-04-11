@@ -42,15 +42,17 @@ export default function MoaTestPage() {
     setResult(null);
 
     try {
-      const response = await apiRequest("/api/model-specific-test", {
-        method: "POST",
-        body: JSON.stringify({
+      const response = await apiRequest(
+        "POST",
+        "/api/model-specific-test",
+        {
           provider,
           text: requirement,
-        }),
-      });
+        }
+      );
 
-      setResult(response);
+      const responseData = await response.json();
+      setResult(responseData);
       toast({
         title: "Success",
         description: `${provider.toUpperCase()} test completed successfully`,
