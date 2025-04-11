@@ -96,6 +96,16 @@ export default function MoaTestPage() {
       );
 
       const responseData = await response.json();
+      
+      // Add detailed logging to debug the structure
+      console.log("Raw response:", JSON.stringify(responseData));
+      if (responseData.model_output) {
+        console.log("model_output structure:", JSON.stringify(Object.keys(responseData.model_output)));
+      }
+      if (responseData.saved_data) {
+        console.log("saved_data structure:", JSON.stringify(Object.keys(responseData.saved_data)));
+      }
+      
       setResult(responseData);
       toast({
         title: "Success",
