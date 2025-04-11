@@ -1,60 +1,89 @@
-# RFP Response Generator (v0.2)
+# RFP Response Generator
 
-An advanced AI-powered RFP Response Generator that transforms complex proposal creation through intelligent multi-model AI integration and robust API connectivity.
+An advanced AI-powered RFP Response Generator leveraging multi-model vector search and intelligent requirement matching to streamline proposal creation.
+
+## Key Technologies
+
+- React frontend with TypeScript
+- Python backend for AI processing
+- PostgreSQL vector search with advanced similarity matching
+- Multi-AI model integration (OpenAI, Anthropic, Deepseek)
+- Automated response generation with contextual reference lookup
+
+## Architecture Overview
+
+The application uses a comprehensive multi-page approach with:
+
+1. **PostgreSQL Vector Database**
+   - Uses pgvector extension for efficient similarity search
+   - 9,658 requirement embeddings stored as vectors
+   - Optimized IVFFLAT indexing for performance
+
+2. **AI Response Generation**
+   - MOA (Mixture of Agents) approach with multiple models
+   - OpenAI, Anthropic, and Deepseek integration
+   - Two-phase generation with final synthesis
+
+3. **Export Capabilities**
+   - Print functionality with markdown formatting
+   - Email functionality with SendGrid
+   - Excel export with clean formatting
+
+## Vector Search Implementation
+
+The application uses PostgreSQL with pgvector extension for efficient similarity search instead of loading embeddings into memory:
+
+- **Embedding Storage**: All 9,658 embeddings are stored in the database
+- **Search Optimization**: Uses cosine similarity with IVFFLAT indexing
+- **Performance**: Efficient queries with proper index optimization
 
 ## Key Features
 
-- **Multi-model AI integration**: Supports OpenAI, Anthropic, and Deepseek models for comprehensive response generation
-- **Mixture of Agents (MOA)**: Combines responses from multiple AI models to create high-quality answers
-- **Vector Embeddings**: Uses similarity search to find relevant previous responses
-- **Excel Analysis**: Upload and analyze Excel files containing RFP requirements
-- **Response Editing**: Edit and customize AI-generated responses
-- **Batch Processing**: Generate responses for multiple requirements at once
-- **Proper Markdown Rendering**: Enhanced display with ReactMarkdown and remark-gfm
-- **Advanced Data Sorting**: Sort requirements by ID, date, RFP name, and category with visual indicators
+- Upload Excel requirements and display content
+- Store data in PostgreSQL database (parent-child relationships)
+- Generate AI-powered responses with multiple models
+- Edit generated responses with version tracking
+- Process multiple requirements with progress tracking
+- Export selected requirements and responses
+- Rate responses with feedback system
 
-## Tech Stack
+## Development Setup
 
-- **Frontend**: React with TypeScript, TailwindCSS, and ShadCN UI components
-- **Backend**: Express server with Python processing capabilities
-- **Database**: PostgreSQL with Drizzle ORM
-- **AI Models**: OpenAI, Anthropic Claude, and Deepseek
-- **Vector Database**: In-memory vector store with similarity search
+1. **Prerequisites**
+   - PostgreSQL database with pgvector extension
+   - Node.js and npm
+   - Python 3.11+
+   - API keys for OpenAI, Anthropic, and DeepSeek
 
-## Getting Started
+2. **Environment Variables**
+   - `DATABASE_URL`: PostgreSQL connection string
+   - `OPENAI_API_KEY`: OpenAI API key
+   - `ANTHROPIC_API_KEY`: Anthropic API key
+   - `DEEPSEEK_API_KEY`: DeepSeek API key
+   - `SENDGRID_API_KEY`: (Optional) SendGrid API key for email functionality
 
-1. Ensure you have the required environment variables:
-   - `OPENAI_API_KEY`
-   - `ANTHROPIC_API_KEY`
-   - `DATABASE_URL` (PostgreSQL connection string)
+3. **Running the Application**
+   - Start the development server with: `npm run dev`
 
-2. Start the application:
-   ```
-   npm run dev
-   ```
+## Database Schema
 
-3. Access the application at http://localhost:5000
+The PostgreSQL database includes these key tables:
 
-## Architecture
+1. **embeddings**: Stores requirement embeddings for vector search
+   - Uses pgvector's vector data type for the embedding field
+   - Includes category, requirement, response, and reference fields
 
-The application follows a multi-tier architecture:
+2. **responses**: Stores generated responses with model-specific fields
+   - `finalResponse`: The final synthesized response
+   - `openaiResponse`, `anthropicResponse`, `deepseekResponse`: Model-specific responses
+   - `moaResponse`: Mixture of Agents synthesized response
+   - `feedback`: User feedback on response quality
 
-1. **React Frontend**: Handles user interface and interactions
-2. **Express Backend**: Routes API requests and manages database operations
-3. **Python Processing**: Generates embeddings and LLM responses
-4. **PostgreSQL Database**: Stores requirements, responses, and references
+## Vector Search Implementation
 
-## Usage
+The application has migrated from loading a large pickle file (135MB) into memory to using PostgreSQL's pgvector extension for more efficient similarity search:
 
-1. **Upload Requirements**: Use the Excel Analyzer to upload and process RFP requirements
-2. **View Data**: Browse, filter, and sort uploaded requirements using the advanced data management features
-   - **Filter**: Filter data by RFP name, category, response status, and generation model
-   - **Sort**: Sort data by ID, date, RFP name, or category in ascending or descending order
-   - **Select**: Choose multiple items for batch processing
-3. **Generate Responses**: Select requirements and generate AI responses using different models
-4. **Edit Responses**: Customize the generated responses as needed
-5. **Export**: Export the final responses in the desired format
-
-## Development
-
-See the [VERSION.md](VERSION.md) file for a detailed changelog and development history.
+- All 9,658 embeddings are stored in the database
+- Vector similarity search uses cosine distance with proper normalization
+- Optimized IVFFLAT index with vector_cosine_ops for performance
+- Text search capabilities for keyword queries
