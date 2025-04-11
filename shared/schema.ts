@@ -52,6 +52,7 @@ export const excelRequirementResponses = pgTable("excel_requirement_responses", 
   // Metadata
   timestamp: timestamp("timestamp").defaultNow().notNull(),
   rating: integer("rating"),
+  feedback: text("feedback"),  // 'positive', 'negative', or null
   modelProvider: text("model_provider"),
 });
 

@@ -292,6 +292,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(500).json({ message: "Failed to update Excel requirement response" });
     }
   });
+  
+  // Save feedback for an Excel requirement response
+  app.post("/api/excel-requirements/:id/feedback", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid ID format" });
+      }
+      
+      const { feedback } = req.body;
+      if (typeof feedback !== 'string' || !['positive', 'negative'].includes(feedback)) {
+        return res.status(400).json({ message: "Feedback must be 'positive' or 'negative'" });
+      }
+      
+      // Get the existing response to ensure it exists
+      const existingResponse = await storage.getExcelRequirementResponse(id);
+      if (!existingResponse) {
+        return res.status(404).json({ message: "Response not found" });
+      }
+      
+      // Update the response with feedback
+      const updatedResponse = await storage.updateExcelRequirementResponse(id, { feedback });
+      
+      return res.json({ 
+        success: true, 
+        message: "Feedback saved successfully", 
+        response: updatedResponse 
+      });
+    } catch (error) {
+      console.error("Error saving feedback:", error);
+      return res.status(500).json({ 
+        message: "Failed to save feedback", 
+        details: error instanceof Error ? error.message : String(error) 
+      });
+    }
+  });
 
   // Delete an Excel requirement response
   app.delete("/api/excel-requirements/:id", async (req: Request, res: Response) => {
