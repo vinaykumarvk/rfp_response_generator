@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
-Script to import embeddings from pickle file to PostgreSQL database
+Script to import a subset of embeddings from pickle file to PostgreSQL database
+This version imports a smaller subset to fit within time constraints
 """
 import os
 import sys
@@ -10,6 +11,7 @@ import time
 import psycopg2
 from psycopg2.extras import execute_values
 import numpy as np
+import random
 
 # Constants - use the same paths as the main script for consistency
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -32,8 +34,13 @@ def get_database_connection():
         sys.stderr.write(f"Error connecting to database: {str(e)}\n")
         sys.exit(1)
 
-def load_pickle_embeddings():
-    """Load embeddings from the pickle file."""
+def load_pickle_embeddings(max_points=2000):
+    """
+    Load embeddings from the pickle file, returning only a subset.
+    
+    Args:
+        max_points: Maximum number of points to return (to limit processing time)
+    """
     try:
         if not os.path.exists(EMBEDDING_FILE_PATH):
             sys.stderr.write(f"Embeddings file not found at: {EMBEDDING_FILE_PATH}\n")
@@ -41,23 +48,45 @@ def load_pickle_embeddings():
             
         with open(EMBEDDING_FILE_PATH, 'rb') as f:
             data = pickle.load(f)
-            
+        
+        # Get all points but limit to max_points
+        points = data.get('points', [])
+        total_points = len(points)
+        
+        if total_points <= max_points:
+            return data
+        
+        # Take a subset - let's take some from the beginning, middle, and end to get more variety
+        subset_points = []
+        # Take first 500 points 
+        subset_points.extend(points[:500])
+        # Take 1000 random points from the middle
+        random_indices = random.sample(range(500, total_points-500), min(1000, total_points-1000))
+        for idx in random_indices:
+            subset_points.append(points[idx])
+        # Take last 500 points
+        subset_points.extend(points[-500:])
+        
+        # Create a new data object with the subset
+        subset_data = {'points': subset_points}
+        
         sys.stderr.write(f"Successfully loaded embeddings from pickle file\n")
-        return data
+        sys.stderr.write(f"Original: {total_points} points, Subset: {len(subset_points)} points\n")
+        return subset_data
     except Exception as e:
         sys.stderr.write(f"Error loading embeddings from pickle file: {str(e)}\n")
         sys.exit(1)
 
 def import_embeddings_to_postgres():
-    """Import embeddings from pickle file to PostgreSQL."""
+    """Import a subset of embeddings from pickle file to PostgreSQL."""
     start_time = time.time()
     
     # Connect to the database
     conn = get_database_connection()
     cursor = conn.cursor()
     
-    # Load embeddings from pickle file
-    embeddings_data = load_pickle_embeddings()
+    # Load subset of embeddings from pickle file
+    embeddings_data = load_pickle_embeddings(max_points=2000)
     points = embeddings_data.get('points', [])
     
     if not points:
@@ -82,7 +111,7 @@ def import_embeddings_to_postgres():
     """)
     
     # Prepare data for batch insertion
-    batch_size = 100
+    batch_size = 50  # Smaller batch size for faster commits
     inserted_count = 0
     total_count = len(points)
     
@@ -160,6 +189,7 @@ def import_embeddings_to_postgres():
     duration = end_time - start_time
     
     sys.stderr.write(f"Successfully imported {inserted_count} embeddings in {duration:.2f} seconds\n")
+    sys.stderr.write(f"This represents ~{inserted_count/9858*100:.1f}% of the total available embeddings\n")
 
 if __name__ == "__main__":
     # Run the import process
