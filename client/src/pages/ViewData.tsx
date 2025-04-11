@@ -418,8 +418,8 @@ export default function ViewData() {
     }
   };
   
-  // Function to export selected items as DOCX
-  const handleExportToDocx = async () => {
+  // Function to export selected items as Excel file
+  const handleExportToExcel = () => {
     // Get selected items data
     const selectedData = excelData.filter(item => selectedItems.includes(item.id || 0));
     
@@ -436,21 +436,21 @@ export default function ViewData() {
       // Create filename based on RFP name if all items are from the same RFP
       const rfpNames = new Set(selectedData.map(item => item.rfpName || 'unnamed'));
       const filename = rfpNames.size === 1 
-        ? `${Array.from(rfpNames)[0]}-responses.docx` 
-        : `rfp-responses-${new Date().toISOString().split('T')[0]}.docx`;
+        ? `${Array.from(rfpNames)[0]}-responses.xlsx` 
+        : `rfp-responses-${new Date().toISOString().split('T')[0]}.xlsx`;
       
-      // Download the DOCX file
-      await downloadDocxFile(selectedData, filename);
+      // Download the Excel file
+      downloadExcelFile(selectedData, filename);
       
       toast({
-        title: "DOCX Export Successful",
+        title: "Excel Export Successful",
         description: `${selectedData.length} items exported to ${filename}`,
       });
     } catch (error) {
-      console.error('Error generating DOCX:', error);
+      console.error('Error generating Excel file:', error);
       toast({
-        title: "DOCX Export Failed",
-        description: "Failed to generate DOCX file: " + (error instanceof Error ? error.message : String(error)),
+        title: "Excel Export Failed",
+        description: "Failed to generate Excel file: " + (error instanceof Error ? error.message : String(error)),
         variant: "destructive"
       });
     }
@@ -482,8 +482,8 @@ export default function ViewData() {
       case 'print':
         handleExportToMarkdown();
         break;
-      case 'docx':
-        handleExportToDocx();
+      case 'excel':
+        handleExportToExcel();
         break;
       case 'mail':
         handleEmailMarkdown();
@@ -676,9 +676,9 @@ export default function ViewData() {
                         <Printer className="h-4 w-4" />
                         <span>Export as Markdown</span>
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => handleBulkAction('docx')} className="gap-2">
+                      <DropdownMenuItem onClick={() => handleBulkAction('excel')} className="gap-2">
                         <FileText className="h-4 w-4" />
-                        <span>Export as DOCX</span>
+                        <span>Export as Excel</span>
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => handleBulkAction('mail')} className="gap-2">
                         <Mail className="h-4 w-4" />
