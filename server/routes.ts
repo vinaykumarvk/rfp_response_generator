@@ -10,11 +10,12 @@ import {
   type ExcelRequirementResponse
 } from "@shared/schema";
 import { fromZodError } from "zod-validation-error";
-import { spawn } from "child_process";
+import { spawn, exec as execCallback } from "child_process";
 import * as path from "path";
 import * as fs from "fs";
 import { fileURLToPath } from "url";
 import { dirname } from "path";
+import { promisify } from "util";
 import { sendEmail, createTempFile, fileToBase64Attachment } from "./email";
 
 // Helper function for getting the directory path in ES modules
@@ -2510,82 +2511,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // Special deployment check endpoint to verify file availability
+  // Simple deployment check endpoint
   app.get("/api/deployment-check", async (_req: Request, res: Response) => {
     try {
-      const fs = require('fs');
-      const path = require('path');
-      const { exec } = require('child_process');
+      const exec = promisify(execCallback);
       
-      // Paths to check
+      // Basic environment info
       const baseDir = process.cwd();
-      const embeddingsPath = path.join(baseDir, "rfp_embeddings.pkl");
-      const excelPath = path.join(baseDir, "attached_assets", "previous_responses.xlsx");
-      const pythonScriptPath = path.join(baseDir, "server", "rfp_response_generator.py");
-      
-      // Check file existence and sizes
-      const fileChecks = {
-        embeddings: { 
-          exists: fs.existsSync(embeddingsPath),
-          size: fs.existsSync(embeddingsPath) ? (fs.statSync(embeddingsPath).size / (1024*1024)).toFixed(2) + " MB" : "File not found",
-          permissions: fs.existsSync(embeddingsPath) ? fs.statSync(embeddingsPath).mode.toString(8).slice(-3) : "N/A"
+      const deploymentInfo: any = {
+        environment: process.env.NODE_ENV || 'development',
+        timestamp: new Date().toISOString(),
+        paths: {
+          cwd: baseDir
         },
-        excel: {
-          exists: fs.existsSync(excelPath),
-          size: fs.existsSync(excelPath) ? (fs.statSync(excelPath).size / 1024).toFixed(2) + " KB" : "File not found",
-          permissions: fs.existsSync(excelPath) ? fs.statSync(excelPath).mode.toString(8).slice(-3) : "N/A"
-        },
-        pythonScript: {
-          exists: fs.existsSync(pythonScriptPath),
-          size: fs.existsSync(pythonScriptPath) ? (fs.statSync(pythonScriptPath).size / 1024).toFixed(2) + " KB" : "File not found",
-          permissions: fs.existsSync(pythonScriptPath) ? fs.statSync(pythonScriptPath).mode.toString(8).slice(-3) : "N/A"
-        }
+        files: {}
       };
       
-      // Check environment
-      const environment = {
-        nodeEnv: process.env.NODE_ENV || "development",
-        nodePath: process.env.PATH || "Not available",
-        pythonPath: process.env.PYTHONPATH || "Not available",
-        cwd: process.cwd(),
-        dirname: __dirname,
-      };
-      
-      // Check for alternative pickle file paths
-      const altPaths = [
-        "/home/runner/rfp-embeddings/rfp_embeddings.pkl",
-        "/home/runner/workspace/rfp_embeddings.pkl",
-        "/tmp/rfp_embeddings.pkl"
+      // Check important files
+      const filesToCheck = [
+        'rfp_embeddings.pkl',
+        'attached_assets/previous_responses.xlsx',
+        'server/rfp_response_generator.py'
       ];
       
-      const altPathChecks = {};
-      altPaths.forEach(p => {
-        altPathChecks[p] = {
-          exists: fs.existsSync(p),
-          size: fs.existsSync(p) ? (fs.statSync(p).size / (1024*1024)).toFixed(2) + " MB" : "File not found"
-        };
+      filesToCheck.forEach(file => {
+        const fullPath = path.join(baseDir, file);
+        try {
+          const exists = fs.existsSync(fullPath);
+          let size = 'N/A';
+          let permissions = 'N/A';
+          
+          if (exists) {
+            const stats = fs.statSync(fullPath);
+            size = `${(stats.size / (1024 * 1024)).toFixed(2)} MB`;
+            permissions = stats.mode.toString(8).slice(-3);
+          }
+          
+          deploymentInfo.files[file] = { exists, size, permissions };
+        } catch (err: any) {
+          deploymentInfo.files[file] = { exists: false, error: err.message };
+        }
       });
       
-      // Try running a simple Python module availability check
-      exec('python3 -c "import sys; import os; print(os.getcwd()); print(\',\'.join(sys.path))"', (err: any, stdout: string, stderr: string) => {
-        const pythonCwd = stdout.split('\n')[0];
-        const pythonPaths = stdout.split('\n')[1]?.split(',') || [];
-        
-        // Return all results
-        res.json({
-          message: "Deployment environment check completed",
-          timestamp: new Date().toISOString(),
-          fileChecks,
-          altPathChecks,
-          environment,
-          pythonInfo: {
-            cwd: pythonCwd,
-            paths: pythonPaths || []
-          },
-          error: err ? err.message : null,
-          stderr: stderr || null
-        });
-      });
+      // Add Python version check
+      try {
+        const { stdout } = await exec('python3 --version');
+        deploymentInfo.python = { version: stdout.trim() };
+      } catch (err: any) {
+        deploymentInfo.python = { error: err.message };
+      }
+      
+      res.json(deploymentInfo);
     } catch (error) {
       console.error("Error in deployment check:", error);
       res.status(500).json({ 
