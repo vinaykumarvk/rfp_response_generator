@@ -652,8 +652,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
             console.log(stdout);
             console.log("===== END RAW OUTPUT =====");
             
-            // Parse the output as JSON
-            const result = JSON.parse(stdout);
+            // Clean the output - find the first '{' and the last '}' to extract only the JSON part
+            let jsonStart = stdout.indexOf('{');
+            let jsonEnd = stdout.lastIndexOf('}');
+            
+            if (jsonStart === -1 || jsonEnd === -1 || jsonEnd <= jsonStart) {
+              throw new Error("Invalid JSON structure in Python output");
+            }
+            
+            // Extract only the JSON part of the output
+            const jsonStr = stdout.substring(jsonStart, jsonEnd + 1);
+            console.log("Extracted JSON:", jsonStr.substring(0, 100) + "...");
+            
+            // Parse the cleaned output as JSON
+            const result = JSON.parse(jsonStr);
             
             // Handle MOA Phase 1 response specially
             if (provider === "moa" && result.phase === 1) {
