@@ -585,33 +585,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`- DEEPSEEK_API_KEY: ${process.env.DEEPSEEK_API_KEY ? 'Present (starts with ' + process.env.DEEPSEEK_API_KEY.substring(0, 3) + '...)' : 'Not present'}`);
       
       // Spawn Python process with environment variables explicitly passed
-      const pythonEnv = {
+      const pythonEnv = { 
         ...process.env,
-        OPENAI_API_KEY: process.env.OPENAI_API_KEY,
-        ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
-        DEEPSEEK_API_KEY: process.env.DEEPSEEK_API_KEY,
+        OPENAI_API_KEY: process.env.OPENAI_API_KEY || '',
+        ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY || '',
+        DEEPSEEK_API_KEY: process.env.DEEPSEEK_API_KEY || '',
         NODE_ENV: process.env.NODE_ENV || 'production'
       };
       
-      const process = spawn('python3', [scriptPath, requirement, provider], { env: pythonEnv });
+      // Spawn Python process 
+      const pythonProcess = spawn('python3', [scriptPath, requirement, provider], { env: pythonEnv });
         
         let stdout = '';
         let stderr = '';
         
         // Collect stdout data
-        process.stdout.on('data', (data) => {
+        pythonProcess.stdout.on('data', (data) => {
           const output = data.toString();
           stdout += output;
           console.log("PYTHON STDOUT CHUNK:", output.length <= 500 ? output : output.substring(0, 497) + "...");
         });
         
         // Collect stderr data
-        process.stderr.on('data', (data) => {
+        pythonProcess.stderr.on('data', (data) => {
           stderr += data.toString();
         });
         
         // Handle process close
-        process.on('close', async (code) => {
+        pythonProcess.on('close', async (code) => {
           if (code !== 0) {
             console.error(`Python process exited with code ${code}`);
             console.error(`Error output: ${stderr}`);
