@@ -1719,8 +1719,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      // Spawn a process with a timeout
-      const pythonProcess = spawn('python3', [scriptPath, provider]);
+      // Prepare environment variables for Python process
+      const pythonEnv = {
+        ...process.env,
+        OPENAI_API_KEY: process.env.OPENAI_API_KEY || '',
+        ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY || '',
+        DEEPSEEK_API_KEY: process.env.DEEPSEEK_API_KEY || '',
+        NODE_ENV: process.env.NODE_ENV || 'production',
+        DEBUG_MODE: 'true',
+        DEPLOYMENT_ENV: process.env.REPL_ID ? 'replit' : 'local'
+      };
+
+      // Spawn a process with environment variables and timeout
+      const pythonProcess = spawn('python3', [scriptPath, provider], { env: pythonEnv });
       
       let stdout = '';
       
@@ -1799,8 +1810,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      // Spawn a process with a timeout
-      const pythonProcess = spawn('python3', [scriptPath, provider]);
+      // Prepare environment variables for Python process
+      const pythonEnv = {
+        ...process.env,
+        OPENAI_API_KEY: process.env.OPENAI_API_KEY || '',
+        ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY || '',
+        DEEPSEEK_API_KEY: process.env.DEEPSEEK_API_KEY || '',
+        NODE_ENV: process.env.NODE_ENV || 'production',
+        DEBUG_MODE: 'true',
+        DEPLOYMENT_ENV: process.env.REPL_ID ? 'replit' : 'local'
+      };
+      
+      // Spawn a process with environment variables and timeout
+      const pythonProcess = spawn('python3', [scriptPath, provider], { env: pythonEnv });
       
       let stdout = '';
       let stderr = '';
@@ -2157,12 +2179,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Missing requirement_text parameter" });
       }
       
+      // Prepare environment variables for Python process
+      const pythonEnv = {
+        ...process.env,
+        OPENAI_API_KEY: process.env.OPENAI_API_KEY || '',
+        ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY || '',
+        DEEPSEEK_API_KEY: process.env.DEEPSEEK_API_KEY || '',
+        NODE_ENV: process.env.NODE_ENV || 'production',
+        DEBUG_MODE: 'true',
+        DEPLOYMENT_ENV: process.env.REPL_ID ? 'replit' : 'local'
+      };
+      
+      console.log("Starting LLM test with environment:", {
+        OPENAI_API_KEY: process.env.OPENAI_API_KEY ? `Present (${process.env.OPENAI_API_KEY.substring(0, 5)}...)` : 'Not present',
+        ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY ? `Present (${process.env.ANTHROPIC_API_KEY.substring(0, 5)}...)` : 'Not present',
+        DEEPSEEK_API_KEY: process.env.DEEPSEEK_API_KEY ? `Present (${process.env.DEEPSEEK_API_KEY.substring(0, 5)}...)` : 'Not present'
+      });
+      
       // Call the Python script to process the requirement (positional arguments)
       const pythonProcess = spawn("python3", [
         path.join(getDirPath(), "rfp_response_generator.py"),
         requirement_text,
         modelProvider
-      ]);
+      ], { env: pythonEnv });
       
       let stdout = "";
       let stderr = "";
@@ -2339,8 +2378,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // Debug endpoint to check API keys in deployed environment
-  app.get("/api/check-keys", (_req: Request, res: Response) => {
+  // Enhanced debug endpoint to check API keys in deployed environment
+  app.get("/api/check-keys", async (_req: Request, res: Response) => {
     try {
       // Check keys with safe output (not revealing full keys)
       const openaiKeyAvailable = !!process.env.OPENAI_API_KEY;
@@ -2356,34 +2395,106 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const replId = process.env.REPL_ID || 'Not in Replit';
       const replSlug = process.env.REPL_SLUG || 'Not in Replit';
       
-      // Collect python dependency status
-      // This will help identify if python package installation is the issue
-      const pythonDeps = {
-        openai: true,  // Assumed available as they're in requirements
-        anthropic: true,
-        numpy: true,
-        pandas: true
+      // Try to check Python version
+      let pythonVersion = 'Unknown';
+      let pythonDeps: Record<string, any> = {
+        status: 'Unknown'
       };
       
-      res.json({
+      try {
+        // Attempt to get Python version
+        const { spawn } = await import('child_process');
+        const pythonProcess = spawn('python3', ['--version']);
+        
+        // Collect version info
+        let versionOutput = '';
+        pythonProcess.stdout.on('data', (data) => {
+          versionOutput += data.toString();
+        });
+        
+        pythonProcess.stderr.on('data', (data) => {
+          versionOutput += data.toString();
+        });
+        
+        // Wait for process to complete
+        await new Promise<void>((resolve) => {
+          pythonProcess.on('close', () => {
+            pythonVersion = versionOutput.trim() || 'Not detected';
+            resolve();
+          });
+        });
+        
+        // Check Python dependencies
+        const depCheckProcess = spawn('python3', ['-c', "import sys; import json; deps = {'openai': True, 'anthropic': True, 'numpy': True, 'pandas': True}; for dep in list(deps.keys()): try: __import__(dep); deps[dep] = True; except ImportError: deps[dep] = False; print(json.dumps(deps))"]);
+        
+        let depOutput = '';
+        depCheckProcess.stdout.on('data', (data) => {
+          depOutput += data.toString();
+        });
+        
+        // Wait for process to complete
+        await new Promise<void>((resolve) => {
+          depCheckProcess.on('close', () => {
+            try {
+              pythonDeps = JSON.parse(depOutput.trim());
+              pythonDeps.status = 'Checked';
+            } catch (e) {
+              pythonDeps = {
+                status: 'Check failed',
+                output: depOutput
+              };
+            }
+            resolve();
+          });
+        });
+      } catch (e) {
+        console.error("Error checking Python:", e);
+        pythonVersion = `Error checking: ${String(e)}`;
+      }
+      
+      // Create a comprehensive diagnostic result
+      const diagnostics = {
         environment: process.env.NODE_ENV || 'unknown',
-        openaiKeyAvailable,
-        anthropicKeyAvailable,
-        deepseekKeyAvailable,
-        databaseUrlAvailable,
-        sendgridKeyAvailable,
-        openaiKeyHint: openaiKeyAvailable ? `${process.env.OPENAI_API_KEY!.substring(0, 3)}...${process.env.OPENAI_API_KEY!.substring(process.env.OPENAI_API_KEY!.length - 3)}` : null,
-        anthropicKeyHint: anthropicKeyAvailable ? `${process.env.ANTHROPIC_API_KEY!.substring(0, 3)}...${process.env.ANTHROPIC_API_KEY!.substring(process.env.ANTHROPIC_API_KEY!.length - 3)}` : null,
-        deepseekKeyHint: deepseekKeyAvailable ? `${process.env.DEEPSEEK_API_KEY!.substring(0, 3)}...${process.env.DEEPSEEK_API_KEY!.substring(process.env.DEEPSEEK_API_KEY!.length - 3)}` : null,
-        system: {
+        apiKeys: {
+          openaiKeyAvailable,
+          anthropicKeyAvailable,
+          deepseekKeyAvailable,
+          sendgridKeyAvailable,
+          openaiKeyHint: openaiKeyAvailable ? `${process.env.OPENAI_API_KEY!.substring(0, 5)}...${process.env.OPENAI_API_KEY!.substring(process.env.OPENAI_API_KEY!.length - 3)}` : null,
+          anthropicKeyHint: anthropicKeyAvailable ? `${process.env.ANTHROPIC_API_KEY!.substring(0, 5)}...${process.env.ANTHROPIC_API_KEY!.substring(process.env.ANTHROPIC_API_KEY!.length - 3)}` : null,
+          deepseekKeyHint: deepseekKeyAvailable ? `${process.env.DEEPSEEK_API_KEY!.substring(0, 5)}...${process.env.DEEPSEEK_API_KEY!.substring(process.env.DEEPSEEK_API_KEY!.length - 3)}` : null,
+        },
+        database: {
+          databaseUrlAvailable,
+          postgresHostAvailable: !!process.env.PGHOST,
+          postgresUserAvailable: !!process.env.PGUSER,
+          postgresDbAvailable: !!process.env.PGDATABASE,
+          postgresPassAvailable: !!process.env.PGPASSWORD ? true : false,
+          postgresPortAvailable: !!process.env.PGPORT
+        },
+        nodeSystem: {
           nodeVersion,
           platform,
+          arch: process.arch,
+          memoryUsage: process.memoryUsage(),
+          uptime: process.uptime(),
+          cwd: process.cwd()
+        },
+        replit: {
           isReplit,
           replId,
           replSlug,
-          pythonDeps
-        }
-      });
+          owner: process.env.REPL_OWNER || 'Unknown',
+          envVarsCount: Object.keys(process.env).length
+        },
+        python: {
+          version: pythonVersion,
+          dependencies: pythonDeps
+        },
+        timestamp: new Date().toISOString()
+      };
+      
+      res.json(diagnostics);
     } catch (error) {
       console.error("Error checking API keys:", error);
       res.status(500).json({ message: "Error checking API keys", error: String(error) });
