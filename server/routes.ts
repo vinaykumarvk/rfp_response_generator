@@ -578,8 +578,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const scriptPath = path.join(getDirPath(), 'rfp_response_generator.py');
       
       return new Promise<void>((resolve, reject) => {
-        // Spawn Python process
-        const process = spawn('python3', [scriptPath, requirement, provider]);
+        // Enhanced debugging for environment variables in production
+      console.log(`Environment variables being passed to Python:`);
+      console.log(`- OPENAI_API_KEY: ${process.env.OPENAI_API_KEY ? 'Present (starts with ' + process.env.OPENAI_API_KEY.substring(0, 3) + '...)' : 'Not present'}`);
+      console.log(`- ANTHROPIC_API_KEY: ${process.env.ANTHROPIC_API_KEY ? 'Present (starts with ' + process.env.ANTHROPIC_API_KEY.substring(0, 3) + '...)' : 'Not present'}`);
+      console.log(`- DEEPSEEK_API_KEY: ${process.env.DEEPSEEK_API_KEY ? 'Present (starts with ' + process.env.DEEPSEEK_API_KEY.substring(0, 3) + '...)' : 'Not present'}`);
+      
+      // Spawn Python process with environment variables explicitly passed
+      const pythonEnv = {
+        ...process.env,
+        OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+        ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
+        DEEPSEEK_API_KEY: process.env.DEEPSEEK_API_KEY,
+        NODE_ENV: process.env.NODE_ENV || 'production'
+      };
+      
+      const process = spawn('python3', [scriptPath, requirement, provider], { env: pythonEnv });
         
         let stdout = '';
         let stderr = '';
