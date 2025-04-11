@@ -127,3 +127,29 @@ export const templateSchema = z.object({
 });
 
 export type Template = z.infer<typeof templateSchema>;
+
+// Embeddings table schema - We'll create this using raw SQL since we need pgvector
+export const embeddings = pgTable("embeddings", {
+  id: serial("id").primaryKey(),
+  // Metadata fields
+  category: text("category").notNull(),
+  requirement: text("requirement").notNull(), 
+  response: text("response").notNull(),
+  reference: text("reference"),
+  // Store other payload data as JSON
+  payload: text("payload").notNull(), // JSON string of additional data
+  // Note: The vector field will be created using raw SQL, we just define it here for type-safety
+  // but exclude it from the create table operation
+  // Timestamp for when this embedding was created
+  timestamp: timestamp("timestamp").defaultNow().notNull(),
+});
+
+// Insert schema for embeddings
+export const insertEmbeddingSchema = createInsertSchema(embeddings).omit({
+  id: true,
+  timestamp: true,
+});
+
+// Types
+export type InsertEmbedding = z.infer<typeof insertEmbeddingSchema> & { embedding: number[] };
+export type Embedding = typeof embeddings.$inferSelect & { embedding: number[] };
