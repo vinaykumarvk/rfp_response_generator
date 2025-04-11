@@ -2290,15 +2290,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Check keys with safe output (not revealing full keys)
       const openaiKeyAvailable = !!process.env.OPENAI_API_KEY;
       const anthropicKeyAvailable = !!process.env.ANTHROPIC_API_KEY;
+      const deepseekKeyAvailable = !!process.env.DEEPSEEK_API_KEY;
       const databaseUrlAvailable = !!process.env.DATABASE_URL;
+      const sendgridKeyAvailable = !!process.env.SENDGRID_API_KEY;
       
       res.json({
         environment: process.env.NODE_ENV || 'unknown',
         openaiKeyAvailable,
         anthropicKeyAvailable,
+        deepseekKeyAvailable,
         databaseUrlAvailable,
+        sendgridKeyAvailable,
         openaiKeyHint: openaiKeyAvailable ? `${process.env.OPENAI_API_KEY!.substring(0, 3)}...${process.env.OPENAI_API_KEY!.substring(process.env.OPENAI_API_KEY!.length - 3)}` : null,
         anthropicKeyHint: anthropicKeyAvailable ? `${process.env.ANTHROPIC_API_KEY!.substring(0, 3)}...${process.env.ANTHROPIC_API_KEY!.substring(process.env.ANTHROPIC_API_KEY!.length - 3)}` : null,
+        deepseekKeyHint: deepseekKeyAvailable ? `${process.env.DEEPSEEK_API_KEY!.substring(0, 3)}...${process.env.DEEPSEEK_API_KEY!.substring(process.env.DEEPSEEK_API_KEY!.length - 3)}` : null,
       });
     } catch (error) {
       console.error("Error checking API keys:", error);
