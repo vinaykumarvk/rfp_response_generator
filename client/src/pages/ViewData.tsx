@@ -369,6 +369,7 @@ export default function ViewData() {
   };
   
   // Function to email the selected responses directly with HTML formatting
+  // and simultaneously generate a markdown file for download
   const handleEmailMarkdown = () => {
     // Get selected items data
     const selectedData = excelData.filter(item => selectedItems.includes(item.id || 0));
@@ -384,20 +385,28 @@ export default function ViewData() {
     
     // Create a subject line based on RFP name if all items are from the same RFP
     const rfpNames = new Set(selectedData.map(item => item.rfpName || 'unnamed'));
+    const rfpNameForFile = rfpNames.size === 1 
+      ? Array.from(rfpNames)[0] 
+      : `multiple-rfps-${new Date().toISOString().split('T')[0]}`;
+    
     const subject = rfpNames.size === 1 
       ? `RFP Responses for ${Array.from(rfpNames)[0]}` 
       : `RFP Responses Export (${selectedData.length} items)`;
     
     try {
-      // Generate HTML content with the selected data
-      // We're still using sendEmailWithContent but skipping the markdown generation
-      // It will directly use the selected data to create HTML
+      // Generate markdown content
       const markdownContent = generateMarkdownContent(selectedData);
+      
+      // 1. Generate and download the markdown file
+      const filename = `${rfpNameForFile}-responses.md`;
+      downloadMarkdownFile(markdownContent, filename);
+      
+      // 2. Send email
       sendEmailWithContent(markdownContent, subject);
       
       toast({
-        title: "Email Client Opened",
-        description: "Email content prepared with formatted HTML responses",
+        title: "Email and Markdown Export",
+        description: "Email opened and markdown file downloaded. Please attach the markdown file to your email manually.",
       });
     } catch (error) {
       console.error('Error preparing email:', error);
@@ -673,7 +682,7 @@ export default function ViewData() {
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => handleBulkAction('mail')} className="gap-2">
                         <Mail className="h-4 w-4" />
-                        <span>Email Selected</span>
+                        <span>Email + MD Download</span>
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem onClick={() => handleBulkAction('delete')} className="text-red-600 gap-2">
