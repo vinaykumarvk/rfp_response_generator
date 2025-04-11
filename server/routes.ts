@@ -2511,7 +2511,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // Simple deployment check endpoint
+  // Comprehensive deployment check endpoint
   app.get("/api/deployment-check", async (_req: Request, res: Response) => {
     try {
       const exec = promisify(execCallback);
@@ -2524,14 +2524,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         paths: {
           cwd: baseDir
         },
-        files: {}
+        files: {},
+        api_keys: {},
+        python_modules: {},
+        deployment_platform: "Replit"
       };
       
       // Check important files
       const filesToCheck = [
         'rfp_embeddings.pkl',
         'attached_assets/previous_responses.xlsx',
-        'server/rfp_response_generator.py'
+        'server/rfp_response_generator.py',
+        'server/moa_synthesis.py',
+        'server/direct_test.py',
+        'server/api_test.py',
+        '.env.production'
       ];
       
       filesToCheck.forEach(file => {
@@ -2553,12 +2560,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       });
       
-      // Add Python version check
+      // Check API keys (only presence, not the actual values)
+      const apiKeys = {
+        'OPENAI_API_KEY': !!process.env.OPENAI_API_KEY,
+        'ANTHROPIC_API_KEY': !!process.env.ANTHROPIC_API_KEY,
+        'DEEPSEEK_API_KEY': !!process.env.DEEPSEEK_API_KEY,
+        'SENDGRID_API_KEY': !!process.env.SENDGRID_API_KEY
+      };
+      deploymentInfo.api_keys = apiKeys;
+      
+      // Add Python version and module checks
       try {
-        const { stdout } = await exec('python3 --version');
-        deploymentInfo.python = { version: stdout.trim() };
+        const { stdout: pythonVersion } = await exec('python3 --version');
+        deploymentInfo.python = { version: pythonVersion.trim() };
+        
+        // Check for critical Python modules
+        const modulesToCheck = ['openai', 'anthropic', 'pandas', 'numpy', 'sklearn', 'gdown'];
+        for (const module of modulesToCheck) {
+          try {
+            const { stdout } = await exec(`python3 -c "import ${module}; print('${module} is available')" 2>/dev/null || echo "${module} is not available"`);
+            deploymentInfo.python_modules[module] = stdout.trim().includes('available');
+          } catch (err) {
+            deploymentInfo.python_modules[module] = false;
+          }
+        }
       } catch (err: any) {
         deploymentInfo.python = { error: err.message };
+      }
+      
+      // Check for alternative pickle file paths
+      const altPaths = [
+        "/home/runner/rfp-embeddings/rfp_embeddings.pkl",
+        "/home/runner/workspace/rfp_embeddings.pkl",
+        "/tmp/rfp_embeddings.pkl"
+      ];
+      
+      deploymentInfo.alt_embeddings_paths = {};
+      altPaths.forEach(p => {
+        try {
+          const exists = fs.existsSync(p);
+          deploymentInfo.alt_embeddings_paths[p] = {
+            exists,
+            size: exists ? `${(fs.statSync(p).size / (1024*1024)).toFixed(2)} MB` : "File not found"
+          };
+        } catch (err) {
+          deploymentInfo.alt_embeddings_paths[p] = { exists: false, error: 'Error checking path' };
+        }
+      });
+      
+      // Check ports and network
+      try {
+        const { stdout: netstat } = await exec('netstat -tulpn 2>/dev/null || echo "netstat not available"');
+        deploymentInfo.network = { 
+          ports_in_use: netstat.includes('netstat not available') ? 
+            'Unable to check' : 
+            netstat.split('\n').filter(line => line.includes('LISTEN')).map(line => line.trim())
+        };
+      } catch (err) {
+        deploymentInfo.network = { error: 'Failed to check network information' };
+      }
+      
+      // Check database connection
+      if (process.env.DATABASE_URL) {
+        deploymentInfo.database = { available: true };
+        // We don't actually test the connection to avoid potential side effects
+      } else {
+        deploymentInfo.database = { available: false };
       }
       
       res.json(deploymentInfo);
