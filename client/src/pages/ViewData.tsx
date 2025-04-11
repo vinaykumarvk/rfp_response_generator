@@ -682,7 +682,7 @@ export default function ViewData() {
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => handleBulkAction('mail')} className="gap-2">
                         <Mail className="h-4 w-4" />
-                        <span>Email + MD Download</span>
+                        <span>Email Responses</span>
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem onClick={() => handleBulkAction('delete')} className="text-red-600 gap-2">
