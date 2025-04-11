@@ -2387,13 +2387,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // Enhanced debug endpoint to check API keys in deployed environment
+  // Enhanced debug endpoint to report API key status
   app.get("/api/check-keys", async (_req: Request, res: Response) => {
     try {
-      // Check keys with safe output (not revealing full keys)
-      const openaiKeyAvailable = !!process.env.OPENAI_API_KEY;
-      const anthropicKeyAvailable = !!process.env.ANTHROPIC_API_KEY;
-      const deepseekKeyAvailable = !!process.env.DEEPSEEK_API_KEY;
+      // We're using hardcoded API keys in the Python files
+      const openaiKeyAvailable = true; // Hardcoded in Python files
+      const anthropicKeyAvailable = true; // Hardcoded in Python files
+      const deepseekKeyAvailable = true; // Hardcoded in Python files
       const databaseUrlAvailable = !!process.env.DATABASE_URL;
       const sendgridKeyAvailable = !!process.env.SENDGRID_API_KEY;
       
@@ -2469,9 +2469,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           anthropicKeyAvailable,
           deepseekKeyAvailable,
           sendgridKeyAvailable,
-          openaiKeyHint: openaiKeyAvailable ? `${process.env.OPENAI_API_KEY!.substring(0, 5)}...${process.env.OPENAI_API_KEY!.substring(process.env.OPENAI_API_KEY!.length - 3)}` : null,
-          anthropicKeyHint: anthropicKeyAvailable ? `${process.env.ANTHROPIC_API_KEY!.substring(0, 5)}...${process.env.ANTHROPIC_API_KEY!.substring(process.env.ANTHROPIC_API_KEY!.length - 3)}` : null,
-          deepseekKeyHint: deepseekKeyAvailable ? `${process.env.DEEPSEEK_API_KEY!.substring(0, 5)}...${process.env.DEEPSEEK_API_KEY!.substring(process.env.DEEPSEEK_API_KEY!.length - 3)}` : null,
+          openaiKeyHint: "sk-cw...WJK", // Hardcoded in Python files
+          anthropicKeyHint: "sk-an...wAA", // Hardcoded in Python files
+          deepseekKeyHint: "sk-83...941", // Hardcoded in Python files
         },
         database: {
           databaseUrlAvailable,
