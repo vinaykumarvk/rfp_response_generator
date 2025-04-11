@@ -4,6 +4,13 @@ import { setupVite, serveStatic, log } from "./vite";
 import { addModelTestEndpoint } from "./routes_model_test";
 import { addSimpleTestEndpoint } from "./routes_simple_test";
 
+// Debug API keys availability
+console.log("=== API KEYS AVAILABILITY CHECK ===");
+console.log("OpenAI API Key available:", process.env.OPENAI_API_KEY ? "Yes (starts with " + process.env.OPENAI_API_KEY.substring(0, 3) + "...)" : "No");
+console.log("Anthropic API Key available:", process.env.ANTHROPIC_API_KEY ? "Yes (starts with " + process.env.ANTHROPIC_API_KEY.substring(0, 3) + "...)" : "No");
+console.log("DATABASE_URL available:", process.env.DATABASE_URL ? "Yes" : "No");
+console.log("==================================");
+
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));

@@ -2283,6 +2283,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     }
   });
+  
+  // Debug endpoint to check API keys in deployed environment
+  app.get("/api/check-keys", (_req: Request, res: Response) => {
+    try {
+      // Check keys with safe output (not revealing full keys)
+      const openaiKeyAvailable = !!process.env.OPENAI_API_KEY;
+      const anthropicKeyAvailable = !!process.env.ANTHROPIC_API_KEY;
+      const databaseUrlAvailable = !!process.env.DATABASE_URL;
+      
+      res.json({
+        environment: process.env.NODE_ENV || 'unknown',
+        openaiKeyAvailable,
+        anthropicKeyAvailable,
+        databaseUrlAvailable,
+        openaiKeyHint: openaiKeyAvailable ? `${process.env.OPENAI_API_KEY!.substring(0, 3)}...${process.env.OPENAI_API_KEY!.substring(process.env.OPENAI_API_KEY!.length - 3)}` : null,
+        anthropicKeyHint: anthropicKeyAvailable ? `${process.env.ANTHROPIC_API_KEY!.substring(0, 3)}...${process.env.ANTHROPIC_API_KEY!.substring(process.env.ANTHROPIC_API_KEY!.length - 3)}` : null,
+      });
+    } catch (error) {
+      console.error("Error checking API keys:", error);
+      res.status(500).json({ message: "Error checking API keys", error: String(error) });
+    }
+  });
 
   const httpServer = createServer(app);
   return httpServer;
