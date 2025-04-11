@@ -1,5 +1,11 @@
 import { db, pool } from './db';
 import { sql } from 'drizzle-orm';
+import { fileURLToPath } from 'url';
+import path from 'path';
+
+// Get the current file URL and convert it to a path
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 /**
  * Script to create embeddings table with vector support
@@ -49,15 +55,17 @@ async function createEmbeddingsTable() {
 // Export the function so it can be called from other files
 export { createEmbeddingsTable };
 
-// Run the migration if this script is called directly
-if (require.main === module) {
-  createEmbeddingsTable()
-    .then(() => {
-      console.log('Migration completed successfully!');
-      process.exit(0);
-    })
-    .catch((error) => {
-      console.error('Migration failed:', error);
-      process.exit(1);
-    });
-}
+// Always run the migration when this script is loaded
+console.log('Starting embeddings table migration...');
+console.log('Current directory:', process.cwd());
+console.log('File path:', __filename);
+console.log('import.meta.url:', import.meta.url);
+
+createEmbeddingsTable()
+  .then(() => {
+    console.log('Migration completed successfully!');
+  })
+  .catch((error) => {
+    console.error('Migration failed:', error);
+    process.exit(1);
+  });
