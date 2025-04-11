@@ -1,5 +1,22 @@
 # RFP Response Generator - Version History
 
+## Version 0.6 - April 11, 2025
+
+### Deployment Optimization
+- Added comprehensive deployment diagnostic tools (3 specialized endpoints)
+- Enhanced embeddings file handling with Google Drive integration for production
+- Fixed path resolution issues for cross-environment compatibility
+- Implemented improved error logging and diagnostics for production troubleshooting
+- Added fallback mechanisms for critical resources
+- Created production-specific detection and handling logic
+
+### Technical Improvements
+- Added robust error handling for embeddings file access
+- Created deployment verification scripts with detailed reporting
+- Enhanced API connectivity tests with verbose logging
+- Improved file system interaction with proper permissions handling
+- Implemented environment detection for conditional behavior
+
 ## Version 0.5 - April 11, 2025
 
 ### Model Testing Verification & Bug Fixes
