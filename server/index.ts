@@ -5,14 +5,48 @@ import { addModelTestEndpoint } from "./routes_model_test";
 import { addSimpleTestEndpoint } from "./routes_simple_test";
 
 // Enhanced API keys and environment configuration check
-console.log("=== API KEYS AVAILABILITY CHECK ===");
-console.log("OpenAI API Key available:", process.env.OPENAI_API_KEY ? "Yes (starts with " + process.env.OPENAI_API_KEY.substring(0, 5) + "...)" : "No");
-console.log("Anthropic API Key available:", process.env.ANTHROPIC_API_KEY ? "Yes (starts with " + process.env.ANTHROPIC_API_KEY.substring(0, 5) + "...)" : "No");
-console.log("DeepSeek API Key available:", process.env.DEEPSEEK_API_KEY ? "Yes (starts with " + (process.env.DEEPSEEK_API_KEY ? process.env.DEEPSEEK_API_KEY.substring(0, 5) : "") + "...)" : "No");
-console.log("DATABASE_URL available:", process.env.DATABASE_URL ? "Yes" : "No");
-console.log("Current NODE_ENV:", process.env.NODE_ENV || "development");
-console.log("Runtime environment:", process.env.REPL_ID ? "Replit" : "Other");
-console.log("==================================");
+console.log("=== COMPREHENSIVE ENVIRONMENT DIAGNOSTICS ===");
+console.log("API Keys:");
+console.log("- OpenAI API Key available:", process.env.OPENAI_API_KEY ? "Yes (starts with " + process.env.OPENAI_API_KEY.substring(0, 5) + "...)" : "No");
+console.log("- Anthropic API Key available:", process.env.ANTHROPIC_API_KEY ? "Yes (starts with " + process.env.ANTHROPIC_API_KEY.substring(0, 5) + "...)" : "No");
+console.log("- DeepSeek API Key available:", process.env.DEEPSEEK_API_KEY ? "Yes (starts with " + (process.env.DEEPSEEK_API_KEY ? process.env.DEEPSEEK_API_KEY.substring(0, 5) : "") + "...)" : "No");
+console.log("- SendGrid API Key available:", process.env.SENDGRID_API_KEY ? "Yes" : "No");
+
+console.log("\nDatabase Configuration:");
+console.log("- DATABASE_URL available:", process.env.DATABASE_URL ? "Yes" : "No");
+console.log("- Postgres env vars available:", 
+  (process.env.PGHOST && process.env.PGUSER && process.env.PGDATABASE && process.env.PGPASSWORD && process.env.PGPORT) 
+    ? "All present" 
+    : "Some missing");
+
+console.log("\nRuntime Environment:");
+console.log("- Current NODE_ENV:", process.env.NODE_ENV || "development");
+console.log("- Runtime environment:", process.env.REPL_ID ? "Replit" : "Other");
+console.log("- Node.js version:", process.version);
+console.log("- Platform:", process.platform);
+console.log("- Architecture:", process.arch);
+console.log("- Current directory:", process.cwd());
+
+// Log total environment variables count without revealing values
+const envVarCategories = {
+  API_KEYS: Object.keys(process.env).filter(key => key.includes('KEY') || key.includes('TOKEN')).length,
+  DATABASE: Object.keys(process.env).filter(key => key.includes('DB') || key.includes('SQL') || key.startsWith('PG')).length,
+  SYSTEM: Object.keys(process.env).filter(key => key.startsWith('NODE') || key.startsWith('PATH')).length,
+  REPLIT: Object.keys(process.env).filter(key => key.includes('REPL')).length,
+  OTHER: Object.keys(process.env).filter(key => 
+    !key.includes('KEY') && !key.includes('TOKEN') && 
+    !key.includes('DB') && !key.includes('SQL') && !key.startsWith('PG') &&
+    !key.startsWith('NODE') && !key.startsWith('PATH') && 
+    !key.includes('REPL')).length
+};
+
+console.log("\nEnvironment Variables Stats:");
+console.log(`- Total: ${Object.keys(process.env).length} variables`);
+console.log(`- By category: ${JSON.stringify(envVarCategories)}`);
+
+// Current time for timestamp
+console.log("\nServer startup time:", new Date().toISOString());
+console.log("==================================================");
 
 // Check for SendGrid API key
 if (!process.env.SENDGRID_API_KEY) {
