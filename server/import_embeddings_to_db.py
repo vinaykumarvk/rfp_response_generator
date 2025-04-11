@@ -56,6 +56,8 @@ def import_embeddings_to_postgres(max_embeddings=5000):
         max_embeddings: Maximum number of embeddings to import, to manage resource usage
                        Set to None to import all
     """
+    # Cast max_embeddings to int if it's not None
+    max_embeddings = int(max_embeddings) if max_embeddings is not None else None
     start_time = time.time()
     
     # Connect to the database
@@ -96,7 +98,7 @@ def import_embeddings_to_postgres(max_embeddings=5000):
     """)
     
     # Prepare data for batch insertion
-    batch_size = 100
+    batch_size = 250  # Increased batch size for faster import
     inserted_count = 0
     total_count = len(points)
     
@@ -207,4 +209,5 @@ def import_embeddings_to_postgres(max_embeddings=5000):
 
 if __name__ == "__main__":
     # Run the import process
-    import_embeddings_to_postgres()
+    # Pass None to import all embeddings
+    import_embeddings_to_postgres(max_embeddings=None)
