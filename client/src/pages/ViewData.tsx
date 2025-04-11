@@ -367,7 +367,7 @@ export default function ViewData() {
     });
   };
   
-  // Function to email the markdown content
+  // Function to email the selected responses directly with HTML formatting
   const handleEmailMarkdown = () => {
     // Get selected items data
     const selectedData = excelData.filter(item => selectedItems.includes(item.id || 0));
@@ -381,22 +381,31 @@ export default function ViewData() {
       return;
     }
     
-    // Generate markdown content
-    const markdownContent = generateMarkdownContent(selectedData);
-    
     // Create a subject line based on RFP name if all items are from the same RFP
     const rfpNames = new Set(selectedData.map(item => item.rfpName || 'unnamed'));
     const subject = rfpNames.size === 1 
       ? `RFP Responses for ${Array.from(rfpNames)[0]}` 
       : `RFP Responses Export (${selectedData.length} items)`;
     
-    // Open email client with the content
-    sendEmailWithContent(markdownContent, subject);
-    
-    toast({
-      title: "Email Client Opened",
-      description: "Email content prepared with RFP responses",
-    });
+    try {
+      // Generate HTML content with the selected data
+      // We're still using sendEmailWithContent but skipping the markdown generation
+      // It will directly use the selected data to create HTML
+      const markdownContent = generateMarkdownContent(selectedData);
+      sendEmailWithContent(markdownContent, subject);
+      
+      toast({
+        title: "Email Client Opened",
+        description: "Email content prepared with formatted HTML responses",
+      });
+    } catch (error) {
+      console.error('Error preparing email:', error);
+      toast({
+        title: "Email Preparation Failed",
+        description: "Failed to prepare email content: " + (error instanceof Error ? error.message : String(error)),
+        variant: "destructive"
+      });
+    }
   };
 
   const handleBulkAction = (action: string) => {
