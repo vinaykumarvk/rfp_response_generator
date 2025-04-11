@@ -596,8 +596,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Requirement text is required" });
       }
       
-      // Use Python script to generate response
-      const scriptPath = path.join(getDirPath(), 'rfp_response_generator.py');
+      // Use PostgreSQL-based Python script to generate response
+      const scriptPath = path.join(getDirPath(), 'rfp_response_generator_pg.py');
+      console.log(`Using PostgreSQL-based generator script: ${scriptPath}`);
       
       return new Promise<void>((resolve, reject) => {
         // Enhanced debugging for environment variables in production
@@ -615,10 +616,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         NODE_ENV: process.env.NODE_ENV || 'production',
         DEBUG_MODE: 'true',
         DEPLOYMENT_ENV: process.env.REPL_ID ? 'replit' : 'local',
-        USING_HARDCODED_KEYS: 'true'
+        USING_HARDCODED_KEYS: 'true',
+        // Flag to indicate we're using PostgreSQL for vector search
+        USING_PGVECTOR: 'true'
       };
       
-      // Spawn Python process 
+      // Spawn Python process with PostgreSQL-based script
       const pythonProcess = spawn('python3', [scriptPath, requirement, provider], { env: pythonEnv });
         
         let stdout = '';
