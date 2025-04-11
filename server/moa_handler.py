@@ -158,8 +158,8 @@ def moa_generate_response(requirement, category="Wealth Management Software", pr
         print(f"Requesting response from {model}...")
         model_key = model.lower()
         
-        # Get response with timeout handling
-        result = get_model_response(structured_prompt, model, timeout=timeouts[model])
+        # Get response with consistent 3-minute timeout
+        result = get_model_response(structured_prompt, model)
         model_responses[model_key] = result
         
         if result["status"] == "success":
