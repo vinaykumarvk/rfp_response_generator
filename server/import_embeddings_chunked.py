@@ -259,7 +259,48 @@ def create_indexes():
     try:
         print("Creating/rebuilding indexes...")
         
-        # Vector index
+        # Increase maintenance_work_mem temporarily for index creation
+        try:
+            cursor.execute("SHOW maintenance_work_mem;")
+            original_mem = cursor.fetchone()[0]
+            print(f"Current maintenance_work_mem: {original_mem}")
+            
+            # Set to 128MB temporarily
+            cursor.execute("SET maintenance_work_mem = '128MB';")
+            cursor.execute("SHOW maintenance_work_mem;")
+            new_mem = cursor.fetchone()[0]
+            print(f"Increased maintenance_work_mem to: {new_mem}")
+            
+            conn.commit()
+        except Exception as e:
+            print(f"Warning: Could not adjust maintenance_work_mem: {str(e)}")
+            conn.rollback()
+        
+        # Create category index (simplest)
+        try:
+            cursor.execute("DROP INDEX IF EXISTS embeddings_category_idx;")
+            cursor.execute("CREATE INDEX embeddings_category_idx ON embeddings(category);")
+            conn.commit()
+            print("Successfully created category index")
+        except Exception as e:
+            print(f"Error creating category index: {str(e)}")
+            conn.rollback()
+        
+        # Create text search index
+        try:
+            # First make sure the extension exists
+            cursor.execute("CREATE EXTENSION IF NOT EXISTS pg_trgm;")
+            conn.commit()
+            
+            cursor.execute("DROP INDEX IF EXISTS embeddings_requirement_idx;")
+            cursor.execute("CREATE INDEX embeddings_requirement_idx ON embeddings USING gin(requirement gin_trgm_ops);")
+            conn.commit()
+            print("Successfully created requirement gin index")
+        except Exception as e:
+            print(f"Error creating requirement index: {str(e)}")
+            conn.rollback()
+        
+        # Create vector index (most complex)
         try:
             cursor.execute("DROP INDEX IF EXISTS embeddings_vector_idx;")
             cursor.execute("""
@@ -268,29 +309,51 @@ def create_indexes():
             USING ivfflat (embedding vector_cosine_ops)
             WITH (lists = 100);
             """)
+            conn.commit()
             print("Successfully created vector index")
         except Exception as e:
             print(f"Error creating vector index: {str(e)}")
-        
-        # Text indexes
+            # If vector index fails, try with ivfflat with fewer lists
+            try:
+                print("Retrying with smaller lists parameter...")
+                cursor.execute("DROP INDEX IF EXISTS embeddings_vector_idx;")
+                cursor.execute("""
+                CREATE INDEX embeddings_vector_idx 
+                ON embeddings 
+                USING ivfflat (embedding vector_cosine_ops)
+                WITH (lists = 50);
+                """)
+                conn.commit()
+                print("Successfully created vector index with reduced lists")
+            except Exception as e2:
+                print(f"Error creating vector index with reduced lists: {str(e2)}")
+                conn.rollback()
+                
+                # If that fails too, try with hnsw index type
+                try:
+                    print("Trying HNSW index type instead...")
+                    cursor.execute("DROP INDEX IF EXISTS embeddings_vector_idx;")
+                    cursor.execute("""
+                    CREATE INDEX embeddings_vector_idx 
+                    ON embeddings 
+                    USING hnsw (embedding vector_cosine_ops)
+                    WITH (m = 16, ef_construction = 64);
+                    """)
+                    conn.commit()
+                    print("Successfully created HNSW vector index")
+                except Exception as e3:
+                    print(f"Error creating HNSW vector index: {str(e3)}")
+                    conn.rollback()
+            
+        # Reset maintenance_work_mem to original value
         try:
-            cursor.execute("DROP INDEX IF EXISTS embeddings_category_idx;")
-            cursor.execute("CREATE INDEX embeddings_category_idx ON embeddings(category);")
-            print("Successfully created category index")
+            cursor.execute(f"SET maintenance_work_mem = '{original_mem}';")
+            print(f"Reset maintenance_work_mem to original value: {original_mem}")
+            conn.commit()
         except Exception as e:
-            print(f"Error creating category index: {str(e)}")
-        
-        try:
-            cursor.execute("DROP INDEX IF EXISTS embeddings_requirement_idx;")
-            cursor.execute("CREATE INDEX embeddings_requirement_idx ON embeddings USING gin(requirement gin_trgm_ops);")
-            print("Successfully created requirement gin index")
-        except Exception as e:
-            print(f"Error creating requirement index: {str(e)}")
-        
-        conn.commit()
+            print(f"Warning: Could not reset maintenance_work_mem: {str(e)}")
     except Exception as e:
         print(f"Error during index creation: {str(e)}")
-        conn.rollback()
     finally:
         cursor.close()
         conn.close()
