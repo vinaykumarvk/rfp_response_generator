@@ -126,9 +126,23 @@ app.use((req, res, next) => {
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
+    
+    // Enhanced error logging for deployment troubleshooting
+    console.error('======= ERROR DETAILS =======');
+    console.error(`Status: ${status}`);
+    console.error(`Message: ${message}`);
+    console.error(`Path: ${_req.path}`);
+    console.error(`Stack: ${err.stack || 'No stack available'}`);
+    console.error('============================');
 
-    res.status(status).json({ message });
-    throw err;
+    res.status(status).json({ 
+      message,
+      status,
+      path: _req.path,
+      timestamp: new Date().toISOString(),
+      // Don't expose stack trace to client in production
+      ...(app.get("env") === "development" ? { stack: err.stack } : {})
+    });
   });
 
   // importantly only setup vite in development and after
