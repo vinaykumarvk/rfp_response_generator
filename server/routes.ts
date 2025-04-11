@@ -2203,6 +2203,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // API endpoint for sending emails with attachments via SendGrid
+  app.post("/api/send-email", async (req: Request, res: Response) => {
+    try {
+      const { 
+        to, 
+        subject, 
+        markdownContent,
+        filename = "rfp-responses.md" 
+      } = req.body;
+      
+      if (!to || !subject || !markdownContent) {
+        return res.status(400).json({ 
+          success: false, 
+          message: "Missing required fields (to, subject, and markdownContent)" 
+        });
+      }
+
+      // Create a temporary file with the markdown content
+      const tempFilePath = createTempFile(markdownContent, filename);
+      
+      // Convert the file to a base64 attachment for SendGrid
+      const attachment = fileToBase64Attachment(tempFilePath, filename);
+      
+      // Send the email with the attachment
+      // Per user request: Use markdown text in the email body, not HTML
+      const result = await sendEmail({
+        to,
+        subject,
+        text: markdownContent, // Use markdown text as email body
+        attachments: [attachment]
+      });
+      
+      // Clean up the temporary file
+      fs.unlinkSync(tempFilePath);
+      
+      return res.status(200).json(result);
+    } catch (error) {
+      console.error('Error sending email:', error);
+      return res.status(500).json({ 
+        success: false, 
+        message: `Failed to send email: ${error instanceof Error ? error.message : String(error)}` 
+      });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
