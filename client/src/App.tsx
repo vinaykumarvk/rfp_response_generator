@@ -13,6 +13,7 @@ import DirectLlmTestPage from "@/pages/DirectLlmTestPage";
 import SimpleApiTest from "@/pages/SimpleApiTest";
 import LlmResponseViewer from "@/pages/LlmResponseViewer";
 import MoaTestPage from "@/pages/MoaTestPage";
+import QuickMoaTest from "@/pages/QuickMoaTest";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import Sidebar from "@/components/Sidebar";
@@ -59,6 +60,7 @@ function Router() {
         <Route path="/simple-api-test" component={SimpleApiTest} />
         <Route path="/llm-response-viewer" component={LlmResponseViewer} />
         <Route path="/moa-test" component={MoaTestPage} />
+        <Route path="/quick-moa-test" component={QuickMoaTest} />
         <Route component={NotFound} />
       </Switch>
     </AppLayout>

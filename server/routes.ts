@@ -2837,6 +2837,100 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Quick MOA test endpoint - simplified for debugging
+  app.post("/api/quick-moa-test", async (req: Request, res: Response) => {
+    try {
+      const { requirement } = req.body;
+      
+      if (!requirement) {
+        return res.status(400).json({ 
+          success: false,
+          message: "Missing requirement parameter" 
+        });
+      }
+      
+      console.log(`Quick MOA test for requirement: "${requirement.substring(0, 50)}..."`);
+      
+      // Use our quick_moa_handler.py script
+      const scriptPath = path.join(process.cwd(), 'server/quick_moa_handler.py');
+      
+      if (!fs.existsSync(scriptPath)) {
+        console.error(`Script not found at: ${scriptPath}`);
+        return res.status(500).json({
+          success: false,
+          error: `Quick MOA test script not found at ${scriptPath}`
+        });
+      }
+      
+      console.log(`Using script at: ${scriptPath}`);
+      
+      // Prepare input for the Python script
+      const input = JSON.stringify({ requirement });
+      
+      // Spawn Python process
+      const pythonProcess = spawn('python3', [scriptPath], {
+        stdio: ['pipe', 'pipe', 'pipe'] // We need pipe for stdin
+      });
+      
+      // Write the input to stdin and close it
+      pythonProcess.stdin.write(input);
+      pythonProcess.stdin.end();
+      
+      let stdout = '';
+      let stderr = '';
+      
+      // Collect stdout data
+      pythonProcess.stdout.on('data', (data) => {
+        stdout += data.toString();
+      });
+      
+      // Collect stderr data
+      pythonProcess.stderr.on('data', (data) => {
+        stderr += data.toString();
+      });
+      
+      // Handle process completion
+      pythonProcess.on('close', (code) => {
+        if (code !== 0) {
+          console.error(`Quick MOA test process exited with code ${code}`);
+          console.error(`Error output: ${stderr}`);
+          return res.status(500).json({
+            success: false,
+            error: stderr || "Unknown error"
+          });
+        }
+        
+        try {
+          // Parse the result
+          const result = JSON.parse(stdout.trim());
+          
+          // Return the result
+          return res.json({
+            success: true,
+            message: "Quick MOA test completed successfully",
+            result
+          });
+          
+        } catch (error) {
+          console.error("Error parsing output:", error);
+          console.error("Raw stdout:", stdout);
+          return res.status(500).json({
+            success: false,
+            error: String(error),
+            raw_output: stdout.substring(0, 1000)
+          });
+        }
+      });
+      
+    } catch (error) {
+      console.error("Error in quick MOA test:", error);
+      return res.status(500).json({
+        success: false,
+        error: String(error)
+      });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
