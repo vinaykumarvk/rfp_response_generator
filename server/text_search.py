@@ -5,8 +5,17 @@ This is a fallback when vector search is not available.
 """
 import os
 import sys
+import json
+import decimal
 import psycopg2
 from psycopg2.extras import RealDictCursor
+
+# Custom JSON encoder to handle PostgreSQL-specific types like Decimal
+class CustomJsonEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, decimal.Decimal):
+            return float(obj)
+        return super(CustomJsonEncoder, self).default(obj)
 
 def get_database_connection():
     """Get a connection to the PostgreSQL database."""
