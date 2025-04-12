@@ -24,6 +24,196 @@ const getDirPath = () => {
   return dirname(currentFilePath);
 };
 
+/**
+ * Handles MOA (Mixture of Agents) response generation
+ * This is a specialized handler for the MOA approach which generates responses from
+ * multiple models and synthesizes them.
+ */
+const handleMoaRequest = async (req: Request, res: Response) => {
+  try {
+    const { 
+      requirement, 
+      requirementId,
+      rfpName,
+      uploadedBy,
+      category = "Wealth Management Software",
+      previous_responses = ""
+    } = req.body;
+    
+    if (!requirement) {
+      return res.status(400).json({ message: "Requirement text is required" });
+    }
+    
+    console.log(`MOA Response generation request for requirement: "${requirement.substring(0, 50)}..."`);
+    
+    // Use the specialized MOA Python handler
+    const scriptPath = path.join(getDirPath(), 'moa_route_handler.py');
+    console.log(`Using MOA route handler script: ${scriptPath}`);
+    
+    return new Promise<void>((resolve, reject) => {
+      // Prepare input for the Python script (stdin)
+      const input = JSON.stringify({
+        requirement,
+        category,
+        previous_responses
+      });
+      
+      console.log(`Using hardcoded API keys for MOA:`);
+      console.log(`- OpenAI API Key: hardcoded in Python file`);
+      console.log(`- Anthropic API Key: hardcoded in Python file`);
+      console.log(`- DeepSeek API Key: hardcoded in Python file`);
+      
+      // Environment for the Python process
+      const pythonEnv = { 
+        ...process.env,
+        NODE_ENV: process.env.NODE_ENV || 'production',
+        DEBUG_MODE: 'true',
+        DEPLOYMENT_ENV: process.env.REPL_ID ? 'replit' : 'local',
+        USING_HARDCODED_KEYS: 'true',
+        USING_PGVECTOR: 'true'
+      };
+      
+      // Spawn the Python process
+      const pythonProcess = spawn('python3', [scriptPath], { 
+        env: pythonEnv,
+        stdio: ['pipe', 'pipe', 'pipe'] // We need to write to stdin
+      });
+      
+      // Write the input to stdin and close it
+      pythonProcess.stdin.write(input);
+      pythonProcess.stdin.end();
+      
+      let stdout = '';
+      let stderr = '';
+      
+      // Collect stdout data
+      pythonProcess.stdout.on('data', (data) => {
+        const output = data.toString();
+        stdout += output;
+        console.log("MOA PYTHON STDOUT CHUNK:", output.length <= 500 ? output : output.substring(0, 497) + "...");
+      });
+      
+      // Collect stderr data
+      pythonProcess.stderr.on('data', (data) => {
+        stderr += data.toString();
+        console.log(`MOA Python stderr: ${data}`);
+      });
+      
+      // Handle process close
+      pythonProcess.on('close', async (code) => {
+        console.log(`MOA Python process exited with code ${code}`);
+        
+        if (code !== 0) {
+          console.error(`MOA Python process exited with code ${code}`);
+          console.error(`Error output: ${stderr}`);
+          res.status(500).json({ 
+            message: "Failed to generate MOA response", 
+            error: stderr 
+          });
+          resolve();
+          return;
+        }
+        
+        try {
+          // Parse the result from the Python script
+          const result = JSON.parse(stdout.trim());
+          
+          if (result.status === "error") {
+            console.error("Error in MOA Python response:", result.message);
+            return res.status(500).json({ 
+              message: "Error generating MOA response", 
+              error: result.message 
+            });
+          }
+          
+          // Get the final response and model responses
+          const finalResponse = result.final_response;
+          const modelOutputs = result.model_responses || {};
+          
+          // Get the existing requirement by ID
+          const existingRequirement = await storage.getExcelRequirementResponse(Number(requirementId));
+          
+          if (!existingRequirement) {
+            console.error(`Requirement with ID ${requirementId} not found`);
+            return res.status(404).json({ message: "Requirement not found" });
+          }
+          
+          // Create update object with all fields
+          const updateFields: Partial<ExcelRequirementResponse> = {
+            requirement: existingRequirement.requirement,
+            category: existingRequirement.category || category,
+            rfpName: rfpName || existingRequirement.rfpName,
+            uploadedBy: uploadedBy || existingRequirement.uploadedBy,
+            finalResponse,
+            modelProvider: "moa", // Always "moa" for this handler
+            openaiResponse: modelOutputs.openai_response || null,
+            anthropicResponse: modelOutputs.anthropic_response || null,
+            deepseekResponse: modelOutputs.deepseek_response || null,
+            moaResponse: modelOutputs.moa_response || finalResponse,
+            rating: null // Reset rating for the new response
+          };
+          
+          console.log("Updating requirement response with MOA fields:", 
+            Object.keys(updateFields).join(", "), 
+            "Final response length:", updateFields.finalResponse?.length || 0);
+          
+          // Debug output
+          console.log("Full MOA update fields:", JSON.stringify({
+            finalResponse: updateFields.finalResponse ? `Present (${updateFields.finalResponse.length} chars)` : "Not present",
+            openaiResponse: updateFields.openaiResponse ? `Present (${updateFields.openaiResponse.length} chars)` : "Not present",
+            anthropicResponse: updateFields.anthropicResponse ? `Present (${updateFields.anthropicResponse.length} chars)` : "Not present",
+            deepseekResponse: updateFields.deepseekResponse ? `Present (${updateFields.deepseekResponse.length} chars)` : "Not present",
+            moaResponse: updateFields.moaResponse ? `Present (${updateFields.moaResponse.length} chars)` : "Not present",
+            modelProvider: updateFields.modelProvider
+          }, null, 2));
+          
+          // Update the response in the database
+          const updatedResponse = await storage.updateExcelRequirementResponse(
+            Number(requirementId), 
+            updateFields
+          );
+          
+          if (!updatedResponse) {
+            console.error(`Failed to update MOA response for requirement ID ${requirementId}`);
+            return res.status(500).json({ message: "Failed to update MOA response" });
+          }
+          
+          // Return the updated response
+          return res.status(200).json({
+            message: "MOA response generated successfully",
+            response: updatedResponse,
+            metrics: result.metrics || {}
+          });
+          
+        } catch (error) {
+          console.error("Error processing MOA Python output:", error);
+          console.error("Raw stdout:", stdout);
+          return res.status(500).json({ 
+            message: "Error processing MOA response", 
+            error: String(error)
+          });
+        }
+      });
+      
+      // Handle process error
+      pythonProcess.on('error', (error) => {
+        console.error(`Error spawning MOA Python process: ${error}`);
+        res.status(500).json({ 
+          message: "Error spawning MOA Python process", 
+          error: error.message
+        });
+        resolve();
+      });
+    });
+  } catch (error) {
+    console.error("Unexpected error in handleMoaRequest:", error);
+    return res.status(500).json({ 
+      message: "Unexpected error processing MOA request", 
+      error: String(error)
+    });
+  }
+};
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // API routes - prefix with /api
   const apiRouter = app.route('/api');
@@ -434,6 +624,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         phase = 1, // Default to phase 1 for new requests
         modelResponses = null // Used in phase 2 for synthesis
       } = req.body;
+      
+      // Redirect to MOA handler for 'moa' provider
+      if (provider.toLowerCase() === 'moa') {
+        return await handleMoaRequest(req, res);
+      }
       
       console.log(`Response generation request - Provider: ${provider}, Phase: ${phase}`);
       
