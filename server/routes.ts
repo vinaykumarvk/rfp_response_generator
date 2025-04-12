@@ -25,6 +25,119 @@ const getDirPath = () => {
 };
 
 /**
+ * Handles final responses generation using the new get_final_responses function
+ * This is a more robust implementation that addresses the previous MOA approach issues
+ */
+const handleFinalResponsesRequest = async (req: Request, res: Response) => {
+  try {
+    const { 
+      requirement, 
+      requirementId,
+      rfpName,
+      uploadedBy,
+      category = "Wealth Management Software",
+      previous_responses = ""
+    } = req.body;
+    
+    if (!requirement) {
+      return res.status(400).json({ message: "Requirement text is required" });
+    }
+    
+    console.log(`Final Responses generation request for requirement: "${requirement.substring(0, 50)}..."`);
+    
+    // Use the final responses Python handler
+    const scriptPath = path.join(getDirPath(), 'final_responses_handler.py');
+    
+    // Prepare the input data
+    const inputData = JSON.stringify({
+      requirement,
+      category,
+      previous_responses
+    });
+    
+    // Run the Python script as a child process
+    const pythonProcess = spawn('python3', [scriptPath]);
+    
+    // Send the input data to the Python script
+    pythonProcess.stdin.write(inputData);
+    pythonProcess.stdin.end();
+    
+    // Collect output and errors from the Python script
+    let responseData = '';
+    let errorData = '';
+    
+    pythonProcess.stdout.on('data', (data) => {
+      responseData += data.toString();
+    });
+    
+    pythonProcess.stderr.on('data', (data) => {
+      errorData += data.toString();
+      console.error(`Python error: ${data}`);
+    });
+    
+    // Handle the process completion
+    pythonProcess.on('close', async (code) => {
+      if (code !== 0) {
+        console.error(`Python script exited with code ${code}`);
+        console.error(`Error: ${errorData}`);
+        return res.status(500).json({ message: "Error processing requirement", error: errorData });
+      }
+      
+      try {
+        // Parse the JSON response
+        const result = JSON.parse(responseData);
+        
+        // Add the result to the response
+        if (result.status === 'error') {
+          return res.status(500).json({ message: "Error in Python processing", error: result.message });
+        }
+        
+        // If we have a requirementId, we should store the response in the database
+        if (requirementId) {
+          try {
+            // Extract model-specific responses
+            const { final_response, model_responses } = result;
+            const { openai_response, anthropic_response, deepseek_response, moa_response } = model_responses;
+            
+            // Create a reference response record
+            const referenceResponse: InsertReferenceResponse = {
+              requirementId: parseInt(requirementId),
+              finalResponse: final_response,
+              openaiResponse: openai_response || null,
+              anthropicResponse: anthropic_response || null,
+              deepseekResponse: deepseek_response || null,
+              moaResponse: moa_response || null,
+              provider: 'moa', // We're using MOA approach
+              processTime: result.metrics.total_time,
+              uploadedBy,
+            };
+            
+            // Store the response
+            await storage.createReferenceResponse(referenceResponse);
+            console.log(`Stored reference response for requirement ID ${requirementId}`);
+          } catch (dbError) {
+            console.error("Error storing response in database:", dbError);
+            // Continue with the response even if DB storage fails
+          }
+        }
+        
+        // Return the result
+        return res.json(result);
+        
+      } catch (parseError) {
+        console.error("Error parsing Python response:", parseError);
+        console.error("Raw response:", responseData);
+        return res.status(500).json({ message: "Error parsing Python response", error: parseError.message });
+      }
+    });
+    
+  } catch (error) {
+    console.error("Error in final responses request:", error);
+    return res.status(500).json({ message: "Server error", error: String(error) });
+  }
+};
+
+/**
  * Handles MOA (Mixture of Agents) response generation
  * This is a specialized handler for the MOA approach which generates responses from
  * multiple models and synthesizes them.
