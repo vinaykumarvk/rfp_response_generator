@@ -740,7 +740,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Redirect to MOA handler for 'moa' provider
       if (provider.toLowerCase() === 'moa') {
-        return await handleMoaRequest(req, res);
+        try {
+          // First try the new final-responses implementation
+          console.log("Using new get_final_responses implementation for MOA");
+          return await handleFinalResponsesRequest(req, res);
+        } catch (finalResponsesError) {
+          // If that fails, fall back to the old handler
+          console.error("Error in new get_final_responses implementation:", finalResponsesError);
+          console.log("Falling back to original MOA handler");
+          return await handleMoaRequest(req, res);
+        }
       }
       
       console.log(`Response generation request - Provider: ${provider}, Phase: ${phase}`);
@@ -2949,6 +2958,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     }
   });
+
+  // Final responses endpoint - robust implementation of get_final_responses
+  app.post("/api/final-responses", handleFinalResponsesRequest);
 
   // Quick MOA test endpoint - simplified for debugging
   app.post("/api/quick-moa-test", async (req: Request, res: Response) => {
