@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RFP API Test</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      line-height: 1.6;
+      color: #333;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    h1, h2, h3 {
+      color: #2c3e50;
+    }
+    .requirement-card {
+      margin-bottom: 20px;
+      padding: 15px;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+      background-color: #f9f9f9;
+    }
+    .requirement-card h3 {
+      margin-top: 0;
+    }
+    .test-button {
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      padding: 8px 15px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      margin-top: 10px;
+    }
+    .test-button:hover {
+      background-color: #45a049;
+    }
+    .test-button:disabled {
+      background-color: #cccccc;
+      cursor: not-allowed;
+    }
+    .response-preview {
+      margin-top: 10px;
+      padding: 10px;
+      background-color: #f0f0f0;
+      border-radius: 4px;
+      max-height: 300px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      font-size: 14px;
+    }
+    .results-section {
+      margin-top: 30px;
+    }
+    .status {
+      font-weight: bold;
+    }
+    .status-success {
+      color: green;
+    }
+    .status-error {
+      color: red;
+    }
+    .status-pending {
+      color: #ff9800;
+    }
+    .mfa-highlight {
+      background-color: #ffff00;
+      font-weight: bold;
+    }
+    .progress-bar {
+      height: 20px;
+      background-color: #e0e0e0;
+      border-radius: 10px;
+      margin-top: 5px;
+      overflow: hidden;
+    }
+    .progress-bar-fill {
+      height: 100%;
+      background-color: #4CAF50;
+      border-radius: 10px;
+      transition: width 0.3s ease;
+    }
+    #testAllButton {
+      background-color: #2196F3;
+      padding: 10px 20px;
+      font-size: 16px;
+      margin-bottom: 20px;
+    }
+    #testAllButton:hover {
+      background-color: #0b7dda;
+    }
+    .summary {
+      margin-top: 30px;
+      padding: 15px;
+      background-color: #e8f5e9;
+      border-radius: 5px;
+      border-left: 5px solid #4CAF50;
+    }
+    pre {
+      white-space: pre-wrap;
+      background-color: #f5f5f5;
+      padding: 10px;
+      border-radius: 4px;
+      overflow-x: auto;
+    }
+  </style>
+</head>
+<body>
+  <h1>RFP Response Generation API Test</h1>
+  <p>This page tests the RFP response generation API with different requirements to verify that our fix for the MFA hardcoded requirement issue is working correctly.</p>
+  
+  <button id="testAllButton" class="test-button">Test All Requirements</button>
+  
+  <div id="testRequirements">
+    <!-- Requirements will be dynamically added here -->
+  </div>
+  
+  <div class="results-section">
+    <h2>Test Results Summary</h2>
+    <div id="testSummary">
+      <p>Status: <span id="overallStatus" class="status">Not started</span></p>
+      <div class="progress-bar">
+        <div id="progressBarFill" class="progress-bar-fill" style="width: 0%"></div>
+      </div>
+      <p>Total tests: <span id="totalTests">0</span></p>
+      <p>Passed: <span id="passedTests">0</span></p>
+      <p>Failed: <span id="failedTests">0</span></p>
+    </div>
+    
+    <div id="summarySection" class="summary" style="display: none;">
+      <h3>Test Conclusion</h3>
+      <p id="conclusion"></p>
+    </div>
+  </div>
+
+  <script>
+    // Test requirements
+    const testRequirements = [
+      {
+        id: 1,
+        text: "Describe the reporting capabilities for investment performance",
+        provider: "openai",
+        status: "pending"
+      },
+      {
+        id: 2,
+        text: "Detail your solution's data backup and recovery process",
+        provider: "anthropic",
+        status: "pending"
+      },
+      {
+        id: 3,
+        text: "Explain how your system handles tax reporting for multiple jurisdictions",
+        provider: "deepseek",
+        status: "pending"
+      }
+    ];
+    
+    // Render requirement cards
+    function renderRequirements() {
+      const container = document.getElementById('testRequirements');
+      container.innerHTML = '';
+      
+      testRequirements.forEach(req => {
+        const card = document.createElement('div');
+        card.className = 'requirement-card';
+        card.innerHTML = `
+          <h3>Test ${req.id}: ${req.text}</h3>
+          <p><strong>Provider:</strong> ${req.provider}</p>
+          <p><strong>Status:</strong> <span id="status-${req.id}" class="status status-${req.status}">${req.status}</span></p>
+          <button id="test-button-${req.id}" class="test-button" onclick="testRequirement(${req.id})">
+            Test Requirement
+          </button>
+          <div id="response-${req.id}" class="response-preview" style="display: none;"></div>
+        `;
+        container.appendChild(card);
+      });
+    }
+    
+    // Test a single requirement
+    async function testRequirement(id) {
+      const req = testRequirements.find(r => r.id === id);
+      if (!req) return;
+      
+      // Update status
+      req.status = 'pending';
+      document.getElementById(`status-${id}`).textContent = 'pending';
+      document.getElementById(`status-${id}`).className = 'status status-pending';
+      document.getElementById(`test-button-${id}`).disabled = true;
+      
+      try {
+        // Call the API
+        const response = await fetch('/api/generate-response', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            requirement: req.text,
+            provider: req.provider,
+            requirementId: req.id,
+            rfpName: "Test RFP",
+            uploadedBy: "Test User"
+          })
+        });
+        
+        const data = await response.json();
+        
+        // Check if response contains MFA content
+        const finalResponse = data.response?.finalResponse || '';
+        const containsMfa = finalResponse.toLowerCase().includes('multi-factor authentication') || 
+                            finalResponse.toLowerCase().includes('mfa');
+        
+        // Update status
+        req.status = containsMfa ? 'error' : 'success';
+        req.response = finalResponse;
+        req.containsMfa = containsMfa;
+        
+        document.getElementById(`status-${id}`).textContent = req.status;
+        document.getElementById(`status-${id}`).className = `status status-${req.status}`;
+        
+        // Display response with MFA highlights if present
+        const responseDiv = document.getElementById(`response-${id}`);
+        responseDiv.style.display = 'block';
+        
+        let displayText = finalResponse;
+        if (containsMfa) {
+          // Highlight MFA mentions
+          displayText = finalResponse.replace(/multi-factor authentication|mfa/gi, 
+            match => `<span class="mfa-highlight">${match}</span>`);
+        }
+        
+        responseDiv.innerHTML = `
+          <p><strong>Response Preview:</strong></p>
+          <div>${displayText.substring(0, 500)}${finalResponse.length > 500 ? '...' : ''}</div>
+          <p><strong>Contains MFA references:</strong> ${containsMfa ? 'Yes ❌' : 'No ✅'}</p>
+          <p><strong>Response length:</strong> ${finalResponse.length} characters</p>
+        `;
+      } catch (error) {
+        console.error('Error testing requirement:', error);
+        req.status = 'error';
+        req.error = error.message;
+        
+        document.getElementById(`status-${id}`).textContent = 'error';
+        document.getElementById(`status-${id}`).className = 'status status-error';
+        
+        const responseDiv = document.getElementById(`response-${id}`);
+        responseDiv.style.display = 'block';
+        responseDiv.innerHTML = `<p class="status-error">Error: ${error.message}</p>`;
+      }
+      
+      // Re-enable button
+      document.getElementById(`test-button-${id}`).disabled = false;
+      
+      // Update summary
+      updateSummary();
+      
+      return req;
+    }
+    
+    // Test all requirements
+    async function testAllRequirements() {
+      document.getElementById('testAllButton').disabled = true;
+      document.getElementById('overallStatus').textContent = 'Testing...';
+      document.getElementById('overallStatus').className = 'status status-pending';
+      
+      let completed = 0;
+      const total = testRequirements.length;
+      
+      // Reset status
+      testRequirements.forEach(req => {
+        req.status = 'pending';
+        document.getElementById(`status-${req.id}`).textContent = 'pending';
+        document.getElementById(`status-${req.id}`).className = 'status status-pending';
+      });
+      
+      // Test each requirement sequentially
+      for (const req of testRequirements) {
+        await testRequirement(req.id);
+        
+        // Update progress
+        completed++;
+        document.getElementById('progressBarFill').style.width = `${(completed / total) * 100}%`;
+      }
+      
+      // Final summary update
+      updateSummary(true);
+      document.getElementById('testAllButton').disabled = false;
+    }
+    
+    // Update summary statistics
+    function updateSummary(isComplete = false) {
+      const totalTests = testRequirements.length;
+      const pendingTests = testRequirements.filter(r => r.status === 'pending').length;
+      const passedTests = testRequirements.filter(r => r.status === 'success').length;
+      const failedTests = testRequirements.filter(r => r.status === 'error').length;
+      
+      document.getElementById('totalTests').textContent = totalTests;
+      document.getElementById('passedTests').textContent = passedTests;
+      document.getElementById('failedTests').textContent = failedTests;
+      
+      // Only update overall status if all tests are complete
+      if (pendingTests === 0) {
+        const overallStatus = failedTests === 0 ? 'success' : 'error';
+        document.getElementById('overallStatus').textContent = 
+          overallStatus === 'success' ? 'All tests passed' : 'Some tests failed';
+        document.getElementById('overallStatus').className = `status status-${overallStatus}`;
+        
+        // Show conclusion
+        if (isComplete) {
+          document.getElementById('summarySection').style.display = 'block';
+          document.getElementById('conclusion').textContent = 
+            overallStatus === 'success' 
+              ? 'The fix for the MFA hardcoded requirement issue has been successful. All responses are now unique to their requirements.'
+              : 'The fix was partially successful, but some responses still contain MFA content unrelated to their requirements.';
+        }
+      }
+    }
+    
+    // Initialize
+    document.addEventListener('DOMContentLoaded', () => {
+      renderRequirements();
+      document.getElementById('testAllButton').addEventListener('click', testAllRequirements);
+    });
+  </script>
+</body>
+</html>
