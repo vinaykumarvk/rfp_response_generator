@@ -55,6 +55,12 @@ export default function Sidebar() {
       icon: <Terminal className="h-5 w-5" />,
       path: '/moa-test',
       active: location === '/moa-test'
+    },
+    {
+      title: 'Quick MOA Test',
+      icon: <TerminalSquare className="h-5 w-5" />,
+      path: '/quick-moa-test',
+      active: location === '/quick-moa-test'
     }
   ];
 
