@@ -36,14 +36,19 @@ export async function addModelTestEndpoint(app: any) {
       console.log(`MODEL TEST: Found requirement ${requirementId}: "${existingRequirement.requirement.substring(0, 50)}..."`);
       
       // Use the model-specific test script
-      const scriptPath = path.resolve(process.cwd(), 'server/model_specific_test.py');
+      // Get the directory path directly
+      const dirPath = path.join(process.cwd(), 'server');
+      const scriptPath = path.join(dirPath, 'model_specific_test.py');
       
       if (!fs.existsSync(scriptPath)) {
+        console.error(`MODEL TEST: Script not found at: ${scriptPath}`);
         return res.status(500).json({
           success: false,
           error: `Test script not found at: ${scriptPath}`
         });
       }
+      
+      console.log(`MODEL TEST: Using script at: ${scriptPath}`);
       
       console.log(`MODEL TEST: Running ${provider} test for requirement ${requirementId}`);
       

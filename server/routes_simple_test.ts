@@ -35,14 +35,19 @@ export async function addSimpleTestEndpoint(app: any) {
       console.log(`SIMPLE TEST: Found requirement ${requirementId}`);
       
       // Use the simplified test script (no API calls)
-      const scriptPath = path.resolve(process.cwd(), 'server/test_model_fix.py');
+      // Get the directory path directly
+      const dirPath = path.join(process.cwd(), 'server');
+      const scriptPath = path.join(dirPath, 'test_model_fix.py');
       
       if (!fs.existsSync(scriptPath)) {
+        console.error(`SIMPLE TEST: Script not found at: ${scriptPath}`);
         return res.status(500).json({
           success: false,
           error: `Test script not found at: ${scriptPath}`
         });
       }
+      
+      console.log(`SIMPLE TEST: Using script at: ${scriptPath}`);
       
       console.log(`SIMPLE TEST: Running ${provider} test`);
       
