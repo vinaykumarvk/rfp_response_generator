@@ -28,10 +28,8 @@ export default function FinalResponsesTest() {
     
     try {
       // Call the final-responses endpoint
-      const result = await apiRequest('/api/final-responses', {
-        method: 'POST',
-        body: JSON.stringify({ requirement }),
-        headers: { 'Content-Type': 'application/json' },
+      const result = await apiRequest('/api/final-responses', 'POST', {
+        requirement
       });
       
       setResponse(result);

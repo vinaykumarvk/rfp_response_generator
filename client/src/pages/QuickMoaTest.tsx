@@ -20,9 +20,8 @@ export default function QuickMoaTest() {
     setResult(null);
     
     try {
-      const response = await apiRequest("/api/quick-moa-test", {
-        method: "POST",
-        body: JSON.stringify({ requirement }),
+      const response = await apiRequest("/api/quick-moa-test", "POST", {
+        requirement
       });
       
       setResult(response);
