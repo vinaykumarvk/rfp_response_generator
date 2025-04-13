@@ -61,7 +61,9 @@ wheels/
 # Replit specific
 .upm/
 .cache/
+.pythonlibs/
 .config/
+.local/
 .breakpoints
 replit.nix
 .replit
@@ -69,3 +71,7 @@ replit.nix
 
 # Database
 *.sqlite
+
+# Assets and large files
+generated-icon.png
+*.xlsx
