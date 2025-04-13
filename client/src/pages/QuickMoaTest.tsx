@@ -24,7 +24,10 @@ export default function QuickMoaTest() {
         requirement
       });
       
-      setResult(response);
+      // Parse the JSON response
+      const result = await response.json();
+      
+      setResult(result);
     } catch (err: any) {
       setError(err.message || "An error occurred");
       console.error("Error testing MOA:", err);
