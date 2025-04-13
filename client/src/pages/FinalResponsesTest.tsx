@@ -136,6 +136,7 @@ export default function FinalResponsesTest() {
             <Tabs defaultValue="final">
               <TabsList>
                 <TabsTrigger value="final">Final Response</TabsTrigger>
+                <TabsTrigger value="references">Similar References</TabsTrigger>
                 <TabsTrigger value="openai">OpenAI</TabsTrigger>
                 <TabsTrigger value="anthropic">Anthropic</TabsTrigger>
                 <TabsTrigger value="deepseek">DeepSeek</TabsTrigger>
@@ -146,6 +147,39 @@ export default function FinalResponsesTest() {
                 <div className="p-4 bg-gray-50 rounded-lg">
                   <h3 className="font-medium mb-2">Final Synthesized Response:</h3>
                   <div className="whitespace-pre-wrap">{response.final_response}</div>
+                </div>
+              </TabsContent>
+              
+              <TabsContent value="references" className="mt-4">
+                <div className="p-4 bg-gray-50 rounded-lg">
+                  <h3 className="font-medium mb-2">Similar Requirements Found:</h3>
+                  {response.similar_requirements && response.similar_requirements.length > 0 ? (
+                    <div className="space-y-4">
+                      {response.similar_requirements.map((ref: any, index: number) => (
+                        <div key={index} className="border border-gray-200 rounded-md p-3">
+                          <div className="flex justify-between mb-1">
+                            <div className="font-medium">{ref.category}</div>
+                            <div className="text-sm text-green-600 font-medium">
+                              Match: {(ref.similarity * 100).toFixed(1)}%
+                            </div>
+                          </div>
+                          <div className="mb-2 text-sm bg-gray-100 p-2 rounded">
+                            {ref.requirement}
+                          </div>
+                          {ref.response && (
+                            <div className="text-sm">
+                              <div className="font-medium text-gray-600 mb-1">Previous Response:</div>
+                              <div className="bg-white p-2 rounded border border-gray-100">
+                                {ref.response}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p>No similar requirements found.</p>
+                  )}
                 </div>
               </TabsContent>
               
