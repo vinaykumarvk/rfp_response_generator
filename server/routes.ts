@@ -2,21 +2,16 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { 
-  insertRfpResponseSchema, 
-  insertExcelRequirementResponseSchema, 
-  insertReferenceResponseSchema, 
-  InsertReferenceResponse,
-  type ReferenceResponse,
+  insertExcelRequirementResponseSchema,
   type ExcelRequirementResponse
 } from "@shared/schema";
 import { fromZodError } from "zod-validation-error";
-import { spawn, exec as execCallback } from "child_process";
+import { spawn } from "child_process";
 import * as path from "path";
 import * as fs from "fs";
 import { fileURLToPath } from "url";
 import { dirname } from "path";
 import { promisify } from "util";
-import { sendEmail, createTempFile, fileToBase64Attachment } from "./email";
 
 // Helper function for getting the directory path in ES modules
 const getDirPath = () => {
