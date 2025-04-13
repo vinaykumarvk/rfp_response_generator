@@ -8,7 +8,6 @@ import UploadRequirements from "@/pages/UploadRequirements";
 import ViewData from "@/pages/ViewData";
 import GenerateResponse from "@/pages/GenerateResponse";
 import GeneratedResponses from "@/pages/GeneratedResponses";
-import LlmResponseViewer from "@/pages/LlmResponseViewer";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import Sidebar from "@/components/Sidebar";
@@ -50,7 +49,6 @@ function Router() {
         <Route path="/view-data" component={ViewData} />
         <Route path="/generate-response" component={GenerateResponse} />
         <Route path="/generated-responses" component={GeneratedResponses} />
-        <Route path="/llm-response-viewer" component={LlmResponseViewer} />
         <Route component={NotFound} />
       </Switch>
     </AppLayout>

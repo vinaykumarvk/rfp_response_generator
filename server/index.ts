@@ -1,8 +1,6 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
-import { addModelTestEndpoint } from "./routes_model_test";
-import { addSimpleTestEndpoint } from "./routes_simple_test";
 
 // Enhanced API keys and environment configuration check
 console.log("=== COMPREHENSIVE ENVIRONMENT DIAGNOSTICS ===");
@@ -118,10 +116,6 @@ app.use((req, res, next) => {
 
 (async () => {
   const server = await registerRoutes(app);
-  
-  // Add our test endpoints
-  await addModelTestEndpoint(app);
-  await addSimpleTestEndpoint(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
