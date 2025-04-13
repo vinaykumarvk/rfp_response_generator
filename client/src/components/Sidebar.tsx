@@ -43,18 +43,6 @@ export default function Sidebar() {
       icon: <FileText className="h-5 w-5" />,
       path: '/view-data',
       active: location === '/view-data'
-    },
-    {
-      title: 'Standalone Response',
-      icon: <MessageSquare className="h-5 w-5" />,
-      path: '/generate-response',
-      active: location === '/generate-response'
-    },
-    {
-      title: 'View Responses',
-      icon: <Archive className="h-5 w-5" />,
-      path: '/generated-responses',
-      active: location === '/generated-responses'
     }
   ];
 
