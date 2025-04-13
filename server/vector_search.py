@@ -10,7 +10,7 @@ import json
 import numpy as np
 import psycopg2
 from psycopg2.extras import RealDictCursor
-import openai
+from openai import OpenAI
 
 # Constants
 DEFAULT_SIMILARITY_THRESHOLD = 0.3
@@ -35,7 +35,7 @@ def get_database_connection():
 def get_embedding_from_openai(text):
     """Generate an embedding vector for the provided text using OpenAI API"""
     try:
-        client = openai.OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+        client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
         response = client.embeddings.create(
             model="text-embedding-3-small",
             input=text
