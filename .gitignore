@@ -67,7 +67,6 @@ wheels/
 .breakpoints
 replit.nix
 .replit
-.git/
 
 # Database
 *.sqlite
@@ -79,3 +78,7 @@ generated-icon.png
 # Backup files
 server/backup/
 server/backup*/
+
+# Temp files
+server/temp_files/
+server/temp_files*/
