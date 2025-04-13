@@ -35,6 +35,9 @@ export default function FinalResponsesTest() {
       // Parse the JSON response
       const result = await response.json();
       
+      // Debug logging
+      console.log("API Response received:", result);
+      
       setResponse(result);
     } catch (err: any) {
       setError(err.message || 'Error generating response');
@@ -97,6 +100,28 @@ export default function FinalResponsesTest() {
           </CardContent>
         </Card>
       )}
+      
+      {/* Response debug info */}
+      <Card className="w-full mb-8">
+        <CardHeader>
+          <CardTitle>Response Debug Info</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="mb-4">
+            <p>Response object exists: {response ? 'Yes' : 'No'}</p>
+            {response && (
+              <>
+                <p>Has final_response: {response.final_response ? 'Yes' : 'No'}</p>
+                <p>Has model_responses: {response.model_responses ? 'Yes' : 'No'}</p>
+                <p>Has metrics: {response.metrics ? 'Yes' : 'No'}</p>
+              </>
+            )}
+          </div>
+          <pre className="text-xs bg-gray-100 p-4 rounded-md overflow-auto">
+            Response State: {JSON.stringify(response, null, 2)}
+          </pre>
+        </CardContent>
+      </Card>
       
       {response && (
         <Card className="w-full">
