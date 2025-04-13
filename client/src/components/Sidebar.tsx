@@ -45,7 +45,7 @@ export default function Sidebar() {
       active: location === '/view-data'
     },
     {
-      title: 'Generate Responses',
+      title: 'Standalone Response',
       icon: <MessageSquare className="h-5 w-5" />,
       path: '/generate-response',
       active: location === '/generate-response'
