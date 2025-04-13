@@ -75,3 +75,7 @@ replit.nix
 # Assets and large files
 generated-icon.png
 *.xlsx
+
+# Backup files
+server/backup/
+server/backup*/
