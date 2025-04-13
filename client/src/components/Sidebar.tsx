@@ -45,34 +45,16 @@ export default function Sidebar() {
       active: location === '/view-data'
     },
     {
-      title: 'Standalone Response',
-      icon: <BookOpen className="h-5 w-5" />,
-      path: '/llm-response-viewer',
-      active: location === '/llm-response-viewer'
+      title: 'Generate Responses',
+      icon: <MessageSquare className="h-5 w-5" />,
+      path: '/generate-response',
+      active: location === '/generate-response'
     },
     {
-      title: 'MOA Test Tool',
-      icon: <Terminal className="h-5 w-5" />,
-      path: '/moa-test',
-      active: location === '/moa-test'
-    },
-    {
-      title: 'Quick MOA Test',
-      icon: <TerminalSquare className="h-5 w-5" />,
-      path: '/quick-moa-test',
-      active: location === '/quick-moa-test'
-    },
-    {
-      title: 'Final Responses Test',
-      icon: <TerminalSquare className="h-5 w-5" />,
-      path: '/final-responses-test',
-      active: location === '/final-responses-test'
-    },
-    {
-      title: 'Simple Test Page',
-      icon: <TerminalSquare className="h-5 w-5" />,
-      path: '/simple-test',
-      active: location === '/simple-test'
+      title: 'View Responses',
+      icon: <Archive className="h-5 w-5" />,
+      path: '/generated-responses',
+      active: location === '/generated-responses'
     }
   ];
 
@@ -139,7 +121,7 @@ export default function Sidebar() {
             </ul>
             
             <div className="mt-8 border-t border-slate-200 dark:border-slate-700 pt-4">
-              <div className="text-xs text-slate-500 dark:text-slate-400 mb-2 px-4">Version 0.3</div>
+              <div className="text-xs text-slate-500 dark:text-slate-400 mb-2 px-4">Version 0.9</div>
             </div>
           </nav>
         </div>

@@ -8,14 +8,6 @@ import UploadRequirements from "@/pages/UploadRequirements";
 import ViewData from "@/pages/ViewData";
 import GenerateResponse from "@/pages/GenerateResponse";
 import GeneratedResponses from "@/pages/GeneratedResponses";
-import LlmTestPage from "@/pages/LlmTestPage";
-import DirectLlmTestPage from "@/pages/DirectLlmTestPage";
-import SimpleApiTest from "@/pages/SimpleApiTest";
-import LlmResponseViewer from "@/pages/LlmResponseViewer";
-import MoaTestPage from "@/pages/MoaTestPage";
-import QuickMoaTest from "@/pages/QuickMoaTest";
-import FinalResponsesTest from "@/pages/FinalResponsesTest";
-import SimpleTestPage from "@/pages/SimpleTestPage";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import Sidebar from "@/components/Sidebar";
@@ -57,14 +49,6 @@ function Router() {
         <Route path="/view-data" component={ViewData} />
         <Route path="/generate-response" component={GenerateResponse} />
         <Route path="/generated-responses" component={GeneratedResponses} />
-        <Route path="/llm-test" component={LlmTestPage} />
-        <Route path="/direct-llm-test" component={DirectLlmTestPage} />
-        <Route path="/simple-api-test" component={SimpleApiTest} />
-        <Route path="/llm-response-viewer" component={LlmResponseViewer} />
-        <Route path="/moa-test" component={MoaTestPage} />
-        <Route path="/quick-moa-test" component={QuickMoaTest} />
-        <Route path="/final-responses-test" component={FinalResponsesTest} />
-        <Route path="/simple-test" component={SimpleTestPage} />
         <Route component={NotFound} />
       </Switch>
     </AppLayout>
