@@ -67,6 +67,12 @@ export default function Sidebar() {
       icon: <TerminalSquare className="h-5 w-5" />,
       path: '/final-responses-test',
       active: location === '/final-responses-test'
+    },
+    {
+      title: 'Simple Test Page',
+      icon: <TerminalSquare className="h-5 w-5" />,
+      path: '/simple-test',
+      active: location === '/simple-test'
     }
   ];
 
