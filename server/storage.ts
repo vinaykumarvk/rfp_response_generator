@@ -13,10 +13,13 @@ import {
   type InsertReferenceResponse
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 
 // Define the storage interface with CRUD operations
 export interface IStorage {
+  // System Operations
+  ping(): Promise<boolean>;
+
   // User Operations
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
@@ -36,6 +39,7 @@ export interface IStorage {
   createExcelRequirementResponses(responses: InsertExcelRequirementResponse[]): Promise<ExcelRequirementResponse[]>;
   updateExcelRequirementResponse(id: number, response: Partial<InsertExcelRequirementResponse>): Promise<ExcelRequirementResponse | undefined>;
   deleteExcelRequirementResponse(id: number): Promise<boolean>;
+  deleteAllExcelRequirementResponses(): Promise<boolean>;
 
   // Reference Response Operations
   getReferenceResponses(responseId: number): Promise<ReferenceResponse[]>;
@@ -55,6 +59,12 @@ export interface IStorage {
 
 // Database storage implementation
 export class DatabaseStorage implements IStorage {
+  // System Operations
+  async ping(): Promise<boolean> {
+    // Simple query to check database connectivity
+    await db.execute(sql`SELECT 1`);
+    return true;
+  }
   // User Operations
   async getUser(id: number): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.id, id));
@@ -163,6 +173,14 @@ export class DatabaseStorage implements IStorage {
     await db
       .delete(excelRequirementResponses)
       .where(eq(excelRequirementResponses.id, id));
+    
+    // In PostgreSQL, the count is not directly returned, but we can infer success if no error
+    return true;
+  }
+  
+  async deleteAllExcelRequirementResponses(): Promise<boolean> {
+    // Delete all records from the table
+    await db.delete(excelRequirementResponses);
     
     // In PostgreSQL, the count is not directly returned, but we can infer success if no error
     return true;
