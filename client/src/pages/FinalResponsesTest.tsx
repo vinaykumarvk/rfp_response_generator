@@ -28,7 +28,7 @@ export default function FinalResponsesTest() {
     
     try {
       // Call the final-responses endpoint
-      const result = await apiRequest('/api/final-responses', 'POST', {
+      const result = await apiRequest('POST', '/api/final-responses', {
         requirement
       });
       
