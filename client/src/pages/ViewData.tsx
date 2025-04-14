@@ -1317,14 +1317,16 @@ export default function ViewData() {
                 </div>
                 
                 {/* Visual Progress Bar */}
-                <Progress 
-                  value={processingItems.length > 1 
-                    ? (processedCount / processingItems.length) * 100 
-                    : generationStage === "Process Completed" ? 100 : getProgressValueByStage(generationStage)
-                  } 
-                  className="h-3 bg-slate-100 dark:bg-slate-700" 
-                  indicatorClassName="bg-gradient-to-r from-primary to-primary/70 animate-pulse"
-                />
+                <div className="relative h-3 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-700">
+                  <div 
+                    className="h-full w-full flex-1 bg-gradient-to-r from-primary to-primary/70 animate-pulse transition-all duration-500 ease-in-out" 
+                    style={{ 
+                      transform: `translateX(-${100 - (processingItems.length > 1 
+                        ? (processedCount / processingItems.length) * 100 
+                        : generationStage === "Process Completed" ? 100 : getProgressValueByStage(generationStage))}%)` 
+                    }}
+                  />
+                </div>
                 
                 {/* Current Stage Info */}
                 <div className="text-xs text-slate-500 dark:text-slate-400 mt-1 flex items-center justify-between">

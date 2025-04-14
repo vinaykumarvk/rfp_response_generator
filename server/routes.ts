@@ -313,7 +313,11 @@ except Exception as e:
         try {
           // Prepare the update object
           const updateData: any = {
-            finalResponse: responseData.finalResponse || null,
+            // Set final response from the appropriate field
+            finalResponse: responseData.finalResponse || 
+              (modelProvider.toLowerCase() === 'anthropic' || modelProvider.toLowerCase() === 'claude' 
+                ? responseData.anthropicResponse 
+                : null),
             modelProvider: responseData.modelProvider || modelProvider
           };
           
@@ -386,7 +390,10 @@ except Exception as e:
         try {
           // Prepare the update object
           const updateData: any = {
-            finalResponse: responseContent.finalResponse || null,
+            finalResponse: responseContent.finalResponse || 
+              (modelProvider.toLowerCase() === 'anthropic' || modelProvider.toLowerCase() === 'claude' 
+                ? responseContent.anthropicResponse 
+                : null),
             modelProvider: responseContent.modelProvider || modelProvider
           };
           
