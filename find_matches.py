@@ -1,10 +1,18 @@
 import json
 import logging
+import sys
+import time
 from database import engine
 from sqlalchemy import text
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
+# Configure more detailed logging
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(stream=sys.stdout)
+    ]
+)
 logger = logging.getLogger(__name__)
 
 def find_similar_matches(requirement_id):
@@ -94,8 +102,23 @@ def find_similar_matches(requirement_id):
                 LIMIT 5;
             """)
 
-            # Execute the similarity search
-            similar_results = connection.execute(similar_query, {"req_id": requirement_id}).fetchall()
+            # Log that we're starting the similarity search
+            logger.info(f"Starting similarity search query for requirement ID: {requirement_id}")
+            start_time = time.time()
+            
+            # Execute the similarity search with a timeout
+            # Using try/except to catch potential timeout issues
+            try:
+                similar_results = connection.execution_options(timeout=20).execute(
+                    similar_query, {"req_id": requirement_id}
+                ).fetchall()
+                
+                elapsed_time = time.time() - start_time
+                logger.info(f"Similarity search completed in {elapsed_time:.2f} seconds")
+            except Exception as query_error:
+                elapsed_time = time.time() - start_time
+                logger.error(f"Similarity search failed after {elapsed_time:.2f} seconds: {str(query_error)}")
+                raise
             
             # Format results for return and database storage
             formatted_results = []
