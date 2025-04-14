@@ -443,7 +443,7 @@ def get_llm_responses(requirement_id, model='moa', display_results=True):
                         openai_response = CASE WHEN :model = 'openAI' THEN :response ELSE openai_response END,
                         deepseek_response = CASE WHEN :model = 'deepseek' THEN :response ELSE deepseek_response END,
                         anthropic_response = CASE WHEN :model = 'claude' THEN :response ELSE anthropic_response END,
-                        final_response = :response,
+                        final_response = :response,  -- Always set final_response to the current response
                         similar_questions = :similar_questions,
                         model_provider = :model,
                         timestamp = NOW()

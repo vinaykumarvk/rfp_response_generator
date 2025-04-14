@@ -616,7 +616,8 @@ try:
                 final_response, 
                 openai_response, 
                 anthropic_response, 
-                deepseek_response
+                deepseek_response,
+                model_provider
             FROM excel_requirement_responses 
             WHERE id = :req_id
         ''')
@@ -630,6 +631,7 @@ try:
                 'openaiResponse': result[2], 
                 'anthropicResponse': result[3],
                 'deepseekResponse': result[4],
+                'modelProvider': result[5] or '${model}',
                 'success': True,
                 'message': 'Response generated successfully'
             }
