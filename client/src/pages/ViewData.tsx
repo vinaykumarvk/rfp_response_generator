@@ -880,7 +880,7 @@ export default function ViewData() {
   return (
     <div className="space-y-4">
       {/* Sticky header with all controls */}
-      <div className="sticky top-0 z-10 bg-slate-50 dark:bg-slate-900 py-3 px-4 -mx-4 sm:-mx-6 md:-mx-8 lg:-mx-10 shadow-md">
+      <div className="sticky top-0 z-20 bg-slate-50 dark:bg-slate-900 py-3 px-4 -mx-4 sm:-mx-6 md:-mx-8 lg:-mx-10 shadow-md">
         <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <h1 className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-primary to-primary/70 text-transparent bg-clip-text">View Requirements</h1>
@@ -1014,11 +1014,11 @@ export default function ViewData() {
         </div>
       </div>
       
-      <div>
+      <div className="relative">
         <Card className="shadow-sm">
-          {/* Hidden control section - keeping structure but removing visible elements */}
-          <div className="border-b border-slate-200 dark:border-slate-700">
-            <div className="p-0 bg-white dark:bg-slate-900">
+          {/* Filters panel - making it stick to top under the main header */}
+          <div className="sticky top-[60px] z-10 border-b border-slate-200 dark:border-slate-700">
+            <div className="p-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur-sm">
               <div className="hidden">
                 {/* All controls moved to sticky header, keeping this section to maintain layout structure */}
                 <div className="hidden">
@@ -1275,7 +1275,7 @@ export default function ViewData() {
 
           {/* Progress indicator for generation */}
           {isGenerating && (
-            <div className="p-4 border-b border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-900">
+            <div className="sticky top-[120px] z-10 p-4 border-b border-slate-100 dark:border-slate-700 bg-white/95 dark:bg-slate-900/95 backdrop-blur-sm">
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center">
@@ -1313,7 +1313,7 @@ export default function ViewData() {
             </div>
           )}
           
-          <CardContent className="p-4">
+          <CardContent className="p-4 max-h-[calc(100vh-200px)] overflow-y-auto">
             
             {/* Content display */}
             {loading ? (
