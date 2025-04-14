@@ -15,28 +15,31 @@ def extract_text(response):
     Extract clean text from Claude's TextBlock response.
 
     Args:
-        response: List containing TextBlock object from Claude
+        response: Response object from Claude API
 
     Returns:
         str: Clean text without TextBlock wrapper
     """
-    # Handle list of TextBlocks
-    if isinstance(response, list):
-        # Get the text attribute from each TextBlock and join them
-        return ' '.join(block.text for block in response if hasattr(block, 'text'))
-
-    # Handle single TextBlock
+    # Handle direct string
+    if isinstance(response, str):
+        return response
+        
+    # Handle content attribute (new Anthropic API)
+    if hasattr(response, 'content'):
+        if isinstance(response.content, list):
+            # Handle TextBlock objects
+            return ' '.join(block.text for block in response.content if hasattr(block, 'text'))
+        elif isinstance(response.content, str):
+            return response.content
+        else:
+            # Try as string anyway
+            return str(response.content)
+            
+    # Handle direct TextBlock object
     if hasattr(response, 'text'):
         return response.text
         
-    # Handle content list from newer Claude API
-    if hasattr(response, 'content'):
-        if isinstance(response.content, list):
-            # Join all text content parts
-            return ' '.join(block.get('text', '') for block in response.content if block.get('type') == 'text')
-        return str(response.content)
-
-    # Handle string input (fallback)
+    # Last resort fallback
     return str(response)
 
 def prompt_gpt(prompt, llm='openAI'):
@@ -120,16 +123,8 @@ def prompt_gpt(prompt, llm='openAI'):
                 system=system_message
             )
             
-            # Extract text from the response
-            content = ""
-            if hasattr(response, 'content'):
-                if isinstance(response.content, list):
-                    content = ''.join(
-                        block.get('text', '') for block in response.content 
-                        if block.get('type') == 'text'
-                    )
-                else:
-                    content = extract_text(response.content)
+            # Use our extract_text function to handle all response formats
+            content = extract_text(response)
             
             # Log the actual response content for debugging
             print("====== FULL CLAUDE RESPONSE ======")
