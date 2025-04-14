@@ -79,6 +79,7 @@ export default function ViewData() {
   const [selectAll, setSelectAll] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [isFeedbackSubmitting, setIsFeedbackSubmitting] = useState(false);
+  const [isGeneratingResponse, setIsGeneratingResponse] = useState(false);
   
   // Filters
   const [filters, setFilters] = useState({
@@ -407,6 +408,78 @@ export default function ViewData() {
       console.error(`Error generating response for requirement ${requirementId}:`, error);
       setGenerationError(error instanceof Error ? error.message : String(error));
       return false;
+    }
+  };
+  
+  // Function to generate response using the LLM API for a single requirement
+  const handleGenerateLlmResponse = async (requirementId: number, model: string = 'moa') => {
+    if (!requirementId) return;
+    
+    try {
+      setIsGeneratingResponse(true);
+      
+      console.log(`Generating LLM response for requirement ID ${requirementId} using model ${model}`);
+      
+      // Call the API to generate a response
+      const response = await fetch('/api/generate-llm-response', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          requirementId,
+          model
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to generate response: ${response.status} ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to generate response');
+      }
+      
+      // Update the selected response with the generated response
+      if (selectedResponse && selectedResponse.id === requirementId) {
+        setSelectedResponse({
+          ...selectedResponse,
+          finalResponse: data.finalResponse || selectedResponse.finalResponse,
+          openaiResponse: data.openaiResponse || selectedResponse.openaiResponse,
+          anthropicResponse: data.anthropicResponse || selectedResponse.anthropicResponse,
+          deepseekResponse: data.deepseekResponse || selectedResponse.deepseekResponse,
+          moaResponse: data.moaResponse || selectedResponse.moaResponse
+        });
+        
+        // Set tab to response view since we now have a response
+        setActiveTab('response');
+      }
+      
+      // Show success toast
+      toast({
+        title: "Response Generated",
+        description: `Successfully generated response for requirement ID ${requirementId}`,
+      });
+      
+      // Refresh the data
+      await refetch();
+      
+      return true;
+      
+    } catch (error) {
+      console.error('Error generating LLM response:', error);
+      
+      toast({
+        title: "Generation Error",
+        description: `Failed to generate response: ${error instanceof Error ? error.message : String(error)}`,
+        variant: "destructive",
+      });
+      
+      return false;
+    } finally {
+      setIsGeneratingResponse(false);
     }
   };
   
@@ -1143,10 +1216,63 @@ export default function ViewData() {
       <Dialog open={showResponseDialog} onOpenChange={setShowResponseDialog}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="text-slate-900 dark:text-white">Response Details</DialogTitle>
-            <DialogDescription className="text-slate-700 dark:text-slate-300">
-              View complete response and reference information
-            </DialogDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <DialogTitle className="text-slate-900 dark:text-white">Response Details</DialogTitle>
+                <DialogDescription className="text-slate-700 dark:text-slate-300">
+                  View complete response and reference information
+                </DialogDescription>
+              </div>
+              
+              {/* Generate Response Button */}
+              {selectedResponse && selectedResponseId && (
+                <div className="flex items-center">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="h-9 px-3 flex gap-2 items-center" 
+                        disabled={isGeneratingResponse}
+                      >
+                        {isGeneratingResponse ? (
+                          <>
+                            <RefreshCcw className="h-4 w-4 animate-spin" />
+                            <span>Generating...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles className="h-4 w-4" />
+                            <span>Generate Response</span>
+                          </>
+                        )}
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuLabel>Generate with LLM</DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={() => handleGenerateLlmResponse(selectedResponseId, 'openai')} className="gap-2">
+                        <Atom className="h-4 w-4 text-blue-500" />
+                        <span>OpenAI</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleGenerateLlmResponse(selectedResponseId, 'claude')} className="gap-2">
+                        <Bot className="h-4 w-4 text-purple-500" />
+                        <span>Anthropic</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleGenerateLlmResponse(selectedResponseId, 'deepseek')} className="gap-2">
+                        <Brain className="h-4 w-4 text-amber-500" />
+                        <span>DeepSeek</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={() => handleGenerateLlmResponse(selectedResponseId, 'moa')} className="gap-2">
+                        <Network className="h-4 w-4 text-green-500" />
+                        <span>Mixture of Agents (MOA)</span>
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              )}
+            </div>
           </DialogHeader>
           
           {selectedResponse && (

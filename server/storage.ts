@@ -191,14 +191,14 @@ export class DatabaseStorage implements IStorage {
     console.log(`Updating similar questions for requirement ID ${id}`);
     
     try {
-      // Convert the similarQuestions array to JSON string if it's not already
-      let similarQuestionsData = similarQuestions;
+      // Convert the similarQuestions array to JSON string
+      const similarQuestionsJson = JSON.stringify(similarQuestions);
       
       // Update the response with the similar questions data
       const [updatedResponse] = await db
         .update(excelRequirementResponses)
         .set({
-          similarQuestions: similarQuestionsData
+          similarQuestions: similarQuestionsJson
         })
         .where(eq(excelRequirementResponses.id, id))
         .returning();
