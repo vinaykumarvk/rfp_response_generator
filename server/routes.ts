@@ -260,6 +260,29 @@ asyncio.run(main())
         console.log('- anthropic_response:', responseData.anthropicResponse ? 'Present' : 'Not present');
         console.log('- deepseek_response:', responseData.deepseekResponse ? 'Present' : 'Not present');
         
+        // Save the response to the database
+        try {
+          // Prepare the update object
+          const updateData: any = {
+            finalResponse: responseData.finalResponse || null,
+            modelProvider: responseData.modelProvider || modelProvider
+          };
+          
+          // Set model-specific responses
+          if (responseData.openaiResponse) updateData.openaiResponse = responseData.openaiResponse;
+          if (responseData.anthropicResponse) updateData.anthropicResponse = responseData.anthropicResponse;
+          if (responseData.deepseekResponse) updateData.deepseekResponse = responseData.deepseekResponse;
+          if (responseData.moaResponse) updateData.moaResponse = responseData.moaResponse;
+          
+          // Update the record in the database
+          await storage.updateExcelRequirementResponse(Number(requirementId), updateData);
+          
+          console.log(`Updated requirement ${requirementId} in database with generated response`);
+        } catch (dbError) {
+          console.error(`Failed to update database for requirement ${requirementId}:`, dbError);
+          // Continue processing - we'll return the response even if DB update fails
+        }
+        
         // Return the response
         return res.status(200).json({ 
           success: true,
@@ -308,6 +331,29 @@ asyncio.run(main())
             finalResponse: `Simulated response using ${modelProvider} for requirement ${requirementId}`,
             modelProvider
           };
+        }
+        
+        // Save the simulated response to the database
+        try {
+          // Prepare the update object
+          const updateData: any = {
+            finalResponse: responseContent.finalResponse || null,
+            modelProvider: responseContent.modelProvider || modelProvider
+          };
+          
+          // Set model-specific responses
+          if (responseContent.openaiResponse) updateData.openaiResponse = responseContent.openaiResponse;
+          if (responseContent.anthropicResponse) updateData.anthropicResponse = responseContent.anthropicResponse;
+          if (responseContent.deepseekResponse) updateData.deepseekResponse = responseContent.deepseekResponse;
+          if (responseContent.moaResponse) updateData.moaResponse = responseContent.moaResponse;
+          
+          // Update the record in the database
+          await storage.updateExcelRequirementResponse(Number(requirementId), updateData);
+          
+          console.log(`Updated requirement ${requirementId} in database with simulated response`);
+        } catch (dbError) {
+          console.error(`Failed to update database for requirement ${requirementId}:`, dbError);
+          // Continue processing - we'll return the response even if DB update fails
         }
         
         return res.status(200).json({ 

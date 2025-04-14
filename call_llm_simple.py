@@ -12,6 +12,7 @@ try:
     original_imported = True
 except ImportError:
     original_imported = False
+    original_get_llm_responses = None
     
 async def get_llm_responses(requirement_id: int, model: str = 'moa', display_results: bool = True) -> Dict[str, Any]:
     """
@@ -26,7 +27,7 @@ async def get_llm_responses(requirement_id: int, model: str = 'moa', display_res
         Dictionary containing the responses
     """
     # If we can use the original function, do so
-    if original_imported:
+    if original_imported and original_get_llm_responses:
         try:
             return await original_get_llm_responses(requirement_id, model, display_results)
         except Exception as e:
