@@ -363,6 +363,29 @@ export default function ViewData() {
   const [processedCount, setProcessedCount] = useState(0);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationError, setGenerationError] = useState<string | null>(null);
+  const [generationStage, setGenerationStage] = useState<string>("Initializing");
+  
+  // Helper function to get progress bar value based on generation stage
+  const getProgressValueByStage = (stage: string): number => {
+    switch (stage) {
+      case "Initializing":
+        return 5;
+      case "Fetching similar questions":
+        return 20;
+      case "Storing similar questions":
+        return 35;
+      case "Creating prompt":
+        return 50;
+      case "Fetching response from LLM":
+        return 70;
+      case "Saving response":
+        return 90;
+      case "Process Completed":
+        return 100;
+      default:
+        return 50;
+    }
+  };
   
   // Function to generate response for a single requirement
   const generateResponseForRequirement = async (
@@ -423,6 +446,7 @@ export default function ViewData() {
       setProcessingItems([requirementId]);
       setProcessedCount(0);
       setGenerationError(null);
+      setGenerationStage("Initializing");
 
       console.log(`Generating LLM response for requirement ID ${requirementId} using model ${model}`);
       
@@ -432,6 +456,24 @@ export default function ViewData() {
       if (!requirementItem) {
         throw new Error(`Requirement with ID ${requirementId} not found`);
       }
+      
+      // Update stage to fetching similar questions
+      setGenerationStage("Fetching similar questions");
+      
+      // First get the similar questions (this happens server-side)
+      // We're simulating stage updates since the actual operations happen on the server
+      await new Promise(resolve => setTimeout(resolve, 500)); // simulate brief delay
+      
+      // Update to storing stage
+      setGenerationStage("Storing similar questions");
+      await new Promise(resolve => setTimeout(resolve, 500)); // simulate brief delay
+      
+      // Update to creating prompt stage  
+      setGenerationStage("Creating prompt");
+      await new Promise(resolve => setTimeout(resolve, 500)); // simulate brief delay
+      
+      // Update to fetching LLM response stage
+      setGenerationStage("Fetching response from LLM");
       
       // Call the API to generate a response
       const response = await fetch('/api/generate-response', {
@@ -451,6 +493,9 @@ export default function ViewData() {
       if (!response.ok) {
         throw new Error(`Failed to generate response: ${response.status} ${response.statusText}`);
       }
+      
+      // Update to saving response stage
+      setGenerationStage("Saving response");
       
       const data = await response.json();
       
@@ -475,6 +520,9 @@ export default function ViewData() {
         // Set tab to response view since we now have a response
         setActiveTab('response');
       }
+      
+      // Update to completion stage
+      setGenerationStage("Process Completed");
       
       // Show success toast
       toast({
@@ -501,8 +549,16 @@ export default function ViewData() {
       
       return false;
     } finally {
-      setIsGeneratingResponse(false);
-      setIsGenerating(false);
+      // Keep status visible for a moment so user can see completion
+      if (!generationError) {
+        setTimeout(() => {
+          setIsGeneratingResponse(false);
+          setIsGenerating(false);
+        }, 1500);
+      } else {
+        setIsGeneratingResponse(false);
+        setIsGenerating(false);
+      }
     }
   };
   
@@ -512,6 +568,7 @@ export default function ViewData() {
     setProcessedCount(0);
     setIsGenerating(true);
     setGenerationError(null);
+    setGenerationStage("Initializing batch processing");
     
     const totalItems = selectedItems.length;
     let successCount = 0;
@@ -520,6 +577,7 @@ export default function ViewData() {
       // Process items sequentially to avoid overloading the API
       for (let i = 0; i < selectedItems.length; i++) {
         const requirementId = selectedItems[i];
+        setGenerationStage(`Processing item ${i+1} of ${totalItems}`);
         const success = await generateResponseForRequirement(requirementId, modelProvider);
         
         if (success) {
@@ -528,6 +586,9 @@ export default function ViewData() {
         
         setProcessedCount(i + 1);
       }
+      
+      // Set final stage
+      setGenerationStage("Batch processing completed");
       
       // Refresh data after all items are processed
       await refetch();
@@ -540,6 +601,7 @@ export default function ViewData() {
     } catch (error) {
       console.error('Error in bulk generation:', error);
       setGenerationError(error instanceof Error ? error.message : String(error));
+      setGenerationStage("Error occurred during processing");
       
       toast({
         title: "Generation Error",
@@ -547,8 +609,11 @@ export default function ViewData() {
         variant: "destructive",
       });
     } finally {
-      setIsGenerating(false);
-      setProcessingItems([]);
+      // Keep status visible for a moment
+      setTimeout(() => {
+        setIsGenerating(false);
+        setProcessingItems([]);
+      }, 1500);
     }
   };
   
@@ -1121,26 +1186,29 @@ export default function ViewData() {
                   <div className="flex items-center">
                     <Sparkles className="h-4 w-4 text-blue-500 mr-2" />
                     <span className="font-medium text-sm">
-                      {processingItems.length === 1 
-                        ? "Generating response..." 
-                        : `Generating responses (${processedCount}/${processingItems.length})`
+                      {processingItems.length > 1 
+                        ? `Generating responses (${processedCount}/${processingItems.length})` 
+                        : generationStage
                       }
                     </span>
                   </div>
                   <span className="text-xs font-medium text-slate-500">
-                    {processingItems.length > 0 
+                    {processingItems.length > 1 
                       ? `${Math.round((processedCount / processingItems.length) * 100)}%` 
-                      : "In progress..."
+                      : generationStage === "Process Completed" ? "100%" : "In progress..."
                     }
                   </span>
                 </div>
                 <Progress 
-                  value={processingItems.length > 0 
+                  value={processingItems.length > 1 
                     ? (processedCount / processingItems.length) * 100 
-                    : 50
+                    : generationStage === "Process Completed" ? 100 : getProgressValueByStage(generationStage)
                   } 
                   className="h-2" 
                 />
+                <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                  {generationStage}
+                </div>
                 {generationError && (
                   <div className="text-xs text-red-500 mt-1">
                     Error: {generationError}
