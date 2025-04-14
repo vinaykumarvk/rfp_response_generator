@@ -1,6 +1,11 @@
 import json
+import logging
 from database import engine
 from sqlalchemy import text
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 def find_similar_matches(requirement_id):
     """
@@ -13,6 +18,7 @@ def find_similar_matches(requirement_id):
     Returns:
         Dict with requirement details and similar matches
     """
+    logger.info(f"Finding similar matches for requirement ID: {requirement_id}")
     try:
         with engine.connect() as connection:
             # First, get the requirement details
