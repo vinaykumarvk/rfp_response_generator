@@ -291,8 +291,22 @@ export default function ViewData() {
     }
   };
   
-  const handleRefresh = () => {
-    refetch();
+  const handleRefresh = async () => {
+    try {
+      // Force a fresh fetch from the server with cache bypass
+      await refetch({ fetchPolicy: 'network-only' });
+      toast({
+        title: "Data Refreshed",
+        description: "All requirements have been refreshed from the database.",
+      });
+    } catch (error) {
+      console.error('Error refreshing data:', error);
+      toast({
+        title: "Refresh Error",
+        description: `Failed to refresh data: ${error instanceof Error ? error.message : String(error)}`,
+        variant: "destructive",
+      });
+    }
   };
   
   const handleFeedbackSubmit = async (responseId: number, feedback: 'positive' | 'negative') => {
