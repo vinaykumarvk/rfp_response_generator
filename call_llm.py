@@ -20,33 +20,69 @@ def extract_text(response):
     Returns:
         str: Clean text without TextBlock wrapper
     """
+    print(f"\n==== EXTRACT_TEXT DEBUG ====")
+    print(f"Input response type: {type(response)}")
+    print(f"Input response repr: {repr(response)[:150]}...")
+    
     # Handle direct string
     if isinstance(response, str):
+        print(f"EXTRACT_TEXT: Response is already a string of length {len(response)}")
+        print(f"EXTRACT_TEXT: String sample: {response[:100]}...")
+        print(f"==== END EXTRACT_TEXT DEBUG ====\n")
         return response
         
     # Handle content attribute (new Anthropic API)
     if hasattr(response, 'content'):
-        print(f"DEBUG - extract_text: response has content attribute")
+        print(f"EXTRACT_TEXT: Response has content attribute")
+        print(f"EXTRACT_TEXT: Content type: {type(response.content)}")
+        
         if isinstance(response.content, list):
-            print(f"DEBUG - extract_text: content is a list of length {len(response.content)}")
+            print(f"EXTRACT_TEXT: Content is a list of length {len(response.content)}")
+            print(f"EXTRACT_TEXT: First item type: {type(response.content[0]) if response.content else 'N/A'}")
+            
             # Handle TextBlock objects
             result = ' '.join(block.text for block in response.content if hasattr(block, 'text'))
-            print(f"DEBUG - extract_text: joined text blocks, result length: {len(result)}")
+            print(f"EXTRACT_TEXT: Joined text blocks, result length: {len(result)}")
+            print(f"EXTRACT_TEXT: Result sample: {result[:100]}...")
+            print(f"==== END EXTRACT_TEXT DEBUG ====\n")
             return result
+            
         elif isinstance(response.content, str):
-            print(f"DEBUG - extract_text: content is a string of length {len(response.content)}")
+            print(f"EXTRACT_TEXT: Content is a string of length {len(response.content)}")
+            print(f"EXTRACT_TEXT: String sample: {response.content[:100]}...")
+            print(f"==== END EXTRACT_TEXT DEBUG ====\n")
             return response.content
+            
         else:
             # Try as string anyway
-            print(f"DEBUG - extract_text: content is of type {type(response.content)}")
+            print(f"EXTRACT_TEXT: Content is of type {type(response.content)}")
+            print(f"EXTRACT_TEXT: Converting to string: {str(response.content)[:100]}...")
+            print(f"==== END EXTRACT_TEXT DEBUG ====\n")
             return str(response.content)
             
     # Handle direct TextBlock object
     if hasattr(response, 'text'):
+        print(f"EXTRACT_TEXT: Response has text attribute")
+        print(f"EXTRACT_TEXT: Text length: {len(response.text)}")
+        print(f"EXTRACT_TEXT: Text sample: {response.text[:100]}...")
+        print(f"==== END EXTRACT_TEXT DEBUG ====\n")
         return response.text
+    
+    # Try common properties
+    for attr in ['message', 'choices', 'result', 'output']:
+        if hasattr(response, attr):
+            print(f"EXTRACT_TEXT: Response has {attr} attribute")
+            attr_value = getattr(response, attr)
+            print(f"EXTRACT_TEXT: {attr} type: {type(attr_value)}")
+            print(f"EXTRACT_TEXT: {attr} repr: {repr(attr_value)[:100]}...")
         
     # Last resort fallback
-    return str(response)
+    result = str(response)
+    print(f"EXTRACT_TEXT: Using last resort fallback")
+    print(f"EXTRACT_TEXT: Fallback result length: {len(result)}")
+    print(f"EXTRACT_TEXT: Fallback sample: {result[:100]}...")
+    print(f"==== END EXTRACT_TEXT DEBUG ====\n")
+    return result
 
 def get_model_config(model_name):
     """
