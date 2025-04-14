@@ -138,6 +138,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return res.json({ status: 'ok', timestamp: new Date().toISOString() });
   });
 
+  // Generate response using selected LLM
+  app.post('/api/generate-response', async (req: Request, res: Response) => {
+    try {
+      const { requirementId, model } = req.body;
+      
+      if (!requirementId || !model) {
+        return res.status(400).json({ message: 'Missing requirementId or model' });
+      }
+
+      // Execute Python script with arguments
+      const { exec } = require('child_process');
+      exec(`python3 call_llm.py ${requirementId} ${model}`, (error: any, stdout: string, stderr: string) => {
+        if (error) {
+          console.error(`Error executing LLM script: ${error}`);
+          return res.status(500).json({ message: 'Failed to generate response', error: error.message });
+        }
+        if (stderr) {
+          console.error(`LLM script stderr: ${stderr}`);
+        }
+        return res.json({ message: 'Response generated successfully', data: stdout });
+      });
+    } catch (error) {
+      console.error('Error in generate-response:', error);
+      return res.status(500).json({ message: 'Failed to generate response', error: String(error) });
+    }
+  });
+
   // API key validation check
   app.get('/api/validate-keys', async (_req: Request, res: Response) => {
     // Check if we have the necessary API keys in the environment
