@@ -94,8 +94,10 @@ def prompt_gpt(prompt, llm='openAI'):
             logger.info(f"Successfully generated response of length: {len(content)} characters")
             return content
 
-        elif llm == 'claude':
-            logger.info(f"Calling Claude API with prompt: {prompt}")
+        elif llm == 'claude' or llm == 'anthropic':
+            # Standardize model name for consistent handling
+            normalized_llm = 'anthropic'
+            logger.info(f"Calling {normalized_llm.capitalize()} API with prompt: {prompt}")
             client = Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
             
             # The system message should be passed separately for Claude
@@ -265,7 +267,7 @@ def get_llm_responses(requirement_id, model='moa', display_results=True):
 
     Args:
         requirement_id: ID of the requirement to process
-        model: Model to use ('openAI', 'deepseek', 'claude', or 'moa')
+        model: Model to use ('openAI', 'deepseek', 'anthropic'/'claude', or 'moa')
                If 'moa', responses from all models will be synthesized
         display_results: Whether to display the results after fetching
     """
@@ -371,9 +373,10 @@ def get_llm_responses(requirement_id, model='moa', display_results=True):
                     deepseek_response = None
 
                 try:
-                    claude_response = prompt_gpt(claude_prompt, 'claude')
+                    # Use 'anthropic' as the standardized model name
+                    claude_response = prompt_gpt(claude_prompt, 'anthropic')
                 except Exception as e:
-                    print(f"Error generating Claude response: {str(e)}")
+                    print(f"Error generating Anthropic/Claude response: {str(e)}")
                     claude_response = None
 
                 # Create synthesized prompt
@@ -425,7 +428,7 @@ def get_llm_responses(requirement_id, model='moa', display_results=True):
             else:
                 print(f"3. Generating response from {model}")
                 # Generate response from specific model
-                if model == 'claude':
+                if model == 'claude' or model == 'anthropic':
                     prompt = convert_prompt_to_claude(create_rfp_prompt(requirement[1], requirement[2], previous_responses))
                 else:
                     prompt = create_rfp_prompt(requirement[1], requirement[2], previous_responses)
@@ -437,15 +440,18 @@ def get_llm_responses(requirement_id, model='moa', display_results=True):
 
                 # Save response to database
                 print("4. Saving response to database")
+                # Standardize model name for consistent handling
+                normalized_model = 'anthropic' if model == 'claude' else model
+                
                 save_query = text("""
                     UPDATE excel_requirement_responses
                     SET 
-                        openai_response = CASE WHEN :model = 'openAI' THEN :response ELSE openai_response END,
-                        deepseek_response = CASE WHEN :model = 'deepseek' THEN :response ELSE deepseek_response END,
-                        anthropic_response = CASE WHEN :model = 'claude' THEN :response ELSE anthropic_response END,
+                        openai_response = CASE WHEN :normalized_model = 'openAI' THEN :response ELSE openai_response END,
+                        deepseek_response = CASE WHEN :normalized_model = 'deepseek' THEN :response ELSE deepseek_response END,
+                        anthropic_response = CASE WHEN :normalized_model = 'anthropic' THEN :response ELSE anthropic_response END,
                         final_response = :response,  -- Always set final_response to the current response
                         similar_questions = :similar_questions,
-                        model_provider = :model,
+                        model_provider = :normalized_model,
                         timestamp = NOW()
                     WHERE id = :req_id
                 """)
@@ -453,6 +459,7 @@ def get_llm_responses(requirement_id, model='moa', display_results=True):
                 connection.execute(save_query, {
                     "req_id": requirement_id,
                     "model": model,
+                    "normalized_model": normalized_model,
                     "response": response,
                     "similar_questions": str(similar_questions_list)
                 })

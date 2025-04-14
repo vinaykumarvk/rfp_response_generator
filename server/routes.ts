@@ -311,20 +311,31 @@ except Exception as e:
         
         // Save the response to the database
         try {
+          // Normalize model name
+          const normalizedModelProvider = modelProvider.toLowerCase() === 'claude' 
+            ? 'anthropic' 
+            : modelProvider.toLowerCase();
+            
+          console.log(`Model provider: ${modelProvider}, normalized: ${normalizedModelProvider}`);
+          
+          // Debugging the response data
+          console.log('ResponseData debug:');
+          console.log(JSON.stringify(responseData, null, 2));
+          
           // Prepare the update object
           const updateData: any = {
             // Set final response from the appropriate field based on model
             finalResponse: responseData.finalResponse || 
-              (modelProvider.toLowerCase() === 'anthropic' || modelProvider.toLowerCase() === 'claude' 
+              (normalizedModelProvider === 'anthropic'
                 ? responseData.anthropicResponse 
-                : modelProvider.toLowerCase() === 'openai'
+                : normalizedModelProvider === 'openai'
                   ? responseData.openaiResponse
-                  : modelProvider.toLowerCase() === 'deepseek'
+                  : normalizedModelProvider === 'deepseek'
                     ? responseData.deepseekResponse
-                    : modelProvider.toLowerCase() === 'moa'
+                    : normalizedModelProvider === 'moa'
                       ? responseData.moaResponse
                       : null),
-            modelProvider: responseData.modelProvider || modelProvider
+            modelProvider: responseData.modelProvider || normalizedModelProvider
           };
           
           // Set model-specific responses
@@ -394,19 +405,26 @@ except Exception as e:
         
         // Save the simulated response to the database
         try {
+          // Normalize model name
+          const normalizedModelProvider = modelProvider.toLowerCase() === 'claude' 
+            ? 'anthropic' 
+            : modelProvider.toLowerCase();
+            
+          console.log(`Fallback - Model provider: ${modelProvider}, normalized: ${normalizedModelProvider}`);
+          
           // Prepare the update object
           const updateData: any = {
             finalResponse: responseContent.finalResponse || 
-              (modelProvider.toLowerCase() === 'anthropic' || modelProvider.toLowerCase() === 'claude' 
+              (normalizedModelProvider === 'anthropic'
                 ? responseContent.anthropicResponse 
-                : modelProvider.toLowerCase() === 'openai'
+                : normalizedModelProvider === 'openai'
                   ? responseContent.openaiResponse
-                  : modelProvider.toLowerCase() === 'deepseek'
+                  : normalizedModelProvider === 'deepseek'
                     ? responseContent.deepseekResponse
-                    : modelProvider.toLowerCase() === 'moa'
+                    : normalizedModelProvider === 'moa'
                       ? responseContent.moaResponse
                       : null),
-            modelProvider: responseContent.modelProvider || modelProvider
+            modelProvider: responseContent.modelProvider || normalizedModelProvider
           };
           
           // Set model-specific responses
