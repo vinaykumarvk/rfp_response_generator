@@ -224,6 +224,10 @@ def get_llm_responses(requirement_id, model='moa', display_results=True):
                If 'moa', responses from all models will be synthesized
         display_results: Whether to display the results after fetching
     """
+    print(f"\n\n==== RESPONSE GENERATION PROCESS ====")
+    print(f"Processing requirement ID: {requirement_id}")
+    print(f"Selected model: {model}")
+    print(f"====================================\n")
     try:
         print("\n=== Database Operations ===")
         # First, get the requirement details and generate prompts
@@ -285,24 +289,28 @@ def get_llm_responses(requirement_id, model='moa', display_results=True):
             previous_responses = []
             similar_questions_list = []
             for idx, result in enumerate(similar_results, 1):
-                response_text = f"""
-Response #{idx} (Similarity Score: {result[4]:.4f}):
-Requirement: {result[1]}
-Response: {result[2]}
-"""
-                previous_responses.append(response_text)
+                # Format the similar questions for the prompt in the expected dictionary format
+                previous_responses.append({
+                    "requirement": result[1],  # matched_requirement
+                    "response": result[2],     # matched_response
+                    "similarity_score": result[4]  # similarity_score as float
+                })
+                
+                # Format similar questions for API response and database storage
                 similar_questions_list.append({
                     "question": result[1],
                     "response": result[2],
                     "reference": f"Response #{idx}",
                     "similarity_score": f"{result[4]:.4f}"
                 })
+                
+            print(f"Found {len(previous_responses)} similar questions")
 
             # Generate prompts based on model
             if model == 'moa':
                 print("3. Generating responses from all models")
                 # Generate responses from all models
-                openai_prompt = create_rfp_prompt(requirement[1], previous_responses)
+                openai_prompt = create_rfp_prompt(requirement[1], requirement[2], previous_responses)
                 claude_prompt = convert_prompt_to_claude(openai_prompt)
 
                 try:
@@ -373,9 +381,9 @@ Response: {result[2]}
                 print(f"3. Generating response from {model}")
                 # Generate response from specific model
                 if model == 'claude':
-                    prompt = convert_prompt_to_claude(create_rfp_prompt(requirement[1], previous_responses))
+                    prompt = convert_prompt_to_claude(create_rfp_prompt(requirement[1], requirement[2], previous_responses))
                 else:
-                    prompt = create_rfp_prompt(requirement[1], previous_responses)
+                    prompt = create_rfp_prompt(requirement[1], requirement[2], previous_responses)
 
                 try:
                     response = prompt_gpt(prompt, model)

@@ -21,6 +21,10 @@ def create_rfp_prompt(requirement: str, category: Optional[str] = None, previous
     Returns:
         List of message dictionaries for LLM.
     """
+    logger.info(f"Creating prompt for requirement: {requirement}")
+    logger.info(f"Category: {category}")
+    logger.info(f"Previous responses available: {len(previous_responses or [])} items")
+    
     # System prompt with instructions
     messages = [
         {
@@ -53,10 +57,21 @@ Guidelines for your response:
         category_context = f"This requirement is categorized as: {category}\n\n"
     
     # Add the requirement and context to the prompt
+    user_content = f"{category_context}Please provide a comprehensive response to the following RFP requirement:\n\n{requirement}\n\n{context}"
     messages.append({
         "role": "user",
-        "content": f"{category_context}Please provide a comprehensive response to the following RFP requirement:\n\n{requirement}\n\n{context}"
+        "content": user_content
     })
+    
+    # Print the full prompt for debugging
+    prompt_preview = f"""
+======== GENERATED PROMPT ========
+SYSTEM: {messages[0]['content'][:100]}...
+USER: {user_content[:500]}...
+================================
+"""
+    print(prompt_preview)
+    logger.info(prompt_preview)
     
     return messages
 
