@@ -381,6 +381,94 @@ except Exception as e:
     }
   });
 
+  // Get references for a specific Excel requirement response
+  app.get("/api/excel-requirements/:id/references", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid ID format" });
+      }
+
+      console.log(`Fetching references for requirement ID: ${id}`);
+      
+      // First check if this requirement has similarQuestions data already
+      const requirement = await storage.getExcelRequirementResponse(id);
+      if (!requirement) {
+        return res.status(404).json({ message: "Requirement not found" });
+      }
+      
+      if (requirement.similarQuestions && Array.isArray(requirement.similarQuestions)) {
+        console.log(`Found ${requirement.similarQuestions.length} similar questions in database for requirement ${id}`);
+        
+        // Format the similar questions data to match the Reference interface expected by the frontend
+        const references = requirement.similarQuestions.map((item: any, index: number) => ({
+          id: index + 1,
+          responseId: id,
+          category: item.category || 'Unknown',
+          requirement: item.requirement || '',
+          response: item.response || '',
+          reference: item.id ? `#${item.id}` : undefined,
+          score: item.similarity_score || 0
+        }));
+        
+        return res.json(references);
+      }
+      
+      // If we don't have stored similar questions, try to fetch them using find_matches
+      console.log(`No similar questions found in database for requirement ${id}, fetching from find_matches...`);
+      try {
+        // Call the find_similar_matches function
+        const pythonResponse = await exec(`python3 -c "
+import sys
+import os
+import json
+from find_matches import find_similar_matches
+
+try:
+    # Call the find_similar_matches function and get the results as a dictionary
+    results = find_similar_matches(${id})
+    
+    # Convert the results to JSON and print
+    print(json.dumps(results))
+except Exception as e:
+    print(json.dumps({
+        'success': False,
+        'error': str(e)
+    }))
+"`);
+        
+        const data = JSON.parse(pythonResponse.stdout);
+        
+        if (data.success && data.similar_matches && Array.isArray(data.similar_matches)) {
+          // Format the data for the References panel
+          const references = data.similar_matches.map((item: any, index: number) => ({
+            id: index + 1,
+            responseId: id,
+            category: item.category || 'Unknown',
+            requirement: item.requirement || '',
+            response: item.response || '',
+            reference: item.id ? `#${item.id}` : undefined,
+            score: item.similarity_score || 0
+          }));
+          
+          // Update the database with the new similar questions data
+          await storage.updateSimilarQuestions(id, data.similar_matches);
+          
+          return res.json(references);
+        } else {
+          // Return empty array if no similar matches found
+          return res.json([]);
+        }
+      } catch (pythonError) {
+        console.error('Error executing Python script for finding similar matches:', pythonError);
+        throw new Error('Failed to execute similar matches search');
+      }
+    } catch (error) {
+      console.error("Error fetching references:", error);
+      return res.status(500).json({ message: "Failed to fetch references" });
+    }
+  });
+
   app.get('/api/validate-keys', async (_req: Request, res: Response) => {
     // Check if we have the necessary API keys in the environment
     const apiKeys = {
