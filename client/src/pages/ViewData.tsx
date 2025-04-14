@@ -7,6 +7,7 @@ import { generateMarkdownContent, downloadMarkdownFile, sendEmailWithContent, do
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
@@ -858,21 +859,135 @@ export default function ViewData() {
                     </DropdownMenuContent>
                   </DropdownMenu>
 
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    className="h-9 px-2 sm:px-3 flex gap-1.5 items-center"
-                    title="Toggle filters"
-                    onClick={() => setShowFilters(!showFilters)}
-                  >
-                    <Filter className="h-4 w-4" />
-                    <span className="hidden sm:inline">Filter</span>
-                    {Object.values(filters).some(val => val !== 'all') && (
-                      <Badge className="ml-1 h-5 bg-primary text-white">{
-                        Object.values(filters).filter(val => val !== 'all').length
-                      }</Badge>
-                    )}
-                  </Button>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="h-9 px-2 sm:px-3 flex gap-1.5 items-center"
+                        title="Open filters"
+                      >
+                        <Filter className="h-4 w-4" />
+                        <span className="hidden sm:inline">Filter</span>
+                        {Object.values(filters).some(val => val !== 'all') && (
+                          <Badge className="ml-1 h-5 bg-primary text-white">{
+                            Object.values(filters).filter(val => val !== 'all').length
+                          }</Badge>
+                        )}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[380px] p-4" align="end">
+                      <div className="space-y-4">
+                        <h3 className="font-medium text-base">Filter Requirements</h3>
+                        
+                        <div className="space-y-3">
+                          <div className="space-y-1">
+                            <Label htmlFor="filter-rfp">RFP Name</Label>
+                            <Select
+                              value={filters.rfpName}
+                              onValueChange={(value) => setFilters({...filters, rfpName: value})}
+                            >
+                              <SelectTrigger id="filter-rfp" className="w-full">
+                                <SelectValue placeholder="Select RFP name" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="all">All RFPs</SelectItem>
+                                {uniqueRfpNames.filter(name => name).map(name => (
+                                  <SelectItem key={name} value={name}>{name}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          
+                          <div className="space-y-1">
+                            <Label htmlFor="filter-category">Category</Label>
+                            <Select
+                              value={filters.category}
+                              onValueChange={(value) => setFilters({...filters, category: value})}
+                            >
+                              <SelectTrigger id="filter-category" className="w-full">
+                                <SelectValue placeholder="Select category" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="all">All Categories</SelectItem>
+                                {uniqueCategories.filter(category => category).map(category => (
+                                  <SelectItem key={category} value={category}>{category}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          
+                          <div className="space-y-1">
+                            <Label htmlFor="filter-response">Response Status</Label>
+                            <Select
+                              value={filters.hasResponse}
+                              onValueChange={(value) => setFilters({...filters, hasResponse: value})}
+                            >
+                              <SelectTrigger id="filter-response" className="w-full">
+                                <SelectValue placeholder="Filter by response" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="all">All Statuses</SelectItem>
+                                <SelectItem value="yes">Has Response</SelectItem>
+                                <SelectItem value="no">No Response</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          
+                          <div className="space-y-1">
+                            <Label htmlFor="filter-model">Generation Model</Label>
+                            <Select
+                              value={filters.generationMode}
+                              onValueChange={(value) => setFilters({...filters, generationMode: value})}
+                            >
+                              <SelectTrigger id="filter-model" className="w-full">
+                                <SelectValue placeholder="Filter by model" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="all">All Models</SelectItem>
+                                <SelectItem value="openai">OpenAI</SelectItem>
+                                <SelectItem value="anthropic">Anthropic</SelectItem>
+                                <SelectItem value="deepseek">Deepseek</SelectItem>
+                                <SelectItem value="moa">MOA</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                        
+                        <div className="flex justify-between pt-2">
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={() => setFilters({
+                              rfpName: 'all',
+                              category: 'all',
+                              hasResponse: 'all',
+                              generationMode: 'all',
+                            })}
+                            className="flex items-center gap-1"
+                          >
+                            <X className="h-4 w-4" />
+                            Reset
+                          </Button>
+                          
+                          <Button 
+                            size="sm" 
+                            className="flex items-center gap-1"
+                            onClick={() => {
+                              // Close the popover manually
+                              const popoverButton = document.querySelector("[data-state='open']");
+                              if (popoverButton instanceof HTMLElement) {
+                                popoverButton.click();
+                              }
+                            }}
+                          >
+                            <Check className="h-4 w-4" />
+                            Apply Filters
+                          </Button>
+                        </div>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
 
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -957,99 +1072,7 @@ export default function ViewData() {
               </div>
             </div>
             
-            {/* Expandable Filter Panel */}
-            {showFilters && (
-              <div className="p-4 bg-slate-50 dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700 animate-in fade-in-50 duration-200">
-                <div className="flex flex-col md:flex-row gap-3 items-end">
-                  <div className="space-y-1 flex-1">
-                    <Label htmlFor="filter-rfp-unified">RFP Name</Label>
-                    <Select
-                      value={filters.rfpName}
-                      onValueChange={(value) => setFilters({...filters, rfpName: value})}
-                    >
-                      <SelectTrigger id="filter-rfp-unified" className="max-w-xs h-9">
-                        <SelectValue placeholder="Select RFP name" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All RFPs</SelectItem>
-                        {uniqueRfpNames.filter(name => name).map(name => (
-                          <SelectItem key={name} value={name}>{name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div className="space-y-1 flex-1">
-                    <Label htmlFor="filter-category-unified">Category</Label>
-                    <Select
-                      value={filters.category}
-                      onValueChange={(value) => setFilters({...filters, category: value})}
-                    >
-                      <SelectTrigger id="filter-category-unified" className="max-w-xs h-9">
-                        <SelectValue placeholder="Select category" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Categories</SelectItem>
-                        {uniqueCategories.filter(category => category).map(category => (
-                          <SelectItem key={category} value={category}>{category}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div className="space-y-1 flex-1">
-                    <Label htmlFor="filter-response-unified">Response Status</Label>
-                    <Select
-                      value={filters.hasResponse}
-                      onValueChange={(value) => setFilters({...filters, hasResponse: value})}
-                    >
-                      <SelectTrigger id="filter-response-unified" className="max-w-xs h-9">
-                        <SelectValue placeholder="Filter by response" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Statuses</SelectItem>
-                        <SelectItem value="yes">Has Response</SelectItem>
-                        <SelectItem value="no">No Response</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div className="space-y-1 flex-1">
-                    <Label htmlFor="filter-model-unified">Generation Model</Label>
-                    <Select
-                      value={filters.generationMode}
-                      onValueChange={(value) => setFilters({...filters, generationMode: value})}
-                    >
-                      <SelectTrigger id="filter-model-unified" className="max-w-xs h-9">
-                        <SelectValue placeholder="Filter by model" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Models</SelectItem>
-                        <SelectItem value="openai">OpenAI</SelectItem>
-                        <SelectItem value="anthropic">Anthropic</SelectItem>
-                        <SelectItem value="deepseek">Deepseek</SelectItem>
-                        <SelectItem value="moa">MOA</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <Button 
-                    variant="secondary" 
-                    size="sm" 
-                    onClick={() => setFilters({
-                      rfpName: 'all',
-                      category: 'all',
-                      hasResponse: 'all',
-                      generationMode: 'all',
-                    })}
-                    className="h-9 whitespace-nowrap"
-                  >
-                    <X className="h-4 w-4 mr-1" />
-                    Reset Filters
-                  </Button>
-                </div>
-              </div>
-            )}
+            {/* Filter panel is now a Popover component */}
           </div>
 
           {/* Progress indicator for generation */}
