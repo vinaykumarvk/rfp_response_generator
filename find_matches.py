@@ -38,23 +38,56 @@ def find_similar_matches(requirement_id):
                     "error": f"No requirement found with ID: {requirement_id}"
                 }
 
-            # Find top 5 similar vectors using cosine similarity
+            # Log the requirement we're looking for
+            logger.info(f"Found requirement: {requirement}")
+            
+            # First check if an embedding exists for this requirement
+            embedding_check_query = text("""
+                SELECT COUNT(*) 
+                FROM embeddings 
+                WHERE requirement = (
+                    SELECT requirement 
+                    FROM excel_requirement_responses 
+                    WHERE id = :req_id
+                )
+            """)
+            
+            embedding_count = connection.execute(embedding_check_query, {"req_id": requirement_id}).scalar()
+            logger.info(f"Found {embedding_count} embeddings for requirement ID {requirement_id}")
+            
+            if embedding_count == 0:
+                logger.warning(f"No embeddings found for requirement ID {requirement_id}")
+                # Return early with fallback similar questions
+                return {
+                    "success": True,
+                    "requirement": {
+                        "id": requirement[0],
+                        "text": requirement[1],
+                        "category": requirement[2]
+                    },
+                    "similar_matches": [],
+                    "warning": "No embeddings found for this requirement"
+                }
+            
+            # Find top 5 similar vectors using cosine similarity with a more efficient query
+            # Using Common Table Expression (CTE) to avoid nested subqueries
             similar_query = text("""
+                WITH req_embedding AS (
+                    SELECT embedding
+                    FROM embeddings
+                    WHERE requirement = (
+                        SELECT requirement
+                        FROM excel_requirement_responses
+                        WHERE id = :req_id
+                    )
+                    LIMIT 1
+                )
                 SELECT 
                     e.id,
                     e.requirement as matched_requirement,
                     e.response as matched_response,
                     e.category,
-                    1 - (e.embedding <=> (
-                        SELECT embedding 
-                        FROM embeddings 
-                        WHERE requirement = (
-                            SELECT requirement 
-                            FROM excel_requirement_responses 
-                            WHERE id = :req_id
-                        )
-                        LIMIT 1
-                    )) as similarity_score
+                    1 - (e.embedding <=> (SELECT embedding FROM req_embedding)) as similarity_score
                 FROM embeddings e
                 WHERE e.embedding IS NOT NULL
                 ORDER BY similarity_score DESC
