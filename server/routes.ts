@@ -313,11 +313,17 @@ except Exception as e:
         try {
           // Prepare the update object
           const updateData: any = {
-            // Set final response from the appropriate field
+            // Set final response from the appropriate field based on model
             finalResponse: responseData.finalResponse || 
               (modelProvider.toLowerCase() === 'anthropic' || modelProvider.toLowerCase() === 'claude' 
                 ? responseData.anthropicResponse 
-                : null),
+                : modelProvider.toLowerCase() === 'openai'
+                  ? responseData.openaiResponse
+                  : modelProvider.toLowerCase() === 'deepseek'
+                    ? responseData.deepseekResponse
+                    : modelProvider.toLowerCase() === 'moa'
+                      ? responseData.moaResponse
+                      : null),
             modelProvider: responseData.modelProvider || modelProvider
           };
           
@@ -393,7 +399,13 @@ except Exception as e:
             finalResponse: responseContent.finalResponse || 
               (modelProvider.toLowerCase() === 'anthropic' || modelProvider.toLowerCase() === 'claude' 
                 ? responseContent.anthropicResponse 
-                : null),
+                : modelProvider.toLowerCase() === 'openai'
+                  ? responseContent.openaiResponse
+                  : modelProvider.toLowerCase() === 'deepseek'
+                    ? responseContent.deepseekResponse
+                    : modelProvider.toLowerCase() === 'moa'
+                      ? responseContent.moaResponse
+                      : null),
             modelProvider: responseContent.modelProvider || modelProvider
           };
           
