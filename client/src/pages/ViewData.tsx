@@ -223,6 +223,14 @@ export default function ViewData() {
   const handleViewResponse = (row: ExcelRequirementResponse) => {
     setSelectedResponse(row);
     setSelectedResponseId(row.id);
+    
+    // Set the appropriate tab based on what's available
+    if (row.finalResponse) {
+      setActiveTab('response');
+    } else if (row.similarQuestions) {
+      setActiveTab('references');
+    }
+    
     setShowResponseDialog(true);
   };
   
@@ -1095,19 +1103,20 @@ export default function ViewData() {
                             
                             {/* Requirement text with hover interaction */}
                             <div 
-                              className={`group relative text-sm sm:text-base font-medium text-slate-800 dark:text-slate-100 line-clamp-3 cursor-pointer transition-all duration-200 ${!row.finalResponse ? 'opacity-70' : ''}`}
-                              onClick={() => row.finalResponse && handleViewResponse(row)}
-                              title={row.finalResponse ? "Click to view full response" : "No response generated yet"}
-                              aria-label={row.finalResponse ? "Click to view full response" : "No response generated yet"}
+                              className={`group relative text-sm sm:text-base font-medium text-slate-800 dark:text-slate-100 line-clamp-3 cursor-pointer transition-all duration-200 ${!row.finalResponse && !row.similarQuestions ? 'opacity-70' : ''}`}
+                              onClick={() => (row.finalResponse || row.similarQuestions) && handleViewResponse(row)}
+                              title={(row.finalResponse || row.similarQuestions) ? "Click to view details" : "No response or references available yet"}
+                              aria-label={(row.finalResponse || row.similarQuestions) ? "Click to view details" : "No response or references available yet"}
                             >
                               {row.requirement}
                               
-                              {row.finalResponse && (
+                              {(row.finalResponse || row.similarQuestions) && (
                                 <div className="absolute inset-0 bg-gradient-to-r from-transparent to-white/80 dark:to-black/80 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-end pr-4">
                                   <span className="absolute right-10 top-1/2 transform -translate-y-1/2 bg-slate-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                                    Click to view
+                                    {row.finalResponse && row.similarQuestions ? "View response & references" : 
+                                     row.finalResponse ? "View response" : "View references"}
                                   </span>
-                                  <Hand className="h-5 w-5 text-primary" />
+                                  {row.finalResponse ? <Hand className="h-5 w-5 text-primary" /> : <BookOpen className="h-5 w-5 text-primary" />}
                                 </div>
                               )}
                             </div>
@@ -1171,13 +1180,27 @@ export default function ViewData() {
               
               <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                 <TabsList className="grid w-full grid-cols-2 mb-6">
-                  <TabsTrigger value="response" className="flex items-center gap-2">
+                  <TabsTrigger 
+                    value="response" 
+                    className="flex items-center gap-2"
+                    disabled={!selectedResponse?.finalResponse}
+                  >
                     <MessageSquare className="h-4 w-4" />
                     Response
+                    {!selectedResponse?.finalResponse && <span className="ml-1 text-xs opacity-60">(Not available)</span>}
                   </TabsTrigger>
-                  <TabsTrigger value="references" className="flex items-center gap-2">
+                  <TabsTrigger 
+                    value="references" 
+                    className="flex items-center gap-2"
+                    disabled={!selectedResponse?.similarQuestions}
+                  >
                     <BookOpen className="h-4 w-4" />
                     References
+                    {selectedResponse?.similarQuestions && (
+                      <Badge variant="secondary" className="ml-1">
+                        {Array.isArray(selectedResponse.similarQuestions) ? selectedResponse.similarQuestions.length : 0}
+                      </Badge>
+                    )}
                   </TabsTrigger>
                 </TabsList>
                 
