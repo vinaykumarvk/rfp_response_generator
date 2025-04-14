@@ -1,12 +1,26 @@
-openai>=1.0.0
-anthropic>=0.5.0
-sqlalchemy>=2.0.0
-psycopg2-binary>=2.9.5
-pandas>=1.5.0
-numpy>=1.23.0
-scikit-learn>=1.0.0
-pgvector>=0.1.0
-python-dotenv>=0.21.0
-openpyxl>=3.0.0
-tqdm>=4.64.0
-requests>=2.28.0
+# Core Dependencies
+fastapi==0.109.2
+numpy==1.26.3
+pandas==2.2.0
+pydantic==2.6.1
+scikit-learn==1.4.0
+sqlalchemy==2.0.26
+uvicorn==0.27.1
+
+# AI/ML Models
+anthropic==0.12.1
+openai==1.12.0
+
+# Database
+psycopg2-binary==2.9.9
+pgvector==0.2.4
+qdrant-client==1.7.0
+
+# Utilities
+openpyxl==3.1.2
+requests==2.31.0
+tqdm==4.66.1
+gdown==5.1.0
+
+# To add additional packages, modify pyproject.toml and regenerate this file with:
+# pip freeze > python-requirements.txt

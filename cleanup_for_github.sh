@@ -2,8 +2,16 @@
 
 # Cleanup script for GitHub submission
 # This script removes temporary files, backups, and test files to prepare the codebase for GitHub
+# It also creates a backup archive of the repository before cleaning
 
 echo "Starting cleanup for GitHub submission..."
+
+# Create a snapshot archive as version 1.0
+echo "Creating snapshot archive as version 1.0..."
+timestamp=$(date +"%Y%m%d_%H%M%S")
+backup_name="rfp_response_generator_v1.0_snapshot_${timestamp}.tar.gz"
+tar -czf "$backup_name" --exclude=node_modules --exclude=.git --exclude=.cache --exclude=.pythonlibs .
+echo "Snapshot archive created: $backup_name"
 
 # Step 1: Removing cache and build artifacts
 echo "Removing cache and build directories..."
