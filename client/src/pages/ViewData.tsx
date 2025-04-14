@@ -526,26 +526,45 @@ export default function ViewData() {
     setIsGenerating(true);
     
     try {
-      for (const requirementId of selectedItems) {
+      // Find the selected requirements
+      const selectedRequirements = excelData.filter(item => selectedItems.includes(item.id || 0));
+      
+      for (const requirement of selectedRequirements) {
+        // Convert model name to provider format if needed
+        let provider = model;
+        if (model === 'openAI') provider = 'openai';
+        if (model === 'claude') provider = 'anthropic';
+        
         const response = await fetch('/api/generate-response', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ requirementId, model }),
+          body: JSON.stringify({ 
+            requirementId: requirement.id,
+            requirement: requirement.requirement,
+            provider,
+            rfpName: requirement.rfpName,
+            uploadedBy: requirement.uploadedBy
+          }),
         });
 
         if (!response.ok) {
-          throw new Error(`Failed to generate response for requirement ${requirementId}`);
+          throw new Error(`Failed to generate response for requirement ${requirement.id}`);
         }
 
         const result = await response.json();
-        console.log(`Generated response for requirement ${requirementId}:`, result);
+        console.log(`Generated response for requirement ${requirement.id}:`, result);
+        
+        // Show a preview of the response in the console
+        if (result.finalResponse) {
+          console.log(`Response preview: ${result.finalResponse.substring(0, 100)}...`);
+        }
       }
 
       toast({
         title: "Success",
-        description: `Generated responses using ${model}`,
+        description: `Generated responses for ${selectedRequirements.length} requirements using ${model}`,
       });
 
       // Refresh the data to show new responses

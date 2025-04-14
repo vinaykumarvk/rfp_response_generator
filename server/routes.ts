@@ -141,22 +141,88 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Generate response using selected LLM
   app.post('/api/generate-response', async (req: Request, res: Response) => {
     try {
-      const { requirementId, model } = req.body;
+      const { requirementId, model, requirement, provider, rfpName, uploadedBy } = req.body;
       
-      if (!requirementId || !model) {
-        return res.status(400).json({ message: 'Missing requirementId or model' });
+      // Log the complete request for debugging
+      console.log('==== DETAILED REQUEST DEBUG - /api/generate-response ====');
+      console.log('Request body:', JSON.stringify(req.body, null, 2));
+      
+      // Check for required parameters
+      if (!requirementId) {
+        return res.status(400).json({ message: 'Missing requirementId parameter' });
       }
-
-      // Since we've removed the Python script functionality for simplification
-      // We'll just simulate a successful response here
-      console.log(`Processing request to generate response for requirement ${requirementId} with model ${model}`);
       
-      // Return a simple success response
+      // Set default model if not provided
+      const modelProvider = provider || model || 'openAI';
+      
+      // Get the requirement text from the database if not provided in the request
+      let requirementText = requirement;
+      if (!requirementText) {
+        try {
+          const requirementRecord = await storage.getExcelRequirementResponse(Number(requirementId));
+          if (requirementRecord && requirementRecord.requirement) {
+            requirementText = requirementRecord.requirement;
+          }
+        } catch (err) {
+          console.warn(`Could not fetch requirement text for ID ${requirementId}:`, err);
+        }
+      }
+      
+      console.log(`Processing request to generate response for requirement ${requirementId} with model ${modelProvider}`);
+      console.log(`Requirement text: ${requirementText?.substring(0, 100)}${requirementText?.length > 100 ? '...' : ''}`);
+      
+      // Simulate different response formats based on the model
+      let responseContent;
+      
+      if (modelProvider.toLowerCase() === 'openai') {
+        responseContent = {
+          finalResponse: `This is a simulated OpenAI response for requirement ${requirementId}`,
+          openaiResponse: `Detailed OpenAI response for: ${requirementText?.substring(0, 50) || 'unknown requirement'}...`,
+          modelProvider: 'openai'
+        };
+      } else if (modelProvider.toLowerCase() === 'claude' || modelProvider.toLowerCase() === 'anthropic') {
+        responseContent = {
+          finalResponse: `This is a simulated Anthropic response for requirement ${requirementId}`,
+          anthropicResponse: `Detailed Claude response for: ${requirementText?.substring(0, 50) || 'unknown requirement'}...`,
+          modelProvider: 'anthropic'
+        };
+      } else if (modelProvider.toLowerCase() === 'deepseek') {
+        responseContent = {
+          finalResponse: `This is a simulated DeepSeek response for requirement ${requirementId}`,
+          deepseekResponse: `Detailed DeepSeek response for: ${requirementText?.substring(0, 50) || 'unknown requirement'}...`,
+          modelProvider: 'deepseek'
+        };
+      } else if (modelProvider.toLowerCase() === 'moa') {
+        responseContent = {
+          finalResponse: `This is a simulated MOA (Mixture of Agents) response for requirement ${requirementId}`,
+          openaiResponse: `OpenAI component of MOA response`,
+          anthropicResponse: `Anthropic component of MOA response`,
+          deepseekResponse: `DeepSeek component of MOA response`,
+          moaResponse: `Final synthesized MOA response for: ${requirementText?.substring(0, 50) || 'unknown requirement'}...`,
+          modelProvider: 'moa'
+        };
+      } else {
+        responseContent = {
+          finalResponse: `This is a simulated response using ${modelProvider} for requirement ${requirementId}`,
+          modelProvider
+        };
+      }
+      
+      // Log the response details
+      console.log('==== DETAILED RESPONSE DEBUG - /api/generate-response ====');
+      console.log('Response fields:');
+      console.log('- generated_response:', responseContent.finalResponse ? 'Present' : 'Not present');
+      console.log('- openai_response:', responseContent.openaiResponse ? 'Present' : 'Not present');
+      console.log('- anthropic_response:', responseContent.anthropicResponse ? 'Present' : 'Not present');
+      console.log('- deepseek_response:', responseContent.deepseekResponse ? 'Present' : 'Not present');
+      
+      // Return the response
       return res.status(200).json({ 
-        success: true, 
-        message: `Response generated for requirement ${requirementId} with model ${model}`,
+        success: true,
+        message: `Response generated for requirement ${requirementId} with model ${modelProvider}`,
         requirementId,
-        model
+        model: modelProvider,
+        ...responseContent
       });
     } catch (error) {
       console.error('Error in generate-response:', error);
