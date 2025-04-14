@@ -1040,252 +1040,233 @@ export default function ViewData() {
           {showFilters && (
             <div className="sticky top-[60px] z-10 border-b border-slate-200 dark:border-slate-700">
               <div className="p-3 bg-white/95 dark:bg-slate-900/95 backdrop-blur-sm">
-                <div className="flex flex-wrap gap-4">
-                  {/* Filter controls */}
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        className="h-9 px-2 sm:px-3 flex gap-1.5 items-center" 
-                        disabled={selectedItems.length === 0}
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <h3 className="font-medium text-base">Filter Requirements</h3>
+                    
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button 
+                          variant="default" 
+                          size="sm" 
+                          className="h-9 px-2 sm:px-3 flex gap-1.5 items-center" 
+                          disabled={selectedItems.length === 0}
+                        >
+                          <Sparkles className="h-4 w-4" />
+                          <span className="hidden sm:inline">Generate</span>
+                          {selectedItems.length > 0 && (
+                            <Badge className="ml-1 h-5 bg-white text-primary">{selectedItems.length}</Badge>
+                          )}
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuLabel>Generate with LLM</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => generateResponse('openAI')} className="gap-2">
+                          <Atom className="h-4 w-4 text-blue-500" />
+                          <span>OpenAI</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => generateResponse('claude')} className="gap-2">
+                          <Bot className="h-4 w-4 text-purple-500" />
+                          <span>Anthropic</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => generateResponse('deepseek')} className="gap-2">
+                          <Brain className="h-4 w-4 text-amber-500" />
+                          <span>DeepSeek</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => handleBulkAction('generate-moa')} className="gap-2">
+                          <Network className="h-4 w-4 text-green-500" />
+                          <span>MOA (Mixture of Agents)</span>
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="filter-rfp">RFP Name</Label>
+                      <Select
+                        value={filters.rfpName}
+                        onValueChange={(value) => setFilters({...filters, rfpName: value})}
                       >
-                        <Sparkles className="h-4 w-4" />
-                        <span className="hidden sm:inline">Generate</span>
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuLabel>Generate with LLM</DropdownMenuLabel>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={() => generateResponse('openAI')} className="gap-2">
-                        <Atom className="h-4 w-4 text-blue-500" />
-                        <span>OpenAI</span>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => generateResponse('claude')} className="gap-2">
-                        <Bot className="h-4 w-4 text-purple-500" />
-                        <span>Anthropic</span>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => generateResponse('deepseek')} className="gap-2">
-                        <Brain className="h-4 w-4 text-amber-500" />
-                        <span>DeepSeek</span>
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={() => handleBulkAction('generate-moa')} className="gap-2">
-                        <Network className="h-4 w-4 text-green-500" />
-                        <span>MOA (Mixture of Agents)</span>
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                        <SelectTrigger id="filter-rfp" className="w-full">
+                          <SelectValue placeholder="Select RFP name" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All RFPs</SelectItem>
+                          {uniqueRfpNames.filter(name => name).map(name => (
+                            <SelectItem key={name} value={name}>{name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="filter-category">Category</Label>
+                      <Select
+                        value={filters.category}
+                        onValueChange={(value) => setFilters({...filters, category: value})}
+                      >
+                        <SelectTrigger id="filter-category" className="w-full">
+                          <SelectValue placeholder="Select category" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Categories</SelectItem>
+                          {uniqueCategories.filter(category => category).map(category => (
+                            <SelectItem key={category} value={category}>{category}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="filter-response">Response Status</Label>
+                      <Select
+                        value={filters.hasResponse}
+                        onValueChange={(value) => setFilters({...filters, hasResponse: value})}
+                      >
+                        <SelectTrigger id="filter-response" className="w-full">
+                          <SelectValue placeholder="Filter by response" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Statuses</SelectItem>
+                          <SelectItem value="yes">Has Response</SelectItem>
+                          <SelectItem value="no">No Response</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="filter-model">Generation Model</Label>
+                      <Select
+                        value={filters.generationMode}
+                        onValueChange={(value) => setFilters({...filters, generationMode: value})}
+                      >
+                        <SelectTrigger id="filter-model" className="w-full">
+                          <SelectValue placeholder="Filter by model" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Models</SelectItem>
+                          <SelectItem value="openai">OpenAI</SelectItem>
+                          <SelectItem value="anthropic">Anthropic</SelectItem>
+                          <SelectItem value="deepseek">Deepseek</SelectItem>
+                          <SelectItem value="moa">MOA</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  
+                  <div className="flex justify-between pt-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => setFilters({
+                        rfpName: 'all',
+                        category: 'all',
+                        hasResponse: 'all',
+                        generationMode: 'all',
+                      })}
+                      className="flex items-center gap-1"
+                    >
+                      <X className="h-4 w-4" />
+                      Reset Filters
+                    </Button>
+                    
+                    <Button 
+                      size="sm" 
+                      className="flex items-center gap-1"
+                      onClick={() => setShowFilters(false)}
+                    >
+                      <Check className="h-4 w-4" />
+                      Apply Filters
+                    </Button>
+                  </div>
 
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        className="h-9 px-2 sm:px-3 flex gap-1.5 items-center"
-                        title="Open filters"
-                      >
-                        <Filter className="h-4 w-4" />
-                        <span className="hidden sm:inline">Filter</span>
-                        {Object.values(filters).some(val => val !== 'all') && (
-                          <Badge className="ml-1 h-5 bg-primary text-white">{
-                            Object.values(filters).filter(val => val !== 'all').length
-                          }</Badge>
-                        )}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-[380px] p-4" align="end">
-                      <div className="space-y-4">
-                        <h3 className="font-medium text-base">Filter Requirements</h3>
-                        
-                        <div className="space-y-3">
-                          <div className="space-y-1">
-                            <Label htmlFor="filter-rfp">RFP Name</Label>
-                            <Select
-                              value={filters.rfpName}
-                              onValueChange={(value) => setFilters({...filters, rfpName: value})}
-                            >
-                              <SelectTrigger id="filter-rfp" className="w-full">
-                                <SelectValue placeholder="Select RFP name" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="all">All RFPs</SelectItem>
-                                {uniqueRfpNames.filter(name => name).map(name => (
-                                  <SelectItem key={name} value={name}>{name}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          
-                          <div className="space-y-1">
-                            <Label htmlFor="filter-category">Category</Label>
-                            <Select
-                              value={filters.category}
-                              onValueChange={(value) => setFilters({...filters, category: value})}
-                            >
-                              <SelectTrigger id="filter-category" className="w-full">
-                                <SelectValue placeholder="Select category" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="all">All Categories</SelectItem>
-                                {uniqueCategories.filter(category => category).map(category => (
-                                  <SelectItem key={category} value={category}>{category}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          
-                          <div className="space-y-1">
-                            <Label htmlFor="filter-response">Response Status</Label>
-                            <Select
-                              value={filters.hasResponse}
-                              onValueChange={(value) => setFilters({...filters, hasResponse: value})}
-                            >
-                              <SelectTrigger id="filter-response" className="w-full">
-                                <SelectValue placeholder="Filter by response" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="all">All Statuses</SelectItem>
-                                <SelectItem value="yes">Has Response</SelectItem>
-                                <SelectItem value="no">No Response</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          
-                          <div className="space-y-1">
-                            <Label htmlFor="filter-model">Generation Model</Label>
-                            <Select
-                              value={filters.generationMode}
-                              onValueChange={(value) => setFilters({...filters, generationMode: value})}
-                            >
-                              <SelectTrigger id="filter-model" className="w-full">
-                                <SelectValue placeholder="Filter by model" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="all">All Models</SelectItem>
-                                <SelectItem value="openai">OpenAI</SelectItem>
-                                <SelectItem value="anthropic">Anthropic</SelectItem>
-                                <SelectItem value="deepseek">Deepseek</SelectItem>
-                                <SelectItem value="moa">MOA</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </div>
-                        
-                        <div className="flex justify-between pt-2">
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
-                            onClick={() => setFilters({
-                              rfpName: 'all',
-                              category: 'all',
-                              hasResponse: 'all',
-                              generationMode: 'all',
-                            })}
-                            className="flex items-center gap-1"
-                          >
-                            <X className="h-4 w-4" />
-                            Reset
-                          </Button>
-                          
-                          <Button 
-                            size="sm" 
-                            className="flex items-center gap-1"
-                            onClick={() => {
-                              // Close the popover manually
-                              const popoverButton = document.querySelector("[data-state='open']");
-                              if (popoverButton instanceof HTMLElement) {
-                                popoverButton.click();
-                              }
-                            }}
-                          >
-                            <Check className="h-4 w-4" />
-                            Apply Filters
-                          </Button>
-                        </div>
-                      </div>
-                    </PopoverContent>
-                  </Popover>
+                  <div className="flex flex-wrap gap-2">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="h-9 px-2 sm:px-3 flex gap-1.5 items-center"
+                        >
+                          <ArrowUpDown className="h-4 w-4" />
+                          <span className="hidden sm:inline">Sort</span>
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuLabel>Sort By</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => requestSort('id')} className="gap-2">
+                          <Hash className="h-4 w-4" />
+                          <span>ID</span>
+                          {sortConfig.key === 'id' && (
+                            sortConfig.direction === 'asc' ? <ArrowUp className="h-4 w-4 ml-auto" /> : <ArrowDown className="h-4 w-4 ml-auto" />
+                          )}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => requestSort('timestamp')} className="gap-2">
+                          <Calendar className="h-4 w-4" />
+                          <span>Date</span>
+                          {sortConfig.key === 'timestamp' && (
+                            sortConfig.direction === 'asc' ? <ArrowUp className="h-4 w-4 ml-auto" /> : <ArrowDown className="h-4 w-4 ml-auto" />
+                          )}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => requestSort('rfpName')} className="gap-2">
+                          <BookOpen className="h-4 w-4" />
+                          <span>RFP Name</span>
+                          {sortConfig.key === 'rfpName' && (
+                            sortConfig.direction === 'asc' ? <ArrowUp className="h-4 w-4 ml-auto" /> : <ArrowDown className="h-4 w-4 ml-auto" />
+                          )}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => requestSort('category')} className="gap-2">
+                          <Tag className="h-4 w-4" />
+                          <span>Category</span>
+                          {sortConfig.key === 'category' && (
+                            sortConfig.direction === 'asc' ? <ArrowUp className="h-4 w-4 ml-auto" /> : <ArrowDown className="h-4 w-4 ml-auto" />
+                          )}
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
 
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        className="h-9 px-2 sm:px-3 flex gap-1.5 items-center"
-                      >
-                        <ArrowUpDown className="h-4 w-4" />
-                        <span className="hidden sm:inline">Sort</span>
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuLabel>Sort By</DropdownMenuLabel>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={() => requestSort('id')} className="gap-2">
-                        <Hash className="h-4 w-4" />
-                        <span>ID</span>
-                        {sortConfig.key === 'id' && (
-                          sortConfig.direction === 'asc' ? <ArrowUp className="h-4 w-4 ml-auto" /> : <ArrowDown className="h-4 w-4 ml-auto" />
-                        )}
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => requestSort('timestamp')} className="gap-2">
-                        <Calendar className="h-4 w-4" />
-                        <span>Date</span>
-                        {sortConfig.key === 'timestamp' && (
-                          sortConfig.direction === 'asc' ? <ArrowUp className="h-4 w-4 ml-auto" /> : <ArrowDown className="h-4 w-4 ml-auto" />
-                        )}
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => requestSort('rfpName')} className="gap-2">
-                        <BookOpen className="h-4 w-4" />
-                        <span>RFP Name</span>
-                        {sortConfig.key === 'rfpName' && (
-                          sortConfig.direction === 'asc' ? <ArrowUp className="h-4 w-4 ml-auto" /> : <ArrowDown className="h-4 w-4 ml-auto" />
-                        )}
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => requestSort('category')} className="gap-2">
-                        <Tag className="h-4 w-4" />
-                        <span>Category</span>
-                        {sortConfig.key === 'category' && (
-                          sortConfig.direction === 'asc' ? <ArrowUp className="h-4 w-4 ml-auto" /> : <ArrowDown className="h-4 w-4 ml-auto" />
-                        )}
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        className="h-9 px-2 sm:px-3 flex gap-1.5 items-center ml-auto"
-                        disabled={selectedItems.length === 0}
-                      >
-                        <MoreHorizontal className="h-4 w-4" />
-                        <span className="hidden sm:inline">More</span>
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuLabel>More Actions</DropdownMenuLabel>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={() => handleBulkAction('print')} className="gap-2">
-                        <Printer className="h-4 w-4" />
-                        <span>Export as Markdown</span>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => handleBulkAction('excel')} className="gap-2">
-                        <FileText className="h-4 w-4" />
-                        <span>Export as Excel</span>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => handleBulkAction('mail')} className="gap-2">
-                        <Mail className="h-4 w-4" />
-                        <span>Email Responses</span>
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={() => handleBulkAction('delete')} className="text-red-600 gap-2">
-                        <Trash2 className="h-4 w-4" />
-                        <span>Delete Selected</span>
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="h-9 px-2 sm:px-3 flex gap-1.5 items-center"
+                          disabled={selectedItems.length === 0}
+                        >
+                          <MoreHorizontal className="h-4 w-4" />
+                          <span className="hidden sm:inline">More</span>
+                          {selectedItems.length > 0 && (
+                            <Badge className="ml-1 h-5">{selectedItems.length}</Badge>
+                          )}
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuLabel>More Actions</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => handleBulkAction('print')} className="gap-2">
+                          <Printer className="h-4 w-4" />
+                          <span>Export as Markdown</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleBulkAction('excel')} className="gap-2">
+                          <FileText className="h-4 w-4" />
+                          <span>Export as Excel</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleBulkAction('mail')} className="gap-2">
+                          <Mail className="h-4 w-4" />
+                          <span>Email Responses</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => handleBulkAction('delete')} className="text-red-600 gap-2">
+                          <Trash2 className="h-4 w-4" />
+                          <span>Delete Selected</span>
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
                 </div>
               </div>
             </div>
