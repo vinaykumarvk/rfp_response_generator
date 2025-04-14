@@ -35,6 +35,7 @@ def extract_text(response):
 def prompt_gpt(prompt, llm='openAI'):
     try:
         if llm == 'openAI':
+            logger.info(f"Calling OpenAI API with prompt: {prompt}")
             client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
             response = client.chat.completions.create(
                 model='gpt-4',
@@ -50,10 +51,15 @@ def prompt_gpt(prompt, llm='openAI'):
                 logger.error("Empty response received from API")
                 raise ValueError("Empty response from API")
             content = response.choices[0].message.content.strip()
-            logger.info("Successfully generated response")
+            # Log the actual response content for debugging
+            print("====== FULL OPENAI RESPONSE ======")
+            print(content)
+            print("==================================")
+            logger.info(f"Successfully generated response of length: {len(content)} characters")
             return content
 
         elif llm == 'deepseek':
+            logger.info(f"Calling DeepSeek API with prompt: {prompt}")
             client = OpenAI(
                 api_key=os.environ.get("DEEPSEEK_API_KEY"),
                 base_url="https://api.deepseek.com/v1",
@@ -71,10 +77,15 @@ def prompt_gpt(prompt, llm='openAI'):
                 logger.error("Empty response received from API")
                 raise ValueError("Empty response from API")
             content = response.choices[0].message.content.strip()
-            logger.info("Successfully generated response")
+            # Log the actual response content for debugging
+            print("====== FULL DEEPSEEK RESPONSE ======")
+            print(content)
+            print("===================================")
+            logger.info(f"Successfully generated response of length: {len(content)} characters")
             return content
 
         elif llm == 'claude':
+            logger.info(f"Calling Claude API with prompt: {prompt}")
             client = Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
             response = client.messages.create(
                 model="claude-3-opus-20240229",
@@ -83,7 +94,13 @@ def prompt_gpt(prompt, llm='openAI'):
                 messages=prompt,
                 system="All responses and data must be treated as private and confidential. Do not use for training or any other purpose."
             )
-            return extract_text(response.content)
+            content = extract_text(response.content)
+            # Log the actual response content for debugging
+            print("====== FULL CLAUDE RESPONSE ======")
+            print(content)
+            print("=================================")
+            logger.info(f"Successfully generated Claude response of length: {len(content)} characters")
+            return content
 
     except Exception as e:
         logger.error(f"Error generating response from {llm}: {str(e)}")

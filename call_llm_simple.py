@@ -4,7 +4,12 @@ Simplified version of call_llm.py for API access
 import asyncio
 import json
 import os
+import logging
 from typing import Dict, Any, Optional, List
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Import the original function if possible
 try:
@@ -29,7 +34,13 @@ async def get_llm_responses(requirement_id: int, model: str = 'moa', display_res
     # If we can use the original function, do so
     if original_imported and original_get_llm_responses:
         try:
-            return await original_get_llm_responses(requirement_id, model, display_results)
+            # Since the original function is not async, we need to run it in a thread
+            loop = asyncio.get_event_loop()
+            result = await loop.run_in_executor(
+                None, 
+                lambda: original_get_llm_responses(requirement_id, model, display_results)
+            )
+            return result
         except Exception as e:
             print(f"Error in original get_llm_responses: {e}")
             # Fall back to mock data if original fails
