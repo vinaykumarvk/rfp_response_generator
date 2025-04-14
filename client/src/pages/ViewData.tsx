@@ -378,6 +378,7 @@ export default function ViewData() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationError, setGenerationError] = useState<string | null>(null);
   const [generationStage, setGenerationStage] = useState<string>("Initializing");
+  const [currentItemText, setCurrentItemText] = useState<string>("");
   
   // Helper function to get progress bar value based on generation stage
   const getProgressValueByStage = (stage: string): number => {
@@ -470,6 +471,9 @@ export default function ViewData() {
       if (!requirementItem) {
         throw new Error(`Requirement with ID ${requirementId} not found`);
       }
+      
+      // Set the requirement text for display in the progress area
+      setCurrentItemText(requirementItem.requirement || "");
       
       // Update stage to fetching similar questions
       setGenerationStage("Fetching similar questions");
@@ -591,7 +595,15 @@ export default function ViewData() {
       // Process items sequentially to avoid overloading the API
       for (let i = 0; i < selectedItems.length; i++) {
         const requirementId = selectedItems[i];
+        const requirement = excelData.find(item => item.id === requirementId);
+        
+        // Set the current requirement text for display
+        setCurrentItemText(requirement?.requirement || "");
+        
+        // Update stage with the current item number and total
         setGenerationStage(`Processing item ${i+1} of ${totalItems}`);
+        
+        // Generate response for this requirement
         const success = await generateResponseForRequirement(requirementId, modelProvider);
         
         if (success) {
