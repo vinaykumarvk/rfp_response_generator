@@ -417,12 +417,17 @@ export default function ViewData() {
     if (!requirementId) return;
     
     try {
+      // Set both the single response indicator and the progress tracking for visual feedback
       setIsGeneratingResponse(true);
+      setIsGenerating(true);
+      setProcessingItems([requirementId]);
+      setProcessedCount(0);
+      setGenerationError(null);
       
       console.log(`Generating LLM response for requirement ID ${requirementId} using model ${model}`);
       
       // Call the API to generate a response
-      const response = await fetch('/api/generate-llm-response', {
+      const response = await fetch('/api/generate-response', { // Use api/generate-response instead of api/generate-llm-response
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -442,6 +447,9 @@ export default function ViewData() {
       if (!data.success) {
         throw new Error(data.error || 'Failed to generate response');
       }
+      
+      // Mark as processed for progress bar
+      setProcessedCount(1);
       
       // Update the selected response with the generated response
       if (selectedResponse && selectedResponse.id === requirementId) {
@@ -464,6 +472,8 @@ export default function ViewData() {
         description: `Successfully generated response for requirement ID ${requirementId}`,
       });
       
+      console.log("Generated response for requirement " + requirementId + ":", data);
+      
       // Refresh the data
       await refetch();
       
@@ -471,6 +481,7 @@ export default function ViewData() {
       
     } catch (error) {
       console.error('Error generating LLM response:', error);
+      setGenerationError(error instanceof Error ? error.message : String(error));
       
       toast({
         title: "Generation Error",
@@ -481,6 +492,8 @@ export default function ViewData() {
       return false;
     } finally {
       setIsGeneratingResponse(false);
+      setIsGenerating(false);
+      setProcessingItems([]);
     }
   };
   
