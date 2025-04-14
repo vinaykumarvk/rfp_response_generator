@@ -973,6 +973,11 @@ export default function ViewData() {
                           <div className="flex-1 min-w-0">
                             {/* Mobile view categories and badges */}
                             <div className="flex flex-wrap items-center gap-1.5 mb-2">
+                              {/* ID Badge */}
+                              <Badge variant="secondary" className="text-[10px] sm:text-xs px-1.5 py-0">
+                                ID: {row.id}
+                              </Badge>
+                              
                               {/* Status tag */}
                               <Badge 
                                 variant="outline" 
@@ -1081,9 +1086,15 @@ export default function ViewData() {
           
           {selectedResponse && (
             <div className="space-y-4 py-2">
-              <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-md mb-4">
-                <h4 className="text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">Category:</h4>
-                <p className="text-slate-900 dark:text-slate-100 font-medium">{selectedResponse.category}</p>
+              <div className="flex space-x-4 mb-4">
+                <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-md flex-1">
+                  <h4 className="text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">ID:</h4>
+                  <p className="text-slate-900 dark:text-slate-100 font-medium">{selectedResponse.id}</p>
+                </div>
+                <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-md flex-1">
+                  <h4 className="text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">Category:</h4>
+                  <p className="text-slate-900 dark:text-slate-100 font-medium">{selectedResponse.category}</p>
+                </div>
               </div>
               
               <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-md mb-4">
