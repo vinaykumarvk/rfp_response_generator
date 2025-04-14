@@ -1,6 +1,8 @@
 import os
 import json
 import logging
+from database import engine
+from sqlalchemy import text
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)

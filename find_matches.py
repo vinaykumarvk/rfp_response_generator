@@ -140,6 +140,11 @@ def find_similar_matches(requirement_id):
         }
 
 if __name__ == "__main__":
-    # Use requirement ID 1 as an example
-    results = find_similar_matches(1)
+    import sys
+    
+    # Get requirement ID from command line if provided, otherwise use 1 as default
+    requirement_id = int(sys.argv[1]) if len(sys.argv) > 1 else 1
+    
+    # Run the function with the provided ID
+    results = find_similar_matches(requirement_id)
     print(json.dumps(results, indent=2))
