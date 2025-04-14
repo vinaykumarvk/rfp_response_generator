@@ -48,55 +48,6 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { useToast } from '@/hooks/use-toast';
 import { Progress } from '@/components/ui/progress';
 
-  const generateResponse = async (model: string) => {
-    if (selectedItems.length === 0) {
-      toast({
-        title: "No items selected",
-        description: "Please select at least one requirement to generate a response.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    setIsLoading(true);
-    
-    try {
-      for (const requirementId of selectedItems) {
-        const response = await fetch('/api/generate-response', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ requirementId, model }),
-        });
-
-        if (!response.ok) {
-          throw new Error(`Failed to generate response for requirement ${requirementId}`);
-        }
-
-        const result = await response.json();
-        console.log(`Generated response for requirement ${requirementId}:`, result);
-      }
-
-      toast({
-        title: "Success",
-        description: `Generated responses using ${model}`,
-      });
-
-      // Refresh the data to show new responses
-      fetchData();
-    } catch (error) {
-      console.error('Error generating response:', error);
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to generate response",
-        variant: "destructive"
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
 import ReferencePanel from '@/components/ReferencePanel';
 import { ExcelRequirementResponse } from '@shared/schema';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -558,6 +509,56 @@ export default function ViewData() {
         description: "Failed to generate Excel file: " + (error instanceof Error ? error.message : String(error)),
         variant: "destructive"
       });
+    }
+  };
+  
+  // Function to generate responses using selected model
+  const generateResponse = async (model: string) => {
+    if (selectedItems.length === 0) {
+      toast({
+        title: "No items selected",
+        description: "Please select at least one requirement to generate a response.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsGenerating(true);
+    
+    try {
+      for (const requirementId of selectedItems) {
+        const response = await fetch('/api/generate-response', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ requirementId, model }),
+        });
+
+        if (!response.ok) {
+          throw new Error(`Failed to generate response for requirement ${requirementId}`);
+        }
+
+        const result = await response.json();
+        console.log(`Generated response for requirement ${requirementId}:`, result);
+      }
+
+      toast({
+        title: "Success",
+        description: `Generated responses using ${model}`,
+      });
+
+      // Refresh the data to show new responses
+      refetch();
+    } catch (error) {
+      console.error('Error generating response:', error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to generate response",
+        variant: "destructive"
+      });
+    } finally {
+      setIsGenerating(false);
     }
   };
 
