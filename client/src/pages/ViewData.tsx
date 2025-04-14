@@ -542,6 +542,9 @@ export default function ViewData() {
       // Update to completion stage
       setGenerationStage("Process Completed");
       
+      // Clear the current requirement text
+      setCurrentItemText("");
+      
       // Show success toast
       toast({
         title: "Response Generated",
@@ -615,6 +618,9 @@ export default function ViewData() {
       
       // Set final stage
       setGenerationStage("Batch processing completed");
+      
+      // Clear the current requirement text
+      setCurrentItemText("");
       
       // Refresh data after all items are processed
       await refetch();
@@ -1289,6 +1295,7 @@ export default function ViewData() {
           {isGenerating && (
             <div className="sticky top-[120px] z-10 p-4 border-b border-slate-100 dark:border-slate-700 bg-white/95 dark:bg-slate-900/95 backdrop-blur-sm">
               <div className="space-y-4">
+                {/* Stage and Progress Percentage */}
                 <div className="flex items-center justify-between">
                   <div className="flex items-center">
                     <Sparkles className="h-4 w-4 text-blue-500 mr-2" />
@@ -1306,6 +1313,8 @@ export default function ViewData() {
                     }
                   </span>
                 </div>
+                
+                {/* Visual Progress Bar */}
                 <Progress 
                   value={processingItems.length > 1 
                     ? (processedCount / processingItems.length) * 100 
@@ -1313,9 +1322,26 @@ export default function ViewData() {
                   } 
                   className="h-2" 
                 />
-                <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                  {generationStage}
+                
+                {/* Current Stage Info */}
+                <div className="text-xs text-slate-500 dark:text-slate-400 mt-1 flex items-center justify-between">
+                  <span>{generationStage}</span>
+                  {processingItems.length > 1 && processedCount > 0 && (
+                    <span className="text-xs font-medium text-primary">
+                      Item {processedCount} of {processingItems.length}
+                    </span>
+                  )}
                 </div>
+                
+                {/* Current Processing Item */}
+                {currentItemText && (
+                  <div className="mt-2 text-xs border-l-2 border-primary pl-2 py-1 bg-slate-50 dark:bg-slate-800 rounded">
+                    <div className="font-medium mb-1 text-primary">Current requirement:</div>
+                    <div className="line-clamp-2">{currentItemText}</div>
+                  </div>
+                )}
+                
+                {/* Error display */}
                 {generationError && (
                   <div className="text-xs text-red-500 mt-1">
                     Error: {generationError}
