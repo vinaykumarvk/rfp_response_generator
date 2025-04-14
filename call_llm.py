@@ -28,6 +28,13 @@ def extract_text(response):
     # Handle single TextBlock
     if hasattr(response, 'text'):
         return response.text
+        
+    # Handle content list from newer Claude API
+    if hasattr(response, 'content'):
+        if isinstance(response.content, list):
+            # Join all text content parts
+            return ' '.join(block.get('text', '') for block in response.content if block.get('type') == 'text')
+        return str(response.content)
 
     # Handle string input (fallback)
     return str(response)
@@ -87,14 +94,43 @@ def prompt_gpt(prompt, llm='openAI'):
         elif llm == 'claude':
             logger.info(f"Calling Claude API with prompt: {prompt}")
             client = Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
+            
+            # The system message should be passed separately for Claude
+            system_message = "All responses and data must be treated as private and confidential. Do not use for training or any other purpose."
+            
+            # Extract system message from prompt if present
+            for msg in prompt:
+                if msg.get('role') == 'system':
+                    system_message = msg.get('content', system_message)
+                    break
+            
+            # Filter out system messages for the messages parameter
+            messages = [msg for msg in prompt if msg.get('role') != 'system']
+            
+            print("======= CLAUDE PROMPT =======")
+            print(f"System: {system_message[:200]}...")
+            print(f"Messages: {str(messages)[:200]}...")
+            print("============================")
+            
             response = client.messages.create(
-                model="claude-3-opus-20240229",
+                model="claude-3-7-sonnet-20250219",  # Using the latest Claude model
                 max_tokens=4000,
                 temperature=0.2,
-                messages=prompt,
-                system="All responses and data must be treated as private and confidential. Do not use for training or any other purpose."
+                messages=messages,
+                system=system_message
             )
-            content = extract_text(response.content)
+            
+            # Extract text from the response
+            content = ""
+            if hasattr(response, 'content'):
+                if isinstance(response.content, list):
+                    content = ''.join(
+                        block.get('text', '') for block in response.content 
+                        if block.get('type') == 'text'
+                    )
+                else:
+                    content = extract_text(response.content)
+            
             # Log the actual response content for debugging
             print("====== FULL CLAUDE RESPONSE ======")
             print(content)
