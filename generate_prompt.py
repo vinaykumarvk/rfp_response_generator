@@ -126,24 +126,50 @@ VALIDATION: {validation_message['content'][:200]}...
     
     return messages
 
-def convert_prompt_to_claude(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def convert_prompt_to_claude(prompt: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """
     Convert a standard prompt format to Claude-compatible format.
 
     Args:
-        messages: List of message dictionaries in standard format.
+        prompt: List of message dictionaries in standard format.
 
     Returns:
         List of message dictionaries in Claude format.
     """
-    # Claude format is similar, but may need adjustments
     claude_messages = []
-    
-    for msg in messages:
-        # Claude uses 'human' instead of 'user' and 'assistant' instead of 'assistant'
-        role = "human" if msg["role"] == "user" else ("assistant" if msg["role"] == "assistant" else msg["role"])
-        claude_messages.append({"role": role, "content": msg["content"]})
-    
+    system_message = ""
+
+    # Extract system message if present
+    for msg in prompt:
+        if msg['role'] == 'system':
+            system_message = msg['content']
+            break
+
+    # Convert messages
+    for msg in prompt:
+        if msg['role'] == 'system':
+            continue  # Skip system messages as they're handled differently
+
+        if msg['role'] == 'assistant':
+            claude_messages.append({
+                'role': 'assistant',
+                'content': msg['content']
+            })
+        elif msg['role'] == 'user':
+            # If there's a system message and this is the first user message,
+            # prepend it to the content
+            if system_message and not claude_messages:
+                content = f"{system_message}\n\nHuman: {msg['content']}"
+                claude_messages.append({
+                    'role': 'user',
+                    'content': content
+                })
+            else:
+                claude_messages.append({
+                    'role': 'user',
+                    'content': msg['content']
+                })
+
     return claude_messages
 
 def find_similar_matches_and_generate_prompt(requirement_id: int) -> List[Dict[str, Any]]:
