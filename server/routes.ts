@@ -469,6 +469,107 @@ except Exception as e:
     }
   });
 
+  // Generate LLM response for a requirement using call_llm.py
+  app.post('/api/generate-llm-response', async (req: Request, res: Response) => {
+    try {
+      const { requirementId, model = 'moa' } = req.body;
+      
+      if (!requirementId) {
+        return res.status(400).json({ message: 'Requirement ID is required' });
+      }
+      
+      console.log(`Generating LLM response for requirement ID ${requirementId} using model ${model}`);
+      
+      // Call Python script to generate LLM response
+      const pythonResponse = await exec(`python3 -c "
+import sys
+import os
+import json
+from call_llm import get_llm_responses
+
+try:
+    # Call get_llm_responses to generate and save responses
+    get_llm_responses(${requirementId}, '${model}', False)
+    
+    # Get the saved responses from database
+    from sqlalchemy import text
+    from database import engine
+    
+    with engine.connect() as connection:
+        query = text('''
+            SELECT 
+                id, 
+                final_response, 
+                openai_response, 
+                anthropic_response, 
+                deepseek_response
+            FROM excel_requirement_responses 
+            WHERE id = :req_id
+        ''')
+        
+        result = connection.execute(query, {'req_id': ${requirementId}}).fetchone()
+        
+        if result:
+            response_data = {
+                'id': result[0],
+                'finalResponse': result[1],
+                'openaiResponse': result[2], 
+                'anthropicResponse': result[3],
+                'deepseekResponse': result[4],
+                'success': True,
+                'message': 'Response generated successfully'
+            }
+            print(json.dumps(response_data))
+        else:
+            print(json.dumps({
+                'success': False,
+                'error': 'No response found after generation'
+            }))
+except Exception as e:
+    print(json.dumps({
+        'success': False,
+        'error': str(e)
+    }))
+"`);
+      
+      console.log('Python script response:', pythonResponse.stdout);
+      
+      try {
+        // Parse the response
+        const data = JSON.parse(pythonResponse.stdout);
+        
+        if (data.success === false) {
+          console.error('Error in Python LLM call:', data.error);
+          return res.status(500).json({
+            success: false,
+            message: 'Failed to generate response',
+            error: data.error
+          });
+        }
+        
+        // Return the response data
+        return res.status(200).json(data);
+      } catch (parseError) {
+        console.error('Failed to parse Python script output as JSON:', parseError);
+        console.log('Raw output:', pythonResponse.stdout);
+        
+        return res.status(500).json({
+          success: false,
+          message: 'Failed to parse response from LLM',
+          error: String(parseError),
+          rawOutput: pythonResponse.stdout
+        });
+      }
+    } catch (error) {
+      console.error('Error generating LLM response:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to generate LLM response',
+        error: String(error)
+      });
+    }
+  });
+  
   app.get('/api/validate-keys', async (_req: Request, res: Response) => {
     // Check if we have the necessary API keys in the environment
     const apiKeys = {
