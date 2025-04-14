@@ -1388,37 +1388,32 @@ export default function ViewData() {
                                 </Badge>
                               )}
                               
-                              {/* Status tag */}
+                              {/* Status tag with Model Provider */}
                               <Badge 
                                 variant="outline" 
-                                className={`text-[10px] sm:text-xs px-1.5 py-0 ${row.finalResponse 
-                                  ? "bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-200 border-green-200 dark:border-green-800" 
-                                  : "bg-slate-50 text-slate-700 dark:bg-slate-800 dark:text-slate-200 border-slate-200 dark:border-slate-700"}`}
-                              >
-                                {row.finalResponse ? 
-                                  <><Check className="h-3 w-3 mr-0.5" /> Generated</> : 
-                                  'Not Generated'}
-                              </Badge>
-                              
-                              {/* Model Provider badge */}
-                              {row.finalResponse && (
-                                <Badge variant="outline" className={`text-[10px] sm:text-xs 
-                                  ${row.modelProvider === 'openai' ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-200 border-blue-200 dark:border-blue-800' : 
+                                className={`text-[10px] sm:text-xs px-1.5 py-0 ${
+                                  row.finalResponse ? 
+                                    row.modelProvider === 'openai' ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-200 border-blue-200 dark:border-blue-800' : 
                                     row.modelProvider === 'anthropic' ? 'bg-purple-50 text-purple-700 dark:bg-purple-950 dark:text-purple-200 border-purple-200 dark:border-purple-800' : 
                                     row.modelProvider === 'deepseek' ? 'bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-200 border-amber-200 dark:border-amber-800' : 
                                     row.modelProvider === 'moa' ? 'bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-200 border-green-200 dark:border-green-800' : 
-                                    'bg-slate-50 text-slate-700 dark:bg-slate-800 dark:text-slate-200 border-slate-200 dark:border-slate-700'
-                                  }`}
-                                >
-                                  {row.modelProvider === 'moa' ? 
-                                    <><Network className="h-3 w-3 mr-0.5" /> MOA</> : 
-                                    row.modelProvider === 'openai' ? 'OpenAI' : 
-                                    row.modelProvider === 'anthropic' ? 'Anthropic' : 
-                                    row.modelProvider === 'deepseek' ? 'DeepSeek' : 
-                                    'Model'
-                                  }
-                                </Badge>
-                              )}
+                                    'bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-200 border-green-200 dark:border-green-800'
+                                  : "bg-slate-50 text-slate-700 dark:bg-slate-800 dark:text-slate-200 border-slate-200 dark:border-slate-700"
+                                }`}
+                              >
+                                {row.finalResponse ? (
+                                  <>
+                                    <Check className="h-3 w-3 mr-0.5" /> 
+                                    {row.modelProvider === 'openai' ? 'OpenAI' : 
+                                     row.modelProvider === 'anthropic' ? 'Anthropic' : 
+                                     row.modelProvider === 'deepseek' ? 'DeepSeek' : 
+                                     row.modelProvider === 'moa' ? 'MOA' : 
+                                     'Generated'}
+                                  </>
+                                ) : (
+                                  'Not Generated'
+                                )}
+                              </Badge>
                             </div>
                             
                             {/* Requirement text */}
