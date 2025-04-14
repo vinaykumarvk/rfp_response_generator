@@ -38,6 +38,7 @@ export interface IStorage {
   createExcelRequirementResponse(response: InsertExcelRequirementResponse): Promise<ExcelRequirementResponse>;
   createExcelRequirementResponses(responses: InsertExcelRequirementResponse[]): Promise<ExcelRequirementResponse[]>;
   updateExcelRequirementResponse(id: number, response: Partial<InsertExcelRequirementResponse>): Promise<ExcelRequirementResponse | undefined>;
+  updateSimilarQuestions(id: number, similarQuestions: any[]): Promise<ExcelRequirementResponse | undefined>;
   deleteExcelRequirementResponse(id: number): Promise<boolean>;
   deleteAllExcelRequirementResponses(): Promise<boolean>;
 
@@ -184,6 +185,30 @@ export class DatabaseStorage implements IStorage {
     
     // In PostgreSQL, the count is not directly returned, but we can infer success if no error
     return true;
+  }
+  
+  async updateSimilarQuestions(id: number, similarQuestions: any[]): Promise<ExcelRequirementResponse | undefined> {
+    console.log(`Updating similar questions for requirement ID ${id}`);
+    
+    try {
+      // Convert the similarQuestions array to JSON string if it's not already
+      let similarQuestionsData = similarQuestions;
+      
+      // Update the response with the similar questions data
+      const [updatedResponse] = await db
+        .update(excelRequirementResponses)
+        .set({
+          similarQuestions: similarQuestionsData
+        })
+        .where(eq(excelRequirementResponses.id, id))
+        .returning();
+      
+      console.log(`Successfully updated similar questions for requirement ID ${id}`);
+      return updatedResponse || undefined;
+    } catch (error) {
+      console.error(`Error updating similar questions for requirement ID ${id}:`, error);
+      throw error;
+    }
   }
 
   // Reference Response Operations
