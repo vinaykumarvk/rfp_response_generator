@@ -185,18 +185,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
 import sys
 import os
 import json
-import asyncio
-from call_llm_simple import get_llm_responses
+import traceback
 
-async def main():
-    try:
-        # Call the LLM function directly
-        response = await get_llm_responses(${requirementId}, '${pythonModel}', True)
-        print(json.dumps(response))
-    except Exception as e:
-        print(json.dumps({'error': str(e)}))
-
-asyncio.run(main())
+try:
+    # Import and call the get_llm_responses function directly
+    from call_llm import get_llm_responses
+    
+    # This will generate the response and store it in database
+    get_llm_responses(${requirementId}, '${pythonModel}', False)
+    
+    # Now fetch the response from database to return
+    from sqlalchemy import text
+    from database import engine
+    
+    with engine.connect() as connection:
+        query = text('''
+            SELECT 
+                id, 
+                final_response, 
+                openai_response, 
+                anthropic_response, 
+                deepseek_response,
+                model_provider
+            FROM excel_requirement_responses 
+            WHERE id = :req_id
+        ''')
+        
+        result = connection.execute(query, {'req_id': ${requirementId}}).fetchone()
+        
+        if result:
+            response_data = {
+                'id': result[0],
+                'finalResponse': result[1],
+                'openaiResponse': result[2], 
+                'anthropicResponse': result[3],
+                'deepseekResponse': result[4],
+                'modelProvider': result[5] or '${pythonModel}',
+                'success': True,
+                'message': 'Response generated successfully'
+            }
+            print(json.dumps(response_data))
+        else:
+            print(json.dumps({
+                'success': False,
+                'error': 'No response found after generation'
+            }))
+except Exception as e:
+    error_details = {
+        'error': str(e),
+        'traceback': traceback.format_exc()
+    }
+    print(json.dumps(error_details))
 "`);
         
         console.log('Python script response:', pythonApiResponse.stdout);
