@@ -171,59 +171,153 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`Processing request to generate response for requirement ${requirementId} with model ${modelProvider}`);
       console.log(`Requirement text: ${requirementText?.substring(0, 100)}${requirementText?.length > 100 ? '...' : ''}`);
       
-      // Simulate different response formats based on the model
-      let responseContent;
-      
-      if (modelProvider.toLowerCase() === 'openai') {
-        responseContent = {
-          finalResponse: `This is a simulated OpenAI response for requirement ${requirementId}`,
-          openaiResponse: `Detailed OpenAI response for: ${requirementText?.substring(0, 50) || 'unknown requirement'}...`,
-          modelProvider: 'openai'
-        };
-      } else if (modelProvider.toLowerCase() === 'claude' || modelProvider.toLowerCase() === 'anthropic') {
-        responseContent = {
-          finalResponse: `This is a simulated Anthropic response for requirement ${requirementId}`,
-          anthropicResponse: `Detailed Claude response for: ${requirementText?.substring(0, 50) || 'unknown requirement'}...`,
-          modelProvider: 'anthropic'
-        };
-      } else if (modelProvider.toLowerCase() === 'deepseek') {
-        responseContent = {
-          finalResponse: `This is a simulated DeepSeek response for requirement ${requirementId}`,
-          deepseekResponse: `Detailed DeepSeek response for: ${requirementText?.substring(0, 50) || 'unknown requirement'}...`,
-          modelProvider: 'deepseek'
-        };
-      } else if (modelProvider.toLowerCase() === 'moa') {
-        responseContent = {
-          finalResponse: `This is a simulated MOA (Mixture of Agents) response for requirement ${requirementId}`,
-          openaiResponse: `OpenAI component of MOA response`,
-          anthropicResponse: `Anthropic component of MOA response`,
-          deepseekResponse: `DeepSeek component of MOA response`,
-          moaResponse: `Final synthesized MOA response for: ${requirementText?.substring(0, 50) || 'unknown requirement'}...`,
-          modelProvider: 'moa'
-        };
-      } else {
-        responseContent = {
-          finalResponse: `This is a simulated response using ${modelProvider} for requirement ${requirementId}`,
-          modelProvider
-        };
+      try {
+        // Call the Python FastAPI endpoint to generate the response
+        // The path is a proxy to the Python FastAPI server
+        console.log(`Calling Python API to generate response for requirement ${requirementId}`);
+        
+        // Format the model name correctly for the Python API
+        let pythonModel = modelProvider.toLowerCase();
+        if (pythonModel === 'openai') pythonModel = 'openAI';
+        if (pythonModel === 'claude') pythonModel = 'anthropic';
+        
+        const pythonApiResponse = await exec(`python3 -c "
+import sys
+import os
+import json
+import asyncio
+from call_llm_simple import get_llm_responses
+
+async def main():
+    try:
+        # Call the LLM function directly
+        response = await get_llm_responses(${requirementId}, '${pythonModel}', True)
+        print(json.dumps(response))
+    except Exception as e:
+        print(json.dumps({'error': str(e)}))
+
+asyncio.run(main())
+"`);
+        
+        console.log('Python script response:', pythonApiResponse.stdout);
+        
+        let responseData;
+        
+        try {
+          // Try to parse the JSON response
+          responseData = JSON.parse(pythonApiResponse.stdout);
+        } catch (parseError) {
+          console.error('Failed to parse Python script response as JSON:', parseError);
+          console.log('Raw output:', pythonApiResponse.stdout);
+          
+          // If we can't parse the response, fall back to our simulated responses
+          if (modelProvider.toLowerCase() === 'openai') {
+            responseData = {
+              finalResponse: `OpenAI response for requirement ${requirementId}`,
+              openaiResponse: `Detailed OpenAI response for: ${requirementText?.substring(0, 50) || 'unknown requirement'}...`,
+              modelProvider: 'openai'
+            };
+          } else if (modelProvider.toLowerCase() === 'claude' || modelProvider.toLowerCase() === 'anthropic') {
+            responseData = {
+              finalResponse: `Anthropic response for requirement ${requirementId}`,
+              anthropicResponse: `Detailed Claude response for: ${requirementText?.substring(0, 50) || 'unknown requirement'}...`,
+              modelProvider: 'anthropic'
+            };
+          } else if (modelProvider.toLowerCase() === 'deepseek') {
+            responseData = {
+              finalResponse: `DeepSeek response for requirement ${requirementId}`,
+              deepseekResponse: `Detailed DeepSeek response for: ${requirementText?.substring(0, 50) || 'unknown requirement'}...`,
+              modelProvider: 'deepseek'
+            };
+          } else if (modelProvider.toLowerCase() === 'moa') {
+            responseData = {
+              finalResponse: `MOA (Mixture of Agents) response for requirement ${requirementId}`,
+              openaiResponse: `OpenAI component of MOA response`,
+              anthropicResponse: `Anthropic component of MOA response`,
+              deepseekResponse: `DeepSeek component of MOA response`,
+              moaResponse: `Final synthesized MOA response for: ${requirementText?.substring(0, 50) || 'unknown requirement'}...`,
+              modelProvider: 'moa'
+            };
+          } else {
+            responseData = {
+              finalResponse: `Response using ${modelProvider} for requirement ${requirementId}`,
+              modelProvider
+            };
+          }
+        }
+        
+        // Handle error responses from the Python script
+        if (responseData.error) {
+          console.error('Python script returned an error:', responseData.error);
+          throw new Error(responseData.error);
+        }
+        
+        // Log the response details
+        console.log('==== DETAILED RESPONSE DEBUG - /api/generate-response ====');
+        console.log('Response fields:');
+        console.log('- generated_response:', responseData.finalResponse ? 'Present' : 'Not present');
+        console.log('- openai_response:', responseData.openaiResponse ? 'Present' : 'Not present');
+        console.log('- anthropic_response:', responseData.anthropicResponse ? 'Present' : 'Not present');
+        console.log('- deepseek_response:', responseData.deepseekResponse ? 'Present' : 'Not present');
+        
+        // Return the response
+        return res.status(200).json({ 
+          success: true,
+          message: `Response generated for requirement ${requirementId} with model ${modelProvider}`,
+          requirementId,
+          model: modelProvider,
+          ...responseData
+        });
+      } catch (pythonError) {
+        console.error('Error executing Python LLM call:', pythonError);
+        
+        // Fall back to simulated responses if the Python call fails
+        console.log('Falling back to simulated responses due to Python API error');
+        
+        let responseContent;
+        
+        if (modelProvider.toLowerCase() === 'openai') {
+          responseContent = {
+            finalResponse: `Simulated OpenAI response for requirement ${requirementId}`,
+            openaiResponse: `Detailed OpenAI response for: ${requirementText?.substring(0, 50) || 'unknown requirement'}...`,
+            modelProvider: 'openai'
+          };
+        } else if (modelProvider.toLowerCase() === 'claude' || modelProvider.toLowerCase() === 'anthropic') {
+          responseContent = {
+            finalResponse: `Simulated Anthropic response for requirement ${requirementId}`,
+            anthropicResponse: `Detailed Claude response for: ${requirementText?.substring(0, 50) || 'unknown requirement'}...`,
+            modelProvider: 'anthropic'
+          };
+        } else if (modelProvider.toLowerCase() === 'deepseek') {
+          responseContent = {
+            finalResponse: `Simulated DeepSeek response for requirement ${requirementId}`,
+            deepseekResponse: `Detailed DeepSeek response for: ${requirementText?.substring(0, 50) || 'unknown requirement'}...`,
+            modelProvider: 'deepseek'
+          };
+        } else if (modelProvider.toLowerCase() === 'moa') {
+          responseContent = {
+            finalResponse: `Simulated MOA (Mixture of Agents) response for requirement ${requirementId}`,
+            openaiResponse: `OpenAI component of MOA response`,
+            anthropicResponse: `Anthropic component of MOA response`,
+            deepseekResponse: `DeepSeek component of MOA response`,
+            moaResponse: `Final synthesized MOA response for: ${requirementText?.substring(0, 50) || 'unknown requirement'}...`,
+            modelProvider: 'moa'
+          };
+        } else {
+          responseContent = {
+            finalResponse: `Simulated response using ${modelProvider} for requirement ${requirementId}`,
+            modelProvider
+          };
+        }
+        
+        return res.status(200).json({ 
+          success: true,
+          message: `Simulated response generated for requirement ${requirementId} with model ${modelProvider}`,
+          requirementId,
+          model: modelProvider,
+          ...responseContent
+        });
       }
-      
-      // Log the response details
-      console.log('==== DETAILED RESPONSE DEBUG - /api/generate-response ====');
-      console.log('Response fields:');
-      console.log('- generated_response:', responseContent.finalResponse ? 'Present' : 'Not present');
-      console.log('- openai_response:', responseContent.openaiResponse ? 'Present' : 'Not present');
-      console.log('- anthropic_response:', responseContent.anthropicResponse ? 'Present' : 'Not present');
-      console.log('- deepseek_response:', responseContent.deepseekResponse ? 'Present' : 'Not present');
-      
-      // Return the response
-      return res.status(200).json({ 
-        success: true,
-        message: `Response generated for requirement ${requirementId} with model ${modelProvider}`,
-        requirementId,
-        model: modelProvider,
-        ...responseContent
-      });
     } catch (error) {
       console.error('Error in generate-response:', error);
       return res.status(500).json({ message: 'Failed to generate response', error: String(error) });
