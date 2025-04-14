@@ -1,89 +1,105 @@
 # RFP Response Generator
 
-An advanced AI-powered RFP Response Generator leveraging multi-model vector search and intelligent requirement matching to streamline proposal creation.
+An advanced AI-powered RFP Response Generator that leverages multi-model vector search and intelligent requirement matching to streamline proposal creation, with enhanced collaboration and adaptive learning capabilities.
 
-## Key Technologies
+## Features
 
-- React frontend with TypeScript
-- Python backend for AI processing
-- PostgreSQL vector search with advanced similarity matching
-- Multi-AI model integration (OpenAI, Anthropic, Deepseek)
-- Automated response generation with contextual reference lookup
+- **Multi-Model AI Integration**: Uses OpenAI, Anthropic/Claude, and DeepSeek models to generate high-quality responses
+- **Vector Search**: PostgreSQL vector search for finding similar requirements and previous responses
+- **Requirement Management**: Upload, view, and manage RFP requirements from Excel files
+- **Batch Processing**: Generate responses for multiple requirements at once
+- **Reference Panel**: View similar questions and their responses for better context
+- **Rich Export Options**: Export generated responses to various formats
 
-## Architecture Overview
+## Technology Stack
 
-The application uses a comprehensive multi-page approach with:
+- **Frontend**: React with TypeScript, Tailwind CSS
+- **Backend**: Express.js (Node.js) with TypeScript
+- **Database**: PostgreSQL with pgvector extension for vector search
+- **AI Models**: OpenAI (GPT-4), Anthropic (Claude), DeepSeek
 
-1. **PostgreSQL Vector Database**
-   - Uses pgvector extension for efficient similarity search
-   - 9,658 requirement embeddings stored as vectors
-   - Optimized IVFFLAT indexing for performance
+## Getting Started
 
-2. **AI Response Generation**
-   - MOA (Mixture of Agents) approach with multiple models
-   - OpenAI, Anthropic, and Deepseek integration
-   - Two-phase generation with final synthesis
+### Prerequisites
 
-3. **Export Capabilities**
-   - Print functionality with markdown formatting
-   - Email functionality with SendGrid
-   - Excel export with clean formatting
+- Node.js (v16+)
+- Python 3.9+
+- PostgreSQL with pgvector extension
+- API keys for:
+  - OpenAI
+  - Anthropic
+  - DeepSeek
 
-## Vector Search Implementation
+### Environment Variables
 
-The application uses PostgreSQL with pgvector extension for efficient similarity search instead of loading embeddings into memory:
+Create a `.env` file with the following variables:
 
-- **Embedding Storage**: All 9,658 embeddings are stored in the database
-- **Search Optimization**: Uses cosine similarity with IVFFLAT indexing
-- **Performance**: Efficient queries with proper index optimization
+```
+# Database
+DATABASE_URL=postgresql://username:password@localhost:5432/rfp_response_generator
 
-## Key Features
+# API Keys
+OPENAI_API_KEY=your_openai_api_key
+ANTHROPIC_API_KEY=your_anthropic_api_key
+DEEPSEEK_API_KEY=your_deepseek_api_key
+```
 
-- Upload Excel requirements and display content
-- Store data in PostgreSQL database (parent-child relationships)
-- Generate AI-powered responses with multiple models
-- Edit generated responses with version tracking
-- Process multiple requirements with progress tracking
-- Export selected requirements and responses
-- Rate responses with feedback system
+### Installation
 
-## Development Setup
+1. Clone the repository
+   ```
+   git clone https://github.com/your-username/rfp_response_generator.git
+   cd rfp_response_generator
+   ```
 
-1. **Prerequisites**
-   - PostgreSQL database with pgvector extension
-   - Node.js and npm
-   - Python 3.11+
-   - API keys for OpenAI, Anthropic, and DeepSeek
+2. Install dependencies
+   ```
+   npm install
+   pip install -r requirements.txt
+   ```
 
-2. **Environment Variables**
-   - `DATABASE_URL`: PostgreSQL connection string
-   - `OPENAI_API_KEY`: OpenAI API key
-   - `ANTHROPIC_API_KEY`: Anthropic API key
-   - `DEEPSEEK_API_KEY`: DeepSeek API key
-   - `SENDGRID_API_KEY`: (Optional) SendGrid API key for email functionality
+3. Start the development server
+   ```
+   npm run dev
+   ```
 
-3. **Running the Application**
-   - Start the development server with: `npm run dev`
+## Usage
 
-## Database Schema
+1. **Upload Requirements**: Use the Upload Requirements page to import Excel files containing RFP requirements.
+2. **View Requirements**: Navigate to the View Requirements page to see all imported requirements.
+3. **Generate Responses**: Select one or more requirements and use the Generate Response options to create responses with your preferred AI model.
+4. **View and Edit Responses**: Review generated responses, compare outputs from different models, and make edits as needed.
+5. **Export**: Export your responses to various formats for inclusion in your proposal document.
 
-The PostgreSQL database includes these key tables:
+## Core Workflows
 
-1. **embeddings**: Stores requirement embeddings for vector search
-   - Uses pgvector's vector data type for the embedding field
-   - Includes category, requirement, response, and reference fields
+### RFP Response Generation
 
-2. **responses**: Stores generated responses with model-specific fields
-   - `finalResponse`: The final synthesized response
-   - `openaiResponse`, `anthropicResponse`, `deepseekResponse`: Model-specific responses
-   - `moaResponse`: Mixture of Agents synthesized response
-   - `feedback`: User feedback on response quality
+1. Find similar matches to the current requirement
+2. Store similar matches in the database
+3. Call the selected LLM to generate a response based on the requirement and similar matches
+4. Store the generated response in the database
 
-## Vector Search Implementation
+## Code Structure
 
-The application has migrated from loading a large pickle file (135MB) into memory to using PostgreSQL's pgvector extension for more efficient similarity search:
+- `client/`: React frontend code
+  - `src/components/`: UI components
+  - `src/pages/`: Main application pages
+  - `src/lib/`: Utility functions and types
+  
+- `server/`: Express.js backend code
+  - `index.ts`: Server setup and configuration
+  - `routes.ts`: API endpoints
+  - `storage.ts`: Database operations
+  
+- `call_llm.py`: Python code for calling AI models
+- `generate_prompt.py`: Prompt generation logic
+- `database.py`: Database connection and utilities
 
-- All 9,658 embeddings are stored in the database
-- Vector similarity search uses cosine distance with proper normalization
-- Optimized IVFFLAT index with vector_cosine_ops for performance
-- Text search capabilities for keyword queries
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
