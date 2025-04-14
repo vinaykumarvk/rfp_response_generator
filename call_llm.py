@@ -48,65 +48,115 @@ def extract_text(response):
     # Last resort fallback
     return str(response)
 
-def prompt_gpt(prompt, llm='openAI'):
-    try:
-        if llm == 'openAI':
-            logger.info(f"Calling OpenAI API with prompt: {prompt}")
-            client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
-            response = client.chat.completions.create(
-                model='gpt-4',
-                messages=prompt,
-                temperature=0.2,
-                user="private-user",
-                extra_headers={
+def get_model_config(model_name):
+    """
+    Return configuration for a specific model.
+    
+    Args:
+        model_name: The name of the model to get configuration for
+        
+    Returns:
+        dict: Model configuration including API details
+    """
+    # Standardize model name to ensure consistent handling
+    normalized_name = model_name.lower()
+    
+    # Map claude to anthropic for standardization
+    if normalized_name == 'claude':
+        normalized_name = 'anthropic'
+    
+    # Configuration map for supported models
+    model_configs = {
+        'openai': {
+            'display_name': 'OpenAI',
+            'client_class': OpenAI,
+            'client_args': {
+                'api_key': os.environ.get("OPENAI_API_KEY"),
+            },
+            'client_kwargs': {},
+            'completion_args': {
+                'model': 'gpt-4',
+                'temperature': 0.2,
+                'user': "private-user",
+                'extra_headers': {
                     "HTTP-Referer": "null",
                     "X-Data-Use-Consent": "false"
                 }
-            )
-            if not response or not response.choices:
-                logger.error("Empty response received from API")
-                raise ValueError("Empty response from API")
-            content = response.choices[0].message.content.strip()
-            # Log the actual response content for debugging
-            print("====== FULL OPENAI RESPONSE ======")
-            print(content)
-            print("==================================")
-            logger.info(f"Successfully generated response of length: {len(content)} characters")
-            return content
-
-        elif llm == 'deepseek':
-            logger.info(f"Calling DeepSeek API with prompt: {prompt}")
-            client = OpenAI(
-                api_key=os.environ.get("DEEPSEEK_API_KEY"),
-                base_url="https://api.deepseek.com/v1",
-                default_headers={
+            },
+            'requires_system_message_handling': False,
+            'response_handler': lambda response: response.choices[0].message.content.strip()
+        },
+        'deepseek': {
+            'display_name': 'DeepSeek',
+            'client_class': OpenAI,
+            'client_args': {
+                'api_key': os.environ.get("DEEPSEEK_API_KEY"),
+                'base_url': "https://api.deepseek.com/v1",
+            },
+            'client_kwargs': {
+                'default_headers': {
                     "X-Privacy-Mode": "strict",
                     "X-Data-Collection": "disabled"
                 }
-            )
-            response = client.chat.completions.create(
-                model='deepseek-chat',
-                messages=prompt,
-                temperature=0.2
-            )
-            if not response or not response.choices:
-                logger.error("Empty response received from API")
-                raise ValueError("Empty response from API")
-            content = response.choices[0].message.content.strip()
-            # Log the actual response content for debugging
-            print("====== FULL DEEPSEEK RESPONSE ======")
-            print(content)
-            print("===================================")
-            logger.info(f"Successfully generated response of length: {len(content)} characters")
-            return content
+            },
+            'completion_args': {
+                'model': 'deepseek-chat',
+                'temperature': 0.2
+            },
+            'requires_system_message_handling': False,
+            'response_handler': lambda response: response.choices[0].message.content.strip()
+        },
+        'anthropic': {
+            'display_name': 'Anthropic',
+            'client_class': Anthropic,
+            'client_args': {
+                'api_key': os.environ.get("ANTHROPIC_API_KEY"),
+            },
+            'client_kwargs': {},
+            'completion_args': {
+                'model': "claude-3-7-sonnet-20250219",
+                'max_tokens': 4000,
+                'temperature': 0.2
+            },
+            'requires_system_message_handling': True,
+            'response_handler': extract_text
+        }
+    }
+    
+    # Return the configuration for the requested model
+    if normalized_name in model_configs:
+        config = model_configs[normalized_name]
+        # Add the normalized name to the config
+        config['normalized_name'] = normalized_name
+        return config
+    else:
+        raise ValueError(f"Unsupported model: {model_name}")
 
-        elif llm == 'claude' or llm == 'anthropic':
-            # Standardize model name for consistent handling
-            normalized_llm = 'anthropic'
-            logger.info(f"Calling {normalized_llm.capitalize()} API with prompt: {prompt}")
-            client = Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
-            
-            # The system message should be passed separately for Claude
+def prompt_gpt(prompt, model_name='openAI'):
+    """
+    Generic function to prompt any supported LLM.
+    
+    Args:
+        prompt: The prompt to send to the LLM
+        model_name: The name of the model to use (e.g., 'openAI', 'anthropic', 'deepseek')
+        
+    Returns:
+        str: The model's response
+    """
+    try:
+        # Get the configuration for the specified model
+        config = get_model_config(model_name)
+        normalized_name = config['normalized_name']
+        display_name = config['display_name']
+        
+        logger.info(f"Calling {display_name} API with prompt")
+        
+        # Initialize the client with the configuration
+        client = config['client_class'](**config['client_args'], **config.get('client_kwargs', {}))
+        
+        # Handle system message for models that require it separately
+        if config['requires_system_message_handling']:
+            # Default system message
             system_message = "All responses and data must be treated as private and confidential. Do not use for training or any other purpose."
             
             # Extract system message from prompt if present
@@ -118,45 +168,53 @@ def prompt_gpt(prompt, llm='openAI'):
             # Filter out system messages for the messages parameter
             messages = [msg for msg in prompt if msg.get('role') != 'system']
             
-            print("======= CLAUDE PROMPT =======")
+            print(f"======= {display_name.upper()} PROMPT =======")
             print(f"System: {system_message[:200]}...")
             print(f"Messages: {str(messages)[:200]}...")
-            print("============================")
+            print("===============================")
             
-            response = client.messages.create(
-                model="claude-3-7-sonnet-20250219",  # Using the latest Claude model
-                max_tokens=4000,
-                temperature=0.2,
-                messages=messages,
-                system=system_message
-            )
+            # Create the completion with the system message handled separately
+            completion_args = config['completion_args'].copy()
+            completion_args['messages'] = messages
+            completion_args['system'] = system_message
             
-            # Use our extract_text function to handle all response formats
-            content = extract_text(response)
+            response = client.messages.create(**completion_args)
+        else:
+            # Standard completion for models that don't need special system message handling
+            completion_args = config['completion_args'].copy()
+            completion_args['messages'] = prompt
             
-            # Log the actual response content for debugging
-            print("====== FULL CLAUDE RESPONSE ======")
+            response = client.chat.completions.create(**completion_args)
+        
+        # Handle the response using the model-specific handler
+        content = config['response_handler'](response)
+        
+        # Log the response for debugging
+        print(f"====== FULL {display_name.upper()} RESPONSE ======")
+        if not isinstance(content, str):
             print(f"Type: {type(response)}")
             print(f"Response object: {response}")
             print(f"Extracted content: {content}")
-            print("=================================")
-            
-            # Log the extracted text details
-            print(f"Extracted text length: {len(content)}")
-            print(f"Extracted text first 100 chars: {content[:100]}")
-            print(f"Is extracted text empty: {not bool(content.strip())}")
-            logger.info(f"Successfully generated Claude response of length: {len(content)} characters")
+        else:
+            print(f"Content preview: {content[:200]}...")
+        print("=======================================")
+        
+        # Validate and clean up the content
+        if isinstance(content, str):
+            content = content.strip()
+            logger.info(f"Successfully generated {display_name} response of length: {len(content)} characters")
             
             # Ensure we don't return an empty string
-            if not content.strip():
-                print("WARNING: Extracted text is empty, using fallback content")
-                fallback = "The system encountered an issue with the AI response. Please try again or use another model."
-                return fallback
-                
+            if not content:
+                print(f"WARNING: Empty response from {display_name}, using fallback content")
+                return f"The system encountered an issue with the {display_name} response. Please try again or use another model."
+            
             return content
-
+        else:
+            raise ValueError(f"Invalid response format from {display_name}: {type(content)}")
+            
     except Exception as e:
-        logger.error(f"Error generating response from {llm}: {str(e)}")
+        logger.error(f"Error generating response from {model_name}: {str(e)}")
         raise
 
 def create_synthesized_response_prompt(requirement, responses):
@@ -366,24 +424,33 @@ def get_llm_responses(requirement_id, model='moa', display_results=True):
                 openai_prompt = create_rfp_prompt(requirement[1], requirement[2], previous_responses)
                 claude_prompt = convert_prompt_to_claude(openai_prompt)
 
-                try:
-                    openai_response = prompt_gpt(openai_prompt, 'openAI')
-                except Exception as e:
-                    print(f"Error generating OpenAI response: {str(e)}")
-                    openai_response = None
-
-                try:
-                    deepseek_response = prompt_gpt(openai_prompt, 'deepseek')
-                except Exception as e:
-                    print(f"Error generating Deepseek response: {str(e)}")
-                    deepseek_response = None
-
-                try:
-                    # Use 'anthropic' as the standardized model name
-                    claude_response = prompt_gpt(claude_prompt, 'anthropic')
-                except Exception as e:
-                    print(f"Error generating Anthropic/Claude response: {str(e)}")
-                    claude_response = None
+                # Use a dictionary to store model responses
+                model_responses = {}
+                
+                # Define the models to use
+                models = [
+                    {'name': 'openai', 'prompt': openai_prompt},
+                    {'name': 'deepseek', 'prompt': openai_prompt},
+                    {'name': 'anthropic', 'prompt': claude_prompt}
+                ]
+                
+                # Get responses from each model
+                for model_info in models:
+                    model_name = model_info['name']
+                    model_prompt = model_info['prompt']
+                    
+                    try:
+                        print(f"Generating response from {model_name}...")
+                        model_responses[model_name] = prompt_gpt(model_prompt, model_name)
+                        print(f"Successfully generated {model_name} response")
+                    except Exception as e:
+                        print(f"Error generating {model_name} response: {str(e)}")
+                        model_responses[model_name] = None
+                
+                # Assign responses to variables for backward compatibility
+                openai_response = model_responses.get('openai')
+                deepseek_response = model_responses.get('deepseek')
+                claude_response = model_responses.get('anthropic')
 
                 # Create synthesized prompt
                 if any([openai_response, deepseek_response, claude_response]):
@@ -397,10 +464,15 @@ def get_llm_responses(requirement_id, model='moa', display_results=True):
 
                     synthesis_prompt = create_synthesized_response_prompt(requirement[1], "\n\n".join(responses_to_synthesize))
                     try:
-                        final_response = prompt_gpt(synthesis_prompt, 'openAI')
+                        # Use openai for synthesis by default
+                        print("Generating synthesized (MOA) response...")
+                        final_response = prompt_gpt(synthesis_prompt, 'openai')
+                        print(f"Successfully generated synthesized response of length: {len(final_response)}")
                     except Exception as e:
                         print(f"Error generating synthesized response: {str(e)}")
+                        # Fallback to the best available individual response
                         final_response = openai_response or deepseek_response or claude_response
+                        print(f"Using fallback response of length: {len(final_response) if final_response else 0}")
                 else:
                     raise ValueError("Failed to generate responses from any model")
 
@@ -433,10 +505,19 @@ def get_llm_responses(requirement_id, model='moa', display_results=True):
 
             else:
                 print(f"3. Generating response from {model}")
-                # Generate response from specific model
-                if model == 'claude' or model == 'anthropic':
-                    prompt = convert_prompt_to_claude(create_rfp_prompt(requirement[1], requirement[2], previous_responses))
-                else:
+                # Generate prompt based on the model
+                try:
+                    # Get model config to check if it's Anthropic/Claude
+                    config = get_model_config(model)
+                    normalized_model = config['normalized_name']
+                    
+                    # Claude/Anthropic uses a different prompt format
+                    if normalized_model == 'anthropic':
+                        prompt = convert_prompt_to_claude(create_rfp_prompt(requirement[1], requirement[2], previous_responses))
+                    else:
+                        prompt = create_rfp_prompt(requirement[1], requirement[2], previous_responses)
+                except ValueError:
+                    # Handle non-standard models (like 'moa')
                     prompt = create_rfp_prompt(requirement[1], requirement[2], previous_responses)
 
                 try:
@@ -451,13 +532,21 @@ def get_llm_responses(requirement_id, model='moa', display_results=True):
 
                 # Save response to database
                 print("4. Saving response to database")
-                # Standardize model name for consistent handling
-                normalized_model = 'anthropic' if model == 'claude' else model
+                
+                # Get the normalized model name using our config function
+                try:
+                    config = get_model_config(model)
+                    normalized_model = config['normalized_name']
+                except ValueError:
+                    # Fallback for 'moa' which doesn't have a specific config
+                    normalized_model = model.lower()
+                
+                print(f"Original model: '{model}', Normalized model: '{normalized_model}'")
                 
                 save_query = text("""
                     UPDATE excel_requirement_responses
                     SET 
-                        openai_response = CASE WHEN :normalized_model = 'openAI' THEN :response ELSE openai_response END,
+                        openai_response = CASE WHEN :normalized_model = 'openai' THEN :response ELSE openai_response END,
                         deepseek_response = CASE WHEN :normalized_model = 'deepseek' THEN :response ELSE deepseek_response END,
                         anthropic_response = CASE WHEN :normalized_model = 'anthropic' THEN :response ELSE anthropic_response END,
                         final_response = :response,  -- Always set final_response to the current response
@@ -467,13 +556,16 @@ def get_llm_responses(requirement_id, model='moa', display_results=True):
                     WHERE id = :req_id
                 """)
 
+                print(f"Executing database update with model: {normalized_model}")
                 connection.execute(save_query, {
                     "req_id": requirement_id,
-                    "model": model,
-                    "normalized_model": normalized_model,
                     "response": response,
+                    "normalized_model": normalized_model,
                     "similar_questions": str(similar_questions_list)
                 })
+                
+                # Log what was updated for debugging
+                print(f"Updated {normalized_model}_response column and final_response with response length: {len(response)}")
                 connection.commit()
                 print("5. Response saved successfully")
 
