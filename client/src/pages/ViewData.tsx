@@ -42,7 +42,8 @@ import {
   Hand,
   FileText,
   ThumbsUp,
-  ThumbsDown
+  ThumbsDown,
+  Search
 } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useToast } from '@/hooks/use-toast';
@@ -223,6 +224,61 @@ export default function ViewData() {
     setSelectedResponse(row);
     setSelectedResponseId(row.id);
     setShowResponseDialog(true);
+  };
+  
+  // Function to find similar matches
+  const [isFindingSimilar, setIsFindingSimilar] = useState(false);
+  const [similarMatches, setSimilarMatches] = useState<any[]>([]);
+  
+  const handleFindSimilarMatches = async (requirementId: number) => {
+    if (!requirementId) return;
+    
+    try {
+      setIsFindingSimilar(true);
+      setSimilarMatches([]);
+      
+      // Call the API to find similar matches
+      const response = await fetch(`/api/find-similar-matches/${requirementId}`);
+      
+      if (!response.ok) {
+        throw new Error(`Failed to find similar matches: ${response.status} ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      
+      if (data.error) {
+        throw new Error(data.error);
+      }
+      
+      // Set the similar matches
+      if (data.similar_matches) {
+        setSimilarMatches(data.similar_matches);
+      } else if (data.rawOutput) {
+        // Handle raw output case
+        toast({
+          title: "Raw Output Returned",
+          description: "The similarity search returned raw output instead of structured data.",
+          variant: "destructive"
+        });
+        console.log("Raw similarity search output:", data.rawOutput);
+      }
+      
+      // Show a success message
+      toast({
+        title: "Similar Matches Found",
+        description: `Found ${data.similar_matches?.length || 0} similar requirements.`,
+      });
+      
+    } catch (error) {
+      console.error('Error finding similar matches:', error);
+      toast({
+        title: "Similarity Search Error",
+        description: `Failed to find similar matches: ${error instanceof Error ? error.message : String(error)}`,
+        variant: "destructive",
+      });
+    } finally {
+      setIsFindingSimilar(false);
+    }
   };
   
   const handleRefresh = () => {

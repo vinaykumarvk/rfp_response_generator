@@ -325,6 +325,62 @@ asyncio.run(main())
   });
 
   // API key validation check
+  // Find similar matches for a requirement
+  app.get('/api/find-similar-matches/:requirementId', async (req: Request, res: Response) => {
+    try {
+      const requirementId = req.params.requirementId;
+      
+      if (!requirementId) {
+        return res.status(400).json({ message: 'Requirement ID is required' });
+      }
+      
+      console.log(`Finding similar matches for requirement ID: ${requirementId}`);
+      
+      // Call the Python script to find similar matches
+      const pythonResponse = await exec(`python3 -c "
+import sys
+import os
+import json
+from find_matches import find_similar_matches
+
+try:
+    # Call the find_similar_matches function and get the results as a dictionary
+    results = find_similar_matches(${requirementId})
+    
+    # Convert the results to JSON and print
+    print(json.dumps(results))
+except Exception as e:
+    print(json.dumps({
+        'success': False,
+        'error': str(e)
+    }))
+"`);
+      
+      console.log('Python script response:', pythonResponse.stdout);
+      
+      // Try to parse the response
+      try {
+        const data = JSON.parse(pythonResponse.stdout);
+        return res.status(200).json(data);
+      } catch (parseError) {
+        console.error('Failed to parse Python script output as JSON:', parseError);
+        
+        // Return the raw output as a fallback
+        return res.status(200).json({
+          success: true,
+          requirementId,
+          rawOutput: pythonResponse.stdout
+        });
+      }
+    } catch (error) {
+      console.error('Error finding similar matches:', error);
+      return res.status(500).json({ 
+        message: 'Failed to find similar matches',
+        error: String(error)
+      });
+    }
+  });
+
   app.get('/api/validate-keys', async (_req: Request, res: Response) => {
     // Check if we have the necessary API keys in the environment
     const apiKeys = {
