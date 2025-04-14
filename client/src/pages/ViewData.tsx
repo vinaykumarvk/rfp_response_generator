@@ -1323,7 +1323,7 @@ export default function ViewData() {
                 <Skeleton className="h-40 w-full" />
               </div>
             ) : filteredData.length > 0 ? (
-              <div className="space-y-4">
+              <div className="space-y-2">
                 {filteredData.map((row: ExcelRequirementResponse, index: number) => {
                   const isSelected = row.id ? selectedItems.includes(row.id) : false;
                   return (
@@ -1331,7 +1331,7 @@ export default function ViewData() {
                       key={row.id || index} 
                       className={`overflow-hidden border relative transition-all duration-200 ${isSelected ? 'border-blue-400 dark:border-blue-600 shadow-md' : 'border-slate-200 dark:border-slate-700'}`}
                     >
-                      <CardContent className="p-3 sm:p-4">
+                      <CardContent className="p-2 sm:p-3">
                         <div className="flex items-start">
                           <div className="mr-2 sm:mr-3 pt-1">
                             {row.id && (
@@ -1344,12 +1344,24 @@ export default function ViewData() {
                           </div>
                           
                           <div className="flex-1 min-w-0">
-                            {/* Mobile view categories and badges */}
-                            <div className="flex flex-wrap items-center gap-1.5 mb-2">
+                            {/* Compact single-line attributes */}
+                            <div className="flex flex-wrap items-center gap-1 mb-1.5">
                               {/* ID Badge */}
                               <Badge variant="secondary" className="text-[10px] sm:text-xs px-1.5 py-0">
                                 ID: {row.id}
                               </Badge>
+                              
+                              {/* Category Badge */}
+                              <Badge variant="outline" className="text-[10px] sm:text-xs bg-slate-50 text-slate-700 dark:bg-slate-800 dark:text-slate-200 border-slate-200 dark:border-slate-700">
+                                {row.category}
+                              </Badge>
+                              
+                              {/* RFP Badge */}
+                              {row.rfpName && (
+                                <Badge variant="outline" className="text-[10px] sm:text-xs bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-200 border-blue-200 dark:border-blue-800">
+                                  {row.rfpName}
+                                </Badge>
+                              )}
                               
                               {/* Status tag */}
                               <Badge 
@@ -1362,13 +1374,6 @@ export default function ViewData() {
                                   <><Check className="h-3 w-3 mr-0.5" /> Generated</> : 
                                   'Not Generated'}
                               </Badge>
-                              
-                              {/* RFP Badge */}
-                              {row.rfpName && (
-                                <Badge variant="outline" className="text-[10px] sm:text-xs bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-200 border-blue-200 dark:border-blue-800">
-                                  {row.rfpName}
-                                </Badge>
-                              )}
                               
                               {/* Model Provider badge */}
                               {row.finalResponse && (
@@ -1389,69 +1394,65 @@ export default function ViewData() {
                                   }
                                 </Badge>
                               )}
-                              
-                              {/* Category display and timestamp */}
-                              <div className="flex items-center justify-between w-full">
-                                <Badge variant="outline" className="text-[10px] sm:text-xs bg-slate-50 text-slate-700 dark:bg-slate-800 dark:text-slate-200 border-slate-200 dark:border-slate-700">
-                                  {row.category}
-                                </Badge>
-                                
-                                {row.timestamp && (
-                                  <div className="text-[9px] sm:text-[10px] text-slate-500 dark:text-slate-400">
-                                    {(() => {
-                                      try {
-                                        return formatDistanceToNow(new Date(row.timestamp), { addSuffix: true });
-                                      } catch (e) {
-                                        return String(row.timestamp);
-                                      }
-                                    })()}
-                                  </div>
-                                )}
-                              </div>
                             </div>
                             
                             {/* Requirement text */}
-                            <div className="text-sm sm:text-base font-medium text-slate-800 dark:text-slate-100 line-clamp-3 mb-3">
+                            <div className="text-sm sm:text-base font-medium text-slate-800 dark:text-slate-100 line-clamp-3 mb-2">
                               {row.requirement}
                             </div>
                             
-                            {/* Action buttons */}
-                            <div className="flex items-center gap-2 mt-2">
-                              <Button
-                                size="sm"
-                                variant={row.finalResponse ? "default" : "outline"}
-                                className={`h-8 px-3 gap-1 ${!row.finalResponse ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  if (row.finalResponse) {
-                                    setActiveTab('response');
-                                    handleViewResponse(row);
-                                  }
-                                }}
-                                disabled={!row.finalResponse}
-                                title={row.finalResponse ? "View response" : "No response available yet"}
-                              >
-                                <MessageSquare className="h-4 w-4" />
-                                <span>Response</span>
-                              </Button>
+                            {/* Action buttons and timestamp in one row */}
+                            <div className="flex items-center justify-between mt-1">
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  size="sm"
+                                  variant={row.finalResponse ? "default" : "outline"}
+                                  className={`h-7 px-2 gap-1 text-xs ${!row.finalResponse ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (row.finalResponse) {
+                                      setActiveTab('response');
+                                      handleViewResponse(row);
+                                    }
+                                  }}
+                                  disabled={!row.finalResponse}
+                                  title={row.finalResponse ? "View response" : "No response available yet"}
+                                >
+                                  <MessageSquare className="h-3.5 w-3.5" />
+                                  <span>Response</span>
+                                </Button>
+                                
+                                <Button
+                                  size="sm"
+                                  variant={row.similarQuestions ? "secondary" : "outline"}
+                                  className={`h-7 px-2 gap-1 text-xs ${!row.similarQuestions ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (row.similarQuestions) {
+                                      setActiveTab('references');
+                                      handleViewResponse(row);
+                                    }
+                                  }}
+                                  disabled={!row.similarQuestions}
+                                  title={row.similarQuestions ? "View references" : "No references available yet"}
+                                >
+                                  <BookOpen className="h-3.5 w-3.5" />
+                                  <span>References</span>
+                                </Button>
+                              </div>
                               
-                              <Button
-                                size="sm"
-                                variant={row.similarQuestions ? "secondary" : "outline"}
-                                className={`h-8 px-3 gap-1 ${!row.similarQuestions ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  if (row.similarQuestions) {
-                                    setActiveTab('references');
-                                    handleViewResponse(row);
-                                  }
-                                }}
-                                disabled={!row.similarQuestions}
-                                title={row.similarQuestions ? "View references" : "No references available yet"}
-                              >
-                                <BookOpen className="h-4 w-4" />
-                                <span>References</span>
-                              </Button>
+                              {/* Timestamp */}
+                              {row.timestamp && (
+                                <div className="text-[9px] sm:text-[10px] text-slate-500 dark:text-slate-400 ml-auto pl-2">
+                                  {(() => {
+                                    try {
+                                      return formatDistanceToNow(new Date(row.timestamp), { addSuffix: true });
+                                    } catch (e) {
+                                      return String(row.timestamp);
+                                    }
+                                  })()}
+                                </div>
+                              )}
                             </div>
                           </div>
                         </div>
