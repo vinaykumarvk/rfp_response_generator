@@ -128,9 +128,23 @@ def prompt_gpt(prompt, llm='openAI'):
             
             # Log the actual response content for debugging
             print("====== FULL CLAUDE RESPONSE ======")
-            print(content)
+            print(f"Type: {type(response)}")
+            print(f"Response object: {response}")
+            print(f"Extracted content: {content}")
             print("=================================")
+            
+            # Log the extracted text details
+            print(f"Extracted text length: {len(content)}")
+            print(f"Extracted text first 100 chars: {content[:100]}")
+            print(f"Is extracted text empty: {not bool(content.strip())}")
             logger.info(f"Successfully generated Claude response of length: {len(content)} characters")
+            
+            # Ensure we don't return an empty string
+            if not content.strip():
+                print("WARNING: Extracted text is empty, using fallback content")
+                fallback = "The system encountered an issue with the AI response. Please try again or use another model."
+                return fallback
+                
             return content
 
     except Exception as e:
