@@ -46,7 +46,12 @@ def prompt_gpt(prompt, llm='openAI'):
                     "X-Data-Use-Consent": "false"
                 }
             )
-            return response.choices[0].message.content.strip()
+            if not response or not response.choices:
+                logger.error("Empty response received from API")
+                raise ValueError("Empty response from API")
+            content = response.choices[0].message.content.strip()
+            logger.info("Successfully generated response")
+            return content
 
         elif llm == 'deepseek':
             client = OpenAI(
@@ -62,7 +67,12 @@ def prompt_gpt(prompt, llm='openAI'):
                 messages=prompt,
                 temperature=0.2
             )
-            return response.choices[0].message.content.strip()
+            if not response or not response.choices:
+                logger.error("Empty response received from API")
+                raise ValueError("Empty response from API")
+            content = response.choices[0].message.content.strip()
+            logger.info("Successfully generated response")
+            return content
 
         elif llm == 'claude':
             client = Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
