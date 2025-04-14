@@ -105,24 +105,22 @@ def find_similar_matches(requirement_id):
                 
                 # Commit the transaction
                 connection.commit()
-                print(f"\nUpdated similar_questions in database for requirement ID: {requirement_id}")
+                logger.info(f"Updated similar_questions in database for requirement ID: {requirement_id}")
             
-            # For debug/console output
-            print("\nOriginal Requirement:")
-            print(f"ID: {requirement[0]}")
-            print(f"Category: {requirement[2]}")
-            print(f"Text: {requirement[1]}")
-            print("\nTop 5 Similar Matches:")
+            # For debug/console output in logs only
+            logger.info(f"Original Requirement: ID={requirement[0]}, Category={requirement[2]}")
+            logger.info(f"Requirement text: {requirement[1]}")
+            logger.info(f"Found {len(similar_results)} similar matches")
             
-            # Print the results for debug output
+            # Log the results for debugging but don't print to stdout
             for idx, result in enumerate(similar_results, 1):
-                print(f"\nMatch #{idx}")
-                print(f"ID: {result[0]}")
-                print(f"Category: {result[3]}")
-                print(f"Similarity Score: {result[4]:.4f}")
-                print(f"Requirement: {result[1]}")
-                print(f"Response: {result[2]}")
-                print("-" * 80)
+                logger.info(f"Match #{idx}")
+                logger.info(f"ID: {result[0]}")
+                logger.info(f"Category: {result[3]}")
+                logger.info(f"Similarity Score: {result[4]:.4f}")
+                logger.info(f"Requirement: {result[1]}")
+                logger.info(f"Response: {result[2][:100]}...") # Log only the first 100 chars
+                logger.info("-" * 40)
             
             # Return structured data
             return {
@@ -135,7 +133,7 @@ def find_similar_matches(requirement_id):
                 "similar_matches": formatted_results
             }
     except Exception as e:
-        print(f"Error finding similar matches: {str(e)}")
+        logger.error(f"Error finding similar matches: {str(e)}")
         return {
             "success": False,
             "error": str(e)
