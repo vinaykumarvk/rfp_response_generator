@@ -423,18 +423,28 @@ export default function ViewData() {
       setProcessingItems([requirementId]);
       setProcessedCount(0);
       setGenerationError(null);
-      
+
       console.log(`Generating LLM response for requirement ID ${requirementId} using model ${model}`);
       
+      // Get the requirement data to pass to the API
+      const requirementItem = excelData.find(item => item.id === requirementId);
+      
+      if (!requirementItem) {
+        throw new Error(`Requirement with ID ${requirementId} not found`);
+      }
+      
       // Call the API to generate a response
-      const response = await fetch('/api/generate-response', { // Use api/generate-response instead of api/generate-llm-response
+      const response = await fetch('/api/generate-response', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           requirementId,
-          model
+          requirement: requirementItem.requirement,
+          provider: model,
+          rfpName: requirementItem.rfpName,
+          uploadedBy: requirementItem.uploadedBy
         }),
       });
       
@@ -493,7 +503,6 @@ export default function ViewData() {
     } finally {
       setIsGeneratingResponse(false);
       setIsGenerating(false);
-      setProcessingItems([]);
     }
   };
   
@@ -1112,14 +1121,26 @@ export default function ViewData() {
                   <div className="flex items-center">
                     <Sparkles className="h-4 w-4 text-blue-500 mr-2" />
                     <span className="font-medium text-sm">
-                      Generating responses ({processedCount}/{processingItems.length})
+                      {processingItems.length === 1 
+                        ? "Generating response..." 
+                        : `Generating responses (${processedCount}/${processingItems.length})`
+                      }
                     </span>
                   </div>
                   <span className="text-xs font-medium text-slate-500">
-                    {Math.round((processedCount / processingItems.length) * 100)}%
+                    {processingItems.length > 0 
+                      ? `${Math.round((processedCount / processingItems.length) * 100)}%` 
+                      : "In progress..."
+                    }
                   </span>
                 </div>
-                <Progress value={(processedCount / processingItems.length) * 100} className="h-2" />
+                <Progress 
+                  value={processingItems.length > 0 
+                    ? (processedCount / processingItems.length) * 100 
+                    : 50
+                  } 
+                  className="h-2" 
+                />
                 {generationError && (
                   <div className="text-xs text-red-500 mt-1">
                     Error: {generationError}
