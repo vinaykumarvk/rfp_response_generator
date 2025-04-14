@@ -25,49 +25,100 @@ def create_rfp_prompt(requirement: str, category: Optional[str] = None, previous
     logger.info(f"Category: {category}")
     logger.info(f"Previous responses available: {len(previous_responses or [])} items")
     
-    # System prompt with instructions
-    messages = [
-        {
-            "role": "system",
-            "content": """You are an expert in generating high-quality responses for RFPs (Request for Proposals) in the financial technology sector. 
-Your task is to generate a comprehensive, accurate, and professional response to the given requirement.
+    # Create the system message with detailed instructions
+    system_message = {
+        "role": "system",
+        "content": f"""You are a senior RFP specialist with over 15 years of experience in wealth management software.
+Your expertise lies in crafting precise, impactful, and business-aligned responses to RFP requirements.
 
-Guidelines for your response:
-1. Be thorough but concise, focusing on the most relevant information
-2. Use professional, confident language appropriate for formal business communication
-3. Highlight key capabilities, features, and benefits clearly
-4. Structure your response with logical organization
-5. Avoid generic claims; instead, provide specific details about capabilities
-6. Keep your response properly formatted for readability"""
-        }
-    ]
+**CONTEXT**:
+- Domain: Wealth Management Software.
+- Requirement Category: {category or 'Financial Technology'}.
+- Current Requirement: {requirement}.
+- Audience: Business professionals and wealth management decision-makers.
+
+**TASK**:
+Develop a high-quality response to the current RFP requirement. Use the provided previous responses as source material, prioritizing content from responses with higher similarity scores.
+
+**GUIDELINES**:
+1. **Response Style**:
+   - Professional, clear, and concise.
+   - Accessible to business professionals, avoiding excessive technical jargon.
+   - Focus on business benefits, practical applications, and value propositions.
+   - Ensure the response is complete and submission-ready.
+
+2. **Content Rules**:
+   - Incorporate content from the provided previous responses where relevant.
+   - Prioritize responses with higher similarity scores for relevance.
+   - Include technical details only when needed to demonstrate capability.
+   - Maintain an appropriate length (200-400 words) based on the complexity of the requirement.
+
+3. **Response Structure**:
+   - **Opening Statement**: Highlight the most relevant feature or capability related to the requirement.
+   - **Supporting Information**: Include specific examples or benefits that reinforce the feature.
+   - **Value Proposition**: End with a strong, tailored statement of value.
+
+4. **Critical Constraints**:
+   - Do NOT include any meta-text or commentary (e.g., "Here's the response…", 'Draft Response').
+   - Do NOT include speculative or ambiguous language.
+   - Format your response as direct informational content, not as a letter with salutation and signature.
+"""
+    }
     
-    # Add context from similar responses if available
-    context = ""
+    # Format the previous responses for the prompt
+    formatted_examples = ""
     if previous_responses and len(previous_responses) > 0:
-        context = "Here are some example responses to similar requirements that may help inform your response:\n\n"
         for i, resp in enumerate(previous_responses[:3], 1):  # Use up to 3 similar responses
-            context += f"Example {i} (Similarity: {resp.get('similarity_score', 0):.2f}):\n"
-            context += f"Requirement: {resp.get('requirement', '')}\n"
-            context += f"Response: {resp.get('response', '')}\n\n"
+            score = resp.get('similarity_score', 0)
+            if isinstance(score, str):
+                try:
+                    score = float(score)
+                except:
+                    score = 0
+                    
+            formatted_examples += f"**Example {i} (Similarity: {score:.2f})**:\n"
+            formatted_examples += f"Requirement: {resp.get('requirement', '')}\n"
+            formatted_examples += f"Response: {resp.get('response', '')}\n\n"
     
-    # Add category context if available
-    category_context = ""
-    if category:
-        category_context = f"This requirement is categorized as: {category}\n\n"
-    
-    # Add the requirement and context to the prompt
-    user_content = f"{category_context}Please provide a comprehensive response to the following RFP requirement:\n\n{requirement}\n\n{context}"
-    messages.append({
+    # Create user message with requirement and examples
+    user_message = {
         "role": "user",
-        "content": user_content
-    })
+        "content": f"""You have the following previous responses with similarity scores to evaluate:
+
+**Previous Responses and Scores**:
+{formatted_examples or "No previous responses available. Create an original response based on your expertise."}
+
+**Instructions**:
+1. Analyze the responses, prioritizing those with higher scores for relevance.
+2. Draft a response that meets all guidelines and rules outlined in the system message.
+3. Ensure the response is clear, concise, and tailored to the given requirement.
+
+**Current Requirement**: {requirement}
+"""
+    }
+    
+    # Add validation message as a final check
+    validation_message = {
+        "role": "user",
+        "content": """Review and validate the draft response based on these criteria:
+1. Content is appropriate and relevant to the requirement.
+2. The tone is professional and business-focused.
+3. No meta-text, assumptions, or speculative language is present.
+4. No salutation like "Dear [Client's Name]" or signature block is included.
+5. The response delivers a clear, specific value proposition for the requirement.
+
+If any criteria are unmet, revise the response accordingly."""
+    }
+    
+    # Create the full message array
+    messages = [system_message, user_message, validation_message]
     
     # Print the full prompt for debugging
     prompt_preview = f"""
 ======== GENERATED PROMPT ========
-SYSTEM: {messages[0]['content'][:100]}...
-USER: {user_content[:500]}...
+SYSTEM: {system_message['content'][:200]}...
+USER: {user_message['content'][:200]}...
+VALIDATION: {validation_message['content'][:200]}...
 ================================
 """
     print(prompt_preview)
