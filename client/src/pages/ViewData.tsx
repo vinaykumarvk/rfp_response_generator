@@ -882,7 +882,18 @@ export default function ViewData() {
       {/* Sticky header with all controls */}
       <div className="sticky top-0 z-10 bg-slate-50 dark:bg-slate-900 py-3 px-4 -mx-4 sm:-mx-6 md:-mx-8 lg:-mx-10 shadow-md">
         <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
-          <h1 className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-primary to-primary/70 text-transparent bg-clip-text">View Requirements</h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-primary to-primary/70 text-transparent bg-clip-text">View Requirements</h1>
+            
+            <p className="text-sm text-slate-500 dark:text-slate-400 whitespace-nowrap">
+              {filteredData.length} {filteredData.length === 1 ? 'item' : 'items'}
+              {filteredData.length !== excelData.length ? 
+                <Badge variant="outline" className="font-normal ml-1">
+                  Filtered from {excelData.length}
+                </Badge> : ''
+              }
+            </p>
+          </div>
           
           <div className="flex flex-wrap items-center gap-3">
             {/* Select All Checkbox */}
@@ -1005,25 +1016,11 @@ export default function ViewData() {
       
       <div>
         <Card className="shadow-sm">
-          {/* Unified Action Bar - Modern UI pattern with responsive design */}
+          {/* Hidden control section - keeping structure but removing visible elements */}
           <div className="border-b border-slate-200 dark:border-slate-700">
-            {/* Data summary section with meta information */}
-            <div className="p-4 bg-white dark:bg-slate-900">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                <div>
-                  <p className="text-sm text-slate-500 dark:text-slate-400">
-                    {filteredData.length} {filteredData.length === 1 ? 'item' : 'items'} 
-                    {filteredData.length !== excelData.length ? 
-                      <span className="ml-1">
-                        <Badge variant="outline" className="font-normal ml-1">
-                          Filtered from {excelData.length}
-                        </Badge>
-                      </span> : ''
-                    }
-                  </p>
-                </div>
-
-                {/* Hidden DropdownMenu that will be removed after our UI changes */}
+            <div className="p-0 bg-white dark:bg-slate-900">
+              <div className="hidden">
+                {/* All controls moved to sticky header, keeping this section to maintain layout structure */}
                 <div className="hidden">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
