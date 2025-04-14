@@ -204,8 +204,18 @@ asyncio.run(main())
         let responseData;
         
         try {
-          // Try to parse the JSON response
-          responseData = JSON.parse(pythonApiResponse.stdout);
+          // Extract just the JSON part from the output if it contains additional text
+          const jsonStartIndex = pythonApiResponse.stdout.indexOf('{');
+          const jsonEndIndex = pythonApiResponse.stdout.lastIndexOf('}') + 1;
+          
+          if (jsonStartIndex >= 0 && jsonEndIndex > jsonStartIndex) {
+            const jsonPart = pythonApiResponse.stdout.substring(jsonStartIndex, jsonEndIndex);
+            console.log('Extracted JSON:', jsonPart);
+            responseData = JSON.parse(jsonPart);
+          } else {
+            // Try to parse the entire output as JSON
+            responseData = JSON.parse(pythonApiResponse.stdout);
+          }
         } catch (parseError) {
           console.error('Failed to parse Python script response as JSON:', parseError);
           console.log('Raw output:', pythonApiResponse.stdout);

@@ -698,6 +698,22 @@ export default function ViewData() {
         if (result.finalResponse) {
           console.log(`Response preview: ${result.finalResponse.substring(0, 100)}...`);
         }
+        
+        // If this is the currently selected response, update it in the UI
+        if (selectedResponse && selectedResponse.id === requirement.id) {
+          setSelectedResponse({
+            ...selectedResponse,
+            finalResponse: result.finalResponse || selectedResponse.finalResponse,
+            openaiResponse: result.openaiResponse || selectedResponse.openaiResponse,
+            anthropicResponse: result.anthropicResponse || selectedResponse.anthropicResponse,
+            deepseekResponse: result.deepseekResponse || selectedResponse.deepseekResponse,
+            moaResponse: result.moaResponse || selectedResponse.moaResponse,
+            modelProvider: result.modelProvider || selectedResponse.modelProvider
+          });
+          
+          // Set tab to response view since we now have a response
+          setActiveTab('response');
+        }
       }
 
       toast({

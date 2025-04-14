@@ -68,8 +68,8 @@ async def get_llm_responses(requirement_id: int, model: str = 'moa', display_res
     
     # Print results if requested
     if display_results:
-        print(f"Generated response for requirement {requirement_id}:", json.dumps(result))
-        print(f"Response preview: {result.get('finalResponse', '')}...")
+        # Only print the JSON, no additional text that would interfere with parsing
+        print(json.dumps(result))
         
     return result
 
