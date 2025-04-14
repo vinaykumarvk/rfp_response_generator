@@ -43,8 +43,8 @@ function Router() {
   return (
     <AppLayout>
       <Switch>
-        <Route path="/" component={UploadRequirements} />
-        <Route path="/view-data" component={ViewData} />
+        <Route path="/" component={ViewData} />
+        <Route path="/upload" component={UploadRequirements} />
         <Route component={NotFound} />
       </Switch>
     </AppLayout>

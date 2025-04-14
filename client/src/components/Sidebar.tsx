@@ -33,16 +33,16 @@ export default function Sidebar() {
 
   const navItems = [
     {
-      title: 'Upload Requirements',
-      icon: <Upload className="h-5 w-5" />,
+      title: 'View Requirements',
+      icon: <FileText className="h-5 w-5" />,
       path: '/',
       active: location === '/'
     },
     {
-      title: 'View Requirements',
-      icon: <FileText className="h-5 w-5" />,
-      path: '/view-data',
-      active: location === '/view-data'
+      title: 'Upload Requirements',
+      icon: <Upload className="h-5 w-5" />,
+      path: '/upload',
+      active: location === '/upload'
     }
   ];
 
