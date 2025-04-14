@@ -35,8 +35,7 @@ def extract_text(response):
 def prompt_gpt(prompt, llm='openAI'):
     try:
         if llm == 'openAI':
-            # Hardcoded OpenAI API key
-            client = OpenAI(api_key="sk-proj-1234567890abcdef")
+            client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
             response = client.chat.completions.create(
                 model='gpt-4',
                 messages=prompt,
@@ -50,9 +49,8 @@ def prompt_gpt(prompt, llm='openAI'):
             return response.choices[0].message.content.strip()
 
         elif llm == 'deepseek':
-            # Hardcoded Deepseek API key
             client = OpenAI(
-                api_key="sk-dsk-1234567890abcdef",
+                api_key=os.environ.get("DEEPSEEK_API_KEY"),
                 base_url="https://api.deepseek.com/v1",
                 default_headers={
                     "X-Privacy-Mode": "strict",
@@ -67,8 +65,7 @@ def prompt_gpt(prompt, llm='openAI'):
             return response.choices[0].message.content.strip()
 
         elif llm == 'claude':
-            # Hardcoded Anthropic API key
-            client = Anthropic(api_key="sk-ant-1234567890abcdef")
+            client = Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
             response = client.messages.create(
                 model="claude-3-opus-20240229",
                 max_tokens=4000,
@@ -406,4 +403,4 @@ if __name__ == "__main__":
     model = sys.argv[2] if len(sys.argv) > 2 else 'moa'
     display_results = len(sys.argv) <= 3 or sys.argv[3].lower() != 'false'
 
-    get_llm_responses(requirement_id, model, display_results) 
+    get_llm_responses(requirement_id, model, display_results)
