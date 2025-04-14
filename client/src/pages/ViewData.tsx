@@ -1174,24 +1174,48 @@ export default function ViewData() {
                               </div>
                             </div>
                             
-                            {/* Requirement text with hover interaction */}
-                            <div 
-                              className={`group relative text-sm sm:text-base font-medium text-slate-800 dark:text-slate-100 line-clamp-3 cursor-pointer transition-all duration-200 ${!row.finalResponse && !row.similarQuestions ? 'opacity-70' : ''}`}
-                              onClick={() => (row.finalResponse || row.similarQuestions) && handleViewResponse(row)}
-                              title={(row.finalResponse || row.similarQuestions) ? "Click to view details" : "No response or references available yet"}
-                              aria-label={(row.finalResponse || row.similarQuestions) ? "Click to view details" : "No response or references available yet"}
-                            >
+                            {/* Requirement text */}
+                            <div className="text-sm sm:text-base font-medium text-slate-800 dark:text-slate-100 line-clamp-3 mb-3">
                               {row.requirement}
+                            </div>
+                            
+                            {/* Action buttons */}
+                            <div className="flex items-center gap-2 mt-2">
+                              <Button
+                                size="sm"
+                                variant={row.finalResponse ? "default" : "outline"}
+                                className={`h-8 px-3 gap-1 ${!row.finalResponse ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (row.finalResponse) {
+                                    setActiveTab('response');
+                                    handleViewResponse(row);
+                                  }
+                                }}
+                                disabled={!row.finalResponse}
+                                title={row.finalResponse ? "View response" : "No response available yet"}
+                              >
+                                <MessageSquare className="h-4 w-4" />
+                                <span>Response</span>
+                              </Button>
                               
-                              {(row.finalResponse || row.similarQuestions) && (
-                                <div className="absolute inset-0 bg-gradient-to-r from-transparent to-white/80 dark:to-black/80 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-end pr-4">
-                                  <span className="absolute right-10 top-1/2 transform -translate-y-1/2 bg-slate-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                                    {row.finalResponse && row.similarQuestions ? "View response & references" : 
-                                     row.finalResponse ? "View response" : "View references"}
-                                  </span>
-                                  {row.finalResponse ? <Hand className="h-5 w-5 text-primary" /> : <BookOpen className="h-5 w-5 text-primary" />}
-                                </div>
-                              )}
+                              <Button
+                                size="sm"
+                                variant={row.similarQuestions ? "secondary" : "outline"}
+                                className={`h-8 px-3 gap-1 ${!row.similarQuestions ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (row.similarQuestions) {
+                                    setActiveTab('references');
+                                    handleViewResponse(row);
+                                  }
+                                }}
+                                disabled={!row.similarQuestions}
+                                title={row.similarQuestions ? "View references" : "No references available yet"}
+                              >
+                                <BookOpen className="h-4 w-4" />
+                                <span>References</span>
+                              </Button>
                             </div>
                           </div>
                         </div>
