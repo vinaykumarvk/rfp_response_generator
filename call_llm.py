@@ -434,8 +434,13 @@ def get_llm_responses(requirement_id, model='moa', display_results=True):
                     prompt = create_rfp_prompt(requirement[1], requirement[2], previous_responses)
 
                 try:
+                    print(f"Calling LLM API for {model}...")
                     response = prompt_gpt(prompt, model)
+                    print(f"LLM API call for {model} successful, response length: {len(response)} characters")
+                    # Print first 100 chars of the response for debugging
+                    print(f"Response preview: {response[:100]}...")
                 except Exception as e:
+                    print(f"ERROR: Failed to call LLM API for {model}")
                     raise ValueError(f"Error generating response from {model}: {str(e)}")
 
                 # Save response to database

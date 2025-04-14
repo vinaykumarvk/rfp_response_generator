@@ -376,11 +376,56 @@ except Exception as e:
             modelProvider: 'openai'
           };
         } else if (modelProvider.toLowerCase() === 'claude' || modelProvider.toLowerCase() === 'anthropic') {
-          responseContent = {
-            finalResponse: `Simulated Anthropic response for requirement ${requirementId}`,
-            anthropicResponse: `Detailed Claude response for: ${requirementText?.substring(0, 50) || 'unknown requirement'}...`,
-            modelProvider: 'anthropic'
-          };
+          // Get the actual response from Python instead of simulated response
+          try {
+            // Try to get the response from Python (direct call)
+            const pythonDirectResponse = await exec(`python3 -c "
+from call_llm import get_llm_responses
+get_llm_responses(${requirementId}, 'anthropic', False)
+"`);
+            
+            console.log("Direct Python call for Anthropic model completed");
+            
+            // Now fetch the saved response from the database
+            const dbResponse = await exec(`python3 -c "
+import json
+from sqlalchemy import text
+from database import engine
+
+with engine.connect() as connection:
+    query = text('''
+        SELECT 
+            anthropic_response 
+        FROM excel_requirement_responses 
+        WHERE id = :req_id
+    ''')
+    
+    result = connection.execute(query, {'req_id': ${requirementId}}).fetchone()
+    
+    if result and result[0]:
+        print(json.dumps({'response': result[0]}))
+    else:
+        print(json.dumps({'response': None}))
+"`);
+            
+            // Parse the response
+            const dbData = JSON.parse(dbResponse.stdout);
+            const actualResponse = dbData.response;
+            
+            responseContent = {
+              finalResponse: actualResponse,
+              anthropicResponse: actualResponse,
+              modelProvider: 'anthropic'
+            };
+          } catch (directCallError) {
+            console.error("Error in direct Python call:", directCallError);
+            // Fall back to simulated response only if direct call fails
+            responseContent = {
+              finalResponse: `Simulated Anthropic response for requirement ${requirementId}`,
+              anthropicResponse: `Detailed Claude response for: ${requirementText?.substring(0, 50) || 'unknown requirement'}...`,
+              modelProvider: 'anthropic'
+            };
+          }
         } else if (modelProvider.toLowerCase() === 'deepseek') {
           responseContent = {
             finalResponse: `Simulated DeepSeek response for requirement ${requirementId}`,
