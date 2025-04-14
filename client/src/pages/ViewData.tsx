@@ -1037,11 +1037,11 @@ export default function ViewData() {
       <div className="relative">
         <Card className="shadow-sm">
           {/* Filters panel - making it stick to top under the main header */}
-          <div className="sticky top-[60px] z-10 border-b border-slate-200 dark:border-slate-700">
-            <div className="p-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur-sm">
-              <div className="hidden">
-                {/* All controls moved to sticky header, keeping this section to maintain layout structure */}
-                <div className="hidden">
+          {showFilters && (
+            <div className="sticky top-[60px] z-10 border-b border-slate-200 dark:border-slate-700">
+              <div className="p-3 bg-white/95 dark:bg-slate-900/95 backdrop-blur-sm">
+                <div className="flex flex-wrap gap-4">
+                  {/* Filter controls */}
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button 
@@ -1289,9 +1289,7 @@ export default function ViewData() {
                 </div>
               </div>
             </div>
-            
-            {/* Filter panel is now a Popover component */}
-          </div>
+          )}
 
           {/* Progress indicator for generation */}
           {isGenerating && (
