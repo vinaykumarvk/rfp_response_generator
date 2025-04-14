@@ -601,7 +601,9 @@ export default function ViewData() {
         const requirement = excelData.find(item => item.id === requirementId);
         
         // Set the current requirement text for display
-        setCurrentItemText(requirement?.requirement || "");
+        const reqText = requirement?.requirement || "";
+        setCurrentItemText(reqText);
+        console.log(`Processing item ${i+1}/${totalItems}: ${reqText.substring(0, 50)}...`);
         
         // Update stage with the current item number and total
         setGenerationStage(`Processing item ${i+1} of ${totalItems}`);
@@ -1320,7 +1322,8 @@ export default function ViewData() {
                     ? (processedCount / processingItems.length) * 100 
                     : generationStage === "Process Completed" ? 100 : getProgressValueByStage(generationStage)
                   } 
-                  className="h-2" 
+                  className="h-3 bg-slate-100 dark:bg-slate-700" 
+                  indicatorClassName="bg-gradient-to-r from-primary to-primary/70 animate-pulse"
                 />
                 
                 {/* Current Stage Info */}
@@ -1335,9 +1338,12 @@ export default function ViewData() {
                 
                 {/* Current Processing Item */}
                 {currentItemText && (
-                  <div className="mt-2 text-xs border-l-2 border-primary pl-2 py-1 bg-slate-50 dark:bg-slate-800 rounded">
-                    <div className="font-medium mb-1 text-primary">Current requirement:</div>
-                    <div className="line-clamp-2">{currentItemText}</div>
+                  <div className="mt-2 text-xs border-l-2 border-primary pl-2 py-1 bg-blue-50 dark:bg-blue-900/30 rounded shadow-sm">
+                    <div className="font-medium mb-1 text-primary flex items-center">
+                      <FileText className="h-3 w-3 mr-1" />
+                      <span>Current requirement:</span>
+                    </div>
+                    <div className="line-clamp-2 text-slate-700 dark:text-slate-200 font-medium">{currentItemText}</div>
                   </div>
                 )}
                 
