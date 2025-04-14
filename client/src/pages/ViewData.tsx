@@ -294,7 +294,7 @@ export default function ViewData() {
   const handleRefresh = async () => {
     try {
       // Force a fresh fetch from the server with cache bypass
-      await refetch({ fetchPolicy: 'network-only' });
+      await refetch();
       toast({
         title: "Data Refreshed",
         description: "All requirements have been refreshed from the database.",
@@ -879,30 +879,127 @@ export default function ViewData() {
   
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-primary to-primary/70 text-transparent bg-clip-text">View Requirements</h1>
-        
-        <div className="flex items-center gap-2">
-          <Button 
-            size="sm" 
-            onClick={handleRefresh}
-            className="h-8 px-3"
-            variant="outline"
-            title="Refresh all data from database"
-            disabled={loading}
-          >
-            {loading ? (
-              <>
-                <RefreshCcw className="h-4 w-4 mr-1.5 animate-spin" />
-                <span>Refreshing...</span>
-              </>
-            ) : (
-              <>
-                <RefreshCcw className="h-4 w-4 mr-1.5" />
-                <span>Refresh Data</span>
-              </>
-            )}
-          </Button>
+      {/* Sticky header with all controls */}
+      <div className="sticky top-0 z-10 bg-slate-50 dark:bg-slate-900 py-3 px-4 -mx-4 sm:-mx-6 md:-mx-8 lg:-mx-10 shadow-md">
+        <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
+          <h1 className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-primary to-primary/70 text-transparent bg-clip-text">View Requirements</h1>
+          
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Select All Checkbox */}
+            <div className="flex items-center mr-2 border-r border-slate-200 dark:border-slate-700 pr-3">
+              <Checkbox 
+                id="select-all-universal" 
+                checked={selectAll}
+                onCheckedChange={toggleSelectAll}
+              />
+              <label htmlFor="select-all-universal" className="ml-2 whitespace-nowrap text-sm font-medium text-slate-700 dark:text-slate-300">
+                Select All
+              </label>
+            </div>
+            
+            {/* Generate Response Dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button 
+                  size="sm" 
+                  className="h-8"
+                  variant="outline"
+                  disabled={selectedItems.length === 0}
+                >
+                  <Sparkles className="h-4 w-4 mr-1.5 text-primary" />
+                  <span>Generate</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-52">
+                <DropdownMenuLabel>AI Models</DropdownMenuLabel>
+                <DropdownMenuItem onClick={() => generateResponse('openAI')} className="gap-2">
+                  <Atom className="h-4 w-4 text-blue-500" />
+                  <span>OpenAI</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => generateResponse('claude')} className="gap-2">
+                  <Bot className="h-4 w-4 text-purple-500" />
+                  <span>Anthropic</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => generateResponse('deepseek')} className="gap-2">
+                  <Brain className="h-4 w-4 text-amber-500" />
+                  <span>DeepSeek</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => handleBulkAction('generate-moa')} className="gap-2">
+                  <Network className="h-4 w-4 text-green-500" />
+                  <span>Mixture of Agents (MOA)</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            
+            {/* Export Options Dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button 
+                  size="sm"
+                  className="h-8"
+                  variant="outline"
+                  disabled={selectedItems.length === 0}
+                >
+                  <FileText className="h-4 w-4 mr-1.5" />
+                  <span>Export</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-40">
+                <DropdownMenuItem onClick={handleExportToMarkdown} className="gap-2">
+                  <Printer className="h-4 w-4" />
+                  <span>Markdown</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleExportToExcel} className="gap-2">
+                  <FileText className="h-4 w-4" />
+                  <span>Excel</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleEmailMarkdown} className="gap-2">
+                  <Mail className="h-4 w-4" />
+                  <span>Email</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            
+            {/* Filters Button */}
+            <Button 
+              size="sm" 
+              onClick={() => setShowFilters(!showFilters)}
+              className="h-8"
+              variant={showFilters ? "default" : "outline"}
+              title="Toggle filters panel"
+            >
+              <Filter className="h-4 w-4 mr-1.5" />
+              <span>Filters</span>
+              {showFilters ? (
+                <X className="h-3 w-3 ml-1" />
+              ) : (
+                <ChevronRight className="h-3 w-3 ml-1" />
+              )}
+            </Button>
+            
+            {/* Refresh Button */}
+            <Button 
+              size="sm" 
+              onClick={handleRefresh}
+              className="h-8 px-3"
+              variant="outline"
+              title="Refresh all data from database"
+              disabled={loading}
+            >
+              {loading ? (
+                <>
+                  <RefreshCcw className="h-4 w-4 mr-1.5 animate-spin" />
+                  <span>Refreshing...</span>
+                </>
+              ) : (
+                <>
+                  <RefreshCcw className="h-4 w-4 mr-1.5" />
+                  <span>Refresh Data</span>
+                </>
+              )}
+            </Button>
+          </div>
         </div>
       </div>
       
@@ -926,21 +1023,8 @@ export default function ViewData() {
                   </p>
                 </div>
 
-                {/* Primary Action Row - Always visible on all screen sizes */}
-                <div className="flex items-center gap-2">
-                  <div className="flex items-center mr-2 border-r border-slate-200 dark:border-slate-700 pr-3">
-                    <Checkbox 
-                      id="select-all-universal" 
-                      checked={selectAll}
-                      onCheckedChange={toggleSelectAll}
-                    />
-                    <label htmlFor="select-all-universal" className="ml-2 whitespace-nowrap text-sm font-medium text-slate-700 dark:text-slate-300">
-                      Select All
-                    </label>
-                  </div>
-                  
-
-
+                {/* Hidden DropdownMenu that will be removed after our UI changes */}
+                <div className="hidden">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button 
