@@ -26,13 +26,19 @@ def extract_text(response):
         
     # Handle content attribute (new Anthropic API)
     if hasattr(response, 'content'):
+        print(f"DEBUG - extract_text: response has content attribute")
         if isinstance(response.content, list):
+            print(f"DEBUG - extract_text: content is a list of length {len(response.content)}")
             # Handle TextBlock objects
-            return ' '.join(block.text for block in response.content if hasattr(block, 'text'))
+            result = ' '.join(block.text for block in response.content if hasattr(block, 'text'))
+            print(f"DEBUG - extract_text: joined text blocks, result length: {len(result)}")
+            return result
         elif isinstance(response.content, str):
+            print(f"DEBUG - extract_text: content is a string of length {len(response.content)}")
             return response.content
         else:
             # Try as string anyway
+            print(f"DEBUG - extract_text: content is of type {type(response.content)}")
             return str(response.content)
             
     # Handle direct TextBlock object
