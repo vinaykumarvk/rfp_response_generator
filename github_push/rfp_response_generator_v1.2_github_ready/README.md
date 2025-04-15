@@ -11,3 +11,6 @@ An advanced AI-powered RFP Response Generator that leverages multi-model vector 
 - Categorized requirements with filtering and sorting
 - Comprehensive reference tracking
 - WhatsApp, Email and Markdown export capabilities
+
+## Optimization Note
+This is the optimized version of the RFP Response Generator, with a significantly reduced repository size (from 966MB to approximately 118KB) and improved performance.
