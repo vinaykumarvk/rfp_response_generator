@@ -935,6 +935,41 @@ export default function ViewData() {
       });
     }
   };
+
+  // Function to share responses via WhatsApp
+  const handleShareViaWhatsApp = () => {
+    // Get selected items data
+    const selectedData = excelData.filter(item => selectedItems.includes(item.id || 0));
+    
+    if (selectedData.length === 0) {
+      toast({
+        title: "No Data Found",
+        description: "Could not find data for the selected items",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    try {
+      // Generate markdown content
+      const markdownContent = generateMarkdownContent(selectedData);
+      
+      // Share via WhatsApp
+      shareViaWhatsApp(markdownContent);
+      
+      toast({
+        title: "WhatsApp Sharing",
+        description: "Content has been prepared for WhatsApp sharing. A file copy has also been downloaded for your records.",
+      });
+    } catch (error) {
+      console.error('Error sharing via WhatsApp:', error);
+      toast({
+        title: "WhatsApp Sharing Failed",
+        description: "Failed to share via WhatsApp: " + (error instanceof Error ? error.message : String(error)),
+        variant: "destructive"
+      });
+    }
+  };
   
   // Function to generate responses using selected model
   const generateResponse = async (model: string) => {
@@ -1267,6 +1302,10 @@ export default function ViewData() {
                 <DropdownMenuItem onClick={handleEmailMarkdown} className="gap-2">
                   <Mail className="h-4 w-4" />
                   <span>Email</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleBulkAction('whatsapp')} className="gap-2">
+                  <MessageSquare className="h-4 w-4 text-green-500" />
+                  <span>WhatsApp</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
