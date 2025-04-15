@@ -258,80 +258,150 @@ except Exception as e:
           
           if (jsonStartIndex >= 0 && jsonEndIndex > jsonStartIndex) {
             const jsonPart = pythonApiResponse.stdout.substring(jsonStartIndex, jsonEndIndex);
-            console.log('Extracted JSON:', jsonPart);
-            const rawResponseData = JSON.parse(jsonPart);
+            console.log('Extracted JSON:', jsonPart.substring(0, 100) + '...');
             
-            // Process the response based on the model type
-            console.log('Processing response with field mapping for model:', modelProvider);
-            
-            // Normalize model name
-            const normalizedModelProvider = modelProvider.toLowerCase() === 'claude' 
-              ? 'anthropic' 
-              : modelProvider.toLowerCase();
+            try {
+              const rawResponseData = JSON.parse(jsonPart);
               
-            // Apply field mapping to standardize model-specific responses
-            const mappedFields = mapPythonResponseToDbFields(rawResponseData, normalizedModelProvider);
-            console.log('Mapped fields:', mappedFields);
-            
-            // Create a response with all available fields
-            responseData = {
-              ...rawResponseData,
-              ...mappedFields
-            };
-            
-            console.log('Final processed response data keys:', Object.keys(responseData));
+              // Process the response based on the model type
+              console.log('Processing response with field mapping for model:', modelProvider);
+              
+              // Normalize model name
+              const normalizedModelProvider = modelProvider.toLowerCase() === 'claude' 
+                ? 'anthropic' 
+                : modelProvider.toLowerCase();
+                
+              // Apply field mapping to standardize model-specific responses
+              const mappedFields = mapPythonResponseToDbFields(rawResponseData, normalizedModelProvider);
+              console.log('Mapped fields:', Object.keys(mappedFields).join(', '));
+              
+              // Create a response with all available fields
+              responseData = {
+                ...rawResponseData,
+                ...mappedFields
+              };
+              
+              console.log('Final processed response data keys:', Object.keys(responseData));
+            } catch (innerParseError) {
+              console.error('Failed to parse extracted JSON part:', innerParseError);
+              throw innerParseError; // Rethrow to be caught by outer catch
+            }
           } else {
-            // Try to parse the entire output as JSON
-            const rawResponseData = JSON.parse(pythonApiResponse.stdout);
-            
-            // Apply the same mapping for consistent handling
-            const normalizedModelProvider = modelProvider.toLowerCase() === 'claude' 
-              ? 'anthropic' 
-              : modelProvider.toLowerCase();
+            // If we couldn't find JSON brackets, try to parse the entire output as JSON
+            try {
+              const rawResponseData = JSON.parse(pythonApiResponse.stdout);
               
-            const mappedFields = mapPythonResponseToDbFields(rawResponseData, normalizedModelProvider);
-            responseData = {
-              ...rawResponseData,
-              ...mappedFields
-            };
+              // Apply the same mapping for consistent handling
+              const normalizedModelProvider = modelProvider.toLowerCase() === 'claude' 
+                ? 'anthropic' 
+                : modelProvider.toLowerCase();
+                
+              const mappedFields = mapPythonResponseToDbFields(rawResponseData, normalizedModelProvider);
+              responseData = {
+                ...rawResponseData,
+                ...mappedFields
+              };
+            } catch (fullParseError) {
+              console.error('Failed to parse full output as JSON:', fullParseError);
+              throw fullParseError; // Rethrow to be caught by outer catch
+            }
           }
         } catch (parseError) {
           console.error('Failed to parse Python script response as JSON:', parseError);
-          console.log('Raw output:', pythonApiResponse.stdout);
+          console.log('Raw output (first 200 chars):', pythonApiResponse.stdout.substring(0, 200));
           
-          // If we can't parse the response, fall back to our simulated responses
-          if (modelProvider.toLowerCase() === 'openai') {
-            responseData = {
-              finalResponse: `OpenAI response for requirement ${requirementId}`,
-              openaiResponse: `Detailed OpenAI response for: ${requirementText?.substring(0, 50) || 'unknown requirement'}...`,
-              modelProvider: 'openai'
-            };
-          } else if (modelProvider.toLowerCase() === 'claude' || modelProvider.toLowerCase() === 'anthropic') {
-            responseData = {
-              finalResponse: `Anthropic response for requirement ${requirementId}`,
-              anthropicResponse: `Detailed Claude response for: ${requirementText?.substring(0, 50) || 'unknown requirement'}...`,
-              modelProvider: 'anthropic'
-            };
-          } else if (modelProvider.toLowerCase() === 'deepseek') {
-            responseData = {
-              finalResponse: `DeepSeek response for requirement ${requirementId}`,
-              deepseekResponse: `Detailed DeepSeek response for: ${requirementText?.substring(0, 50) || 'unknown requirement'}...`,
-              modelProvider: 'deepseek'
-            };
-          } else if (modelProvider.toLowerCase() === 'moa') {
-            responseData = {
-              finalResponse: `MOA (Mixture of Agents) response for requirement ${requirementId}`,
-              openaiResponse: `OpenAI component of MOA response`,
-              anthropicResponse: `Anthropic component of MOA response`,
-              deepseekResponse: `DeepSeek component of MOA response`,
-              moaResponse: `Final synthesized MOA response for: ${requirementText?.substring(0, 50) || 'unknown requirement'}...`,
-              modelProvider: 'moa'
-            };
-          } else {
-            responseData = {
-              finalResponse: `Response using ${modelProvider} for requirement ${requirementId}`,
-              modelProvider
-            };
+          // Instead of fallback responses, query the database directly to get the actual response
+          try {
+            console.log('Falling back to database query for requirement response');
+            const dbResponse = await storage.getExcelRequirementResponseById(Number(requirementId));
+            
+            if (dbResponse) {
+              console.log('Successfully retrieved response from database');
+              responseData = {
+                id: dbResponse.id,
+                finalResponse: dbResponse.finalResponse,
+                openaiResponse: dbResponse.openaiResponse,
+                anthropicResponse: dbResponse.anthropicResponse,
+                deepseekResponse: dbResponse.deepseekResponse,
+                moaResponse: dbResponse.moaResponse,
+                modelProvider: dbResponse.modelProvider || modelProvider,
+                success: true,
+                message: 'Response retrieved from database'
+              };
+            } else {
+              // If database query fails, then use fallback responses
+              console.error('Failed to retrieve response from database, using fallbacks');
+              
+              if (modelProvider.toLowerCase() === 'openai') {
+                responseData = {
+                  finalResponse: `OpenAI response for requirement ${requirementId}`,
+                  openaiResponse: `Detailed OpenAI response for: ${requirementText?.substring(0, 50) || 'unknown requirement'}...`,
+                  modelProvider: 'openai'
+                };
+              } else if (modelProvider.toLowerCase() === 'claude' || modelProvider.toLowerCase() === 'anthropic') {
+                responseData = {
+                  finalResponse: `Anthropic response for requirement ${requirementId}`,
+                  anthropicResponse: `Detailed Claude response for: ${requirementText?.substring(0, 50) || 'unknown requirement'}...`,
+                  modelProvider: 'anthropic'
+                };
+              } else if (modelProvider.toLowerCase() === 'deepseek') {
+                responseData = {
+                  finalResponse: `DeepSeek response for requirement ${requirementId}`,
+                  deepseekResponse: `Detailed DeepSeek response for: ${requirementText?.substring(0, 50) || 'unknown requirement'}...`,
+                  modelProvider: 'deepseek'
+                };
+              } else if (modelProvider.toLowerCase() === 'moa') {
+                responseData = {
+                  finalResponse: `MOA (Mixture of Agents) response for requirement ${requirementId}`,
+                  openaiResponse: `OpenAI component of MOA response`,
+                  anthropicResponse: `Anthropic component of MOA response`,
+                  deepseekResponse: `DeepSeek component of MOA response`,
+                  moaResponse: `Final synthesized MOA response for: ${requirementText?.substring(0, 50) || 'unknown requirement'}...`,
+                  modelProvider: 'moa'
+                };
+              } else {
+                responseData = {
+                  finalResponse: `Response using ${modelProvider} for requirement ${requirementId}`,
+                  modelProvider
+                };
+              }
+            }
+          } catch (dbError) {
+            console.error('Failed to retrieve response from database:', dbError);
+            // Fall back to the same placeholder responses as before
+            if (modelProvider.toLowerCase() === 'openai') {
+              responseData = {
+                finalResponse: `OpenAI response for requirement ${requirementId}`,
+                openaiResponse: `Detailed OpenAI response for: ${requirementText?.substring(0, 50) || 'unknown requirement'}...`,
+                modelProvider: 'openai'
+              };
+            } else if (modelProvider.toLowerCase() === 'claude' || modelProvider.toLowerCase() === 'anthropic') {
+              responseData = {
+                finalResponse: `Anthropic response for requirement ${requirementId}`,
+                anthropicResponse: `Detailed Claude response for: ${requirementText?.substring(0, 50) || 'unknown requirement'}...`,
+                modelProvider: 'anthropic'
+              };
+            } else if (modelProvider.toLowerCase() === 'deepseek') {
+              responseData = {
+                finalResponse: `DeepSeek response for requirement ${requirementId}`,
+                deepseekResponse: `Detailed DeepSeek response for: ${requirementText?.substring(0, 50) || 'unknown requirement'}...`,
+                modelProvider: 'deepseek'
+              };
+            } else if (modelProvider.toLowerCase() === 'moa') {
+              responseData = {
+                finalResponse: `MOA (Mixture of Agents) response for requirement ${requirementId}`,
+                openaiResponse: `OpenAI component of MOA response`,
+                anthropicResponse: `Anthropic component of MOA response`,
+                deepseekResponse: `DeepSeek component of MOA response`,
+                moaResponse: `Final synthesized MOA response for: ${requirementText?.substring(0, 50) || 'unknown requirement'}...`,
+                modelProvider: 'moa'
+              };
+            } else {
+              responseData = {
+                finalResponse: `Response using ${modelProvider} for requirement ${requirementId}`,
+                modelProvider
+              };
+            }
           }
         }
         

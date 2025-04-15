@@ -34,6 +34,7 @@ export interface IStorage {
   
   // Excel Requirement Response Operations
   getExcelRequirementResponse(id: number): Promise<ExcelRequirementResponse | undefined>;
+  getExcelRequirementResponseById(id: number): Promise<ExcelRequirementResponse | undefined>;
   getExcelRequirementResponses(): Promise<ExcelRequirementResponse[]>;
   createExcelRequirementResponse(response: InsertExcelRequirementResponse): Promise<ExcelRequirementResponse>;
   createExcelRequirementResponses(responses: InsertExcelRequirementResponse[]): Promise<ExcelRequirementResponse[]>;
@@ -134,6 +135,12 @@ export class DatabaseStorage implements IStorage {
   async getExcelRequirementResponse(id: number): Promise<ExcelRequirementResponse | undefined> {
     const [response] = await db.select().from(excelRequirementResponses).where(eq(excelRequirementResponses.id, id));
     return response || undefined;
+  }
+
+  // Alias for getExcelRequirementResponse for backward compatibility
+  async getExcelRequirementResponseById(id: number): Promise<ExcelRequirementResponse | undefined> {
+    console.log(`Getting Excel requirement response by ID: ${id}`);
+    return await this.getExcelRequirementResponse(id);
   }
 
   async getExcelRequirementResponses(): Promise<ExcelRequirementResponse[]> {
