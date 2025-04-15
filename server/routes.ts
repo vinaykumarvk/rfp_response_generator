@@ -692,17 +692,41 @@ except Exception as e:
         return res.status(404).json({ message: "Requirement not found" });
       }
       
-      if (requirement.similarQuestions && Array.isArray(requirement.similarQuestions)) {
-        console.log(`Found ${requirement.similarQuestions.length} similar questions in database for requirement ${id}`);
-        
+      // Check if similarQuestions exists and parse it if it's a string
+      let similarQuestionsList = [];
+      
+      if (requirement.similarQuestions) {
+        try {
+          // If it's a string (from database), parse it
+          if (typeof requirement.similarQuestions === 'string') {
+            similarQuestionsList = JSON.parse(requirement.similarQuestions);
+          } 
+          // If it's already an array, use it directly
+          else if (Array.isArray(requirement.similarQuestions)) {
+            similarQuestionsList = requirement.similarQuestions;
+          }
+          
+          if (Array.isArray(similarQuestionsList) && similarQuestionsList.length > 0) {
+            console.log(`Found ${similarQuestionsList.length} similar questions in database for requirement ${id}`);
+          } else {
+            console.log(`No valid similar questions found for requirement ${id}`);
+            similarQuestionsList = [];
+          }
+        } catch (parseError) {
+          console.error(`Error parsing similarQuestions for requirement ${id}:`, parseError);
+          similarQuestionsList = [];
+        }
+      }
+      
+      if (similarQuestionsList.length > 0) {
         // Format the similar questions data to match the Reference interface expected by the frontend
-        const references = requirement.similarQuestions.map((item: any, index: number) => ({
+        const references = similarQuestionsList.map((item: any, index: number) => ({
           id: index + 1,
           responseId: id,
           category: item.category || 'Unknown',
-          requirement: item.requirement || '',
+          requirement: item.question || item.requirement || '',
           response: item.response || '',
-          reference: item.id ? `#${item.id}` : undefined,
+          reference: item.reference || (item.id ? `#${item.id}` : undefined),
           score: item.similarity_score || 0
         }));
         

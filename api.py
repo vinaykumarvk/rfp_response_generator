@@ -115,7 +115,7 @@ async def generate_response(request: ResponseRequest, db: Session = Depends(get_
         # Get requirement details from database
         query = text("""
             SELECT r.id, r.requirement, r.category 
-            FROM excel_requirements r
+            FROM excel_requirement_responses r
             WHERE r.id = :requirement_id
         """)
         result = db.execute(query, {"requirement_id": request.requirement_id}).fetchone()
@@ -127,14 +127,23 @@ async def generate_response(request: ResponseRequest, db: Session = Depends(get_
         requirement = result[1]
         category = result[2]
 
-        # Get similar questions from database
+        # Get similar questions from database (from the JSON field in excel_requirement_responses)
         similar_questions_query = text("""
-            SELECT similar_question 
-            FROM similar_questions 
-            WHERE requirement_id = :requirement_id
+            SELECT similar_questions 
+            FROM excel_requirement_responses 
+            WHERE id = :requirement_id
         """)
-        similar_questions = db.execute(similar_questions_query, {"requirement_id": request.requirement_id}).fetchall()
-        similar_questions_list = [q[0] for q in similar_questions]
+        similar_result = db.execute(similar_questions_query, {"requirement_id": request.requirement_id}).fetchone()
+        similar_questions_list = []
+        
+        # Parse the JSON string if available
+        if similar_result and similar_result[0]:
+            try:
+                import json
+                similar_questions_list = json.loads(similar_result[0])
+            except (json.JSONDecodeError, TypeError):
+                logger.warning(f"Failed to parse similar_questions JSON for requirement {request.requirement_id}")
+                similar_questions_list = []
 
         # Generate response
         try:
@@ -157,41 +166,32 @@ async def generate_response(request: ResponseRequest, db: Session = Depends(get_
 @app.get("/api/fetch-response/{requirement_id}")
 async def fetch_response(requirement_id: int, db: Session = Depends(get_db)):
     try:
-        # Get the latest response for the requirement
+        # Get the response with all details
         query = text("""
-            SELECT r.id, e.requirement, e.category, 
-                   r.response as final_response,
-                   r.response as openai_response,
-                   r.response as anthropic_response,
-                   r.response as deepseek_response,
-                   r.response as moa_response
-            FROM excel_requirement_responses r
-            JOIN excel_requirements e ON r.requirement_id = e.id
-            WHERE r.requirement_id = :requirement_id
-            ORDER BY r.created_at DESC
-            LIMIT 1
+            SELECT id, requirement, category, 
+                   final_response,
+                   openai_response,
+                   anthropic_response,
+                   deepseek_response,
+                   moa_response,
+                   similar_questions
+            FROM excel_requirement_responses
+            WHERE id = :requirement_id
         """)
         result = db.execute(query, {"requirement_id": requirement_id}).fetchone()
 
         if not result:
             raise HTTPException(status_code=404, detail="Response not found")
 
-        # Get similar questions from the similar_questions table
-        similar_query = text("""
-            SELECT similar_question, similarity_score
-            FROM similar_questions
-            WHERE requirement_id = :requirement_id
-            ORDER BY similarity_score DESC
-        """)
-        similar_results = db.execute(similar_query, {"requirement_id": requirement_id}).fetchall()
-
-        # Format similar questions
+        # Parse similar questions from JSON field
         similar_questions = []
-        for row in similar_results:
-            similar_questions.append({
-                "question": row[0],
-                "similarity_score": row[1]
-            })
+        if result[8]:  # similar_questions column
+            try:
+                import json
+                similar_questions = json.loads(result[8])
+            except (json.JSONDecodeError, TypeError):
+                logger.warning(f"Failed to parse similar_questions JSON for requirement {requirement_id}")
+                similar_questions = []
 
         return ResponseData(
             id=result[0],
@@ -213,8 +213,8 @@ async def create_excel_requirement(requirement: ExcelRequirement, db: Session = 
     try:
         # Insert the requirement into the database
         query = text("""
-            INSERT INTO excel_requirements (requirement, category, rfp_name, uploaded_by, created_at)
-            VALUES (:requirement, :category, :rfp_name, :uploaded_by, :created_at)
+            INSERT INTO excel_requirement_responses (requirement, category, rfp_name, uploaded_by, timestamp)
+            VALUES (:requirement, :category, :rfp_name, :uploaded_by, :timestamp)
             RETURNING id
         """)
 
@@ -225,7 +225,7 @@ async def create_excel_requirement(requirement: ExcelRequirement, db: Session = 
                 "category": requirement.category,
                 "rfp_name": requirement.rfp_name,
                 "uploaded_by": requirement.uploaded_by,
-                "created_at": datetime.now()
+                "timestamp": datetime.now()
             }
         )
 
