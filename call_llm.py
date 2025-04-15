@@ -41,11 +41,38 @@ def extract_text(response):
             print(f"EXTRACT_TEXT: First item type: {type(response.content[0]) if response.content else 'N/A'}")
             
             # Handle TextBlock objects
-            result = ' '.join(block.text for block in response.content if hasattr(block, 'text'))
-            print(f"EXTRACT_TEXT: Joined text blocks, result length: {len(result)}")
-            print(f"EXTRACT_TEXT: Result sample: {result[:100]}...")
-            print(f"==== END EXTRACT_TEXT DEBUG ====\n")
-            return result
+            try:
+                # First try to extract using specific API structure
+                result = ' '.join(block.text for block in response.content if hasattr(block, 'text'))
+                print(f"EXTRACT_TEXT: Joined text blocks, result length: {len(result)}")
+                print(f"EXTRACT_TEXT: Result sample: {result[:100]}...")
+                if result:
+                    print(f"==== END EXTRACT_TEXT DEBUG ====\n")
+                    return result
+            except Exception as e:
+                print(f"EXTRACT_TEXT: Error extracting from content list: {str(e)}")
+            
+            # If that fails, try alternative extraction methods
+            try:
+                # For Claude API v3+, try to extract content from the first item if it's a dict with 'text'
+                if response.content and isinstance(response.content[0], dict) and 'text' in response.content[0]:
+                    result = response.content[0]['text']
+                    print(f"EXTRACT_TEXT: Extracted text from content[0]['text'], length: {len(result)}")
+                    print(f"EXTRACT_TEXT: Result sample: {result[:100]}...")
+                    print(f"==== END EXTRACT_TEXT DEBUG ====\n")
+                    return result
+            except Exception as e:
+                print(f"EXTRACT_TEXT: Error with alternative extraction: {str(e)}")
+                
+            # Last fallback for content list
+            try:
+                content_str = str(response.content)
+                print(f"EXTRACT_TEXT: Converting content list to string, length: {len(content_str)}")
+                print(f"EXTRACT_TEXT: Content string sample: {content_str[:100]}...")
+                print(f"==== END EXTRACT_TEXT DEBUG ====\n")
+                return content_str
+            except Exception as e:
+                print(f"EXTRACT_TEXT: Error converting content list to string: {str(e)}")
             
         elif isinstance(response.content, str):
             print(f"EXTRACT_TEXT: Content is a string of length {len(response.content)}")
@@ -68,13 +95,39 @@ def extract_text(response):
         print(f"==== END EXTRACT_TEXT DEBUG ====\n")
         return response.text
     
-    # Try common properties
+    # Try common properties for modern Claude API
+    if hasattr(response, 'message') and hasattr(response.message, 'content'):
+        print(f"EXTRACT_TEXT: Found response.message.content")
+        try:
+            content = response.message.content
+            if isinstance(content, list) and content and hasattr(content[0], 'text'):
+                result = content[0].text
+                print(f"EXTRACT_TEXT: Extracted from message.content[0].text, length: {len(result)}")
+                print(f"EXTRACT_TEXT: Result sample: {result[:100]}...")
+                print(f"==== END EXTRACT_TEXT DEBUG ====\n")
+                return result
+        except Exception as e:
+            print(f"EXTRACT_TEXT: Error extracting from message.content: {str(e)}")
+    
+    # Try other common properties
     for attr in ['message', 'choices', 'result', 'output']:
         if hasattr(response, attr):
             print(f"EXTRACT_TEXT: Response has {attr} attribute")
             attr_value = getattr(response, attr)
             print(f"EXTRACT_TEXT: {attr} type: {type(attr_value)}")
             print(f"EXTRACT_TEXT: {attr} repr: {repr(attr_value)[:100]}...")
+            
+            # If we have choices, try to extract content from there (common in API responses)
+            if attr == 'choices' and isinstance(attr_value, list) and attr_value:
+                try:
+                    choice = attr_value[0]
+                    if hasattr(choice, 'message') and hasattr(choice.message, 'content'):
+                        content = choice.message.content
+                        print(f"EXTRACT_TEXT: Found content in choices[0].message.content: {content[:100]}...")
+                        print(f"==== END EXTRACT_TEXT DEBUG ====\n")
+                        return content
+                except Exception as e:
+                    print(f"EXTRACT_TEXT: Error extracting from choices: {str(e)}")
         
     # Last resort fallback
     result = str(response)

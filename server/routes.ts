@@ -12,6 +12,7 @@ import { fileURLToPath } from "url";
 import { dirname } from "path";
 import { promisify } from "util";
 import { exec as cpExec } from "child_process";
+import { mapPythonResponseToDbFields } from "./field_mapping_fix";
 
 // Helper function for getting the directory path in ES modules
 const getDirPath = () => {
