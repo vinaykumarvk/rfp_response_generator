@@ -763,6 +763,45 @@ except Exception as e:
       return res.status(500).json({ message: "Failed to fetch references" });
     }
   });
+  
+  // Update response content endpoint
+  app.post('/api/excel-requirements/:id/update-response', async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { finalResponse } = req.body;
+      
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid ID format" });
+      }
+      
+      if (finalResponse === undefined) {
+        return res.status(400).json({ message: "finalResponse is required" });
+      }
+      
+      console.log(`Updating response content for requirement ID: ${id}`);
+      
+      // Update the response in the database
+      const result = await storage.updateExcelRequirementResponse(id, { 
+        finalResponse 
+      });
+      
+      if (!result) {
+        return res.status(404).json({ message: "Response not found" });
+      }
+      
+      return res.json({ 
+        success: true, 
+        message: "Response updated successfully",
+        finalResponse
+      });
+    } catch (error) {
+      console.error("Error updating response content:", error);
+      return res.status(500).json({ 
+        message: "Failed to update response content",
+        error: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
 
   // Generate LLM response for a requirement using call_llm.py
   app.post('/api/generate-llm-response', async (req: Request, res: Response) => {

@@ -2077,19 +2077,75 @@ export default function ViewData() {
                 
                 <TabsContent value="response">
                   <div className="p-4 bg-slate-50 dark:bg-slate-900 rounded-md mb-4">
-                    <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-3">Response:</h4>
-                    <div className="prose prose-slate dark:prose-invert max-w-none text-slate-900 dark:text-slate-50 font-medium">
-                      {selectedResponse.finalResponse && (
-                        <div className="bg-white dark:bg-slate-800 p-3 rounded-md border border-slate-200 dark:border-slate-700">
-                          <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                            {selectedResponse.finalResponse
-                              .replace(/\\n/g, '\n')
-                              .replace(/\\"/g, '"')
-                              .replace(/\\\\/g, '\\')}
-                          </ReactMarkdown>
+                    {!isEditingResponse ? (
+                      <>
+                        <div className="flex justify-between items-center mb-3">
+                          <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-200">Response:</h4>
+                          {selectedResponse.finalResponse && (
+                            <Button 
+                              size="sm" 
+                              variant="outline" 
+                              className="flex items-center gap-1" 
+                              onClick={handleStartEditing}
+                            >
+                              <Edit className="h-3.5 w-3.5" />
+                              Edit
+                            </Button>
+                          )}
                         </div>
-                      )}
-                    </div>
+                        <div className="prose prose-slate dark:prose-invert max-w-none text-slate-900 dark:text-slate-50 font-medium">
+                          {selectedResponse.finalResponse && (
+                            <div className="bg-white dark:bg-slate-800 p-3 rounded-md border border-slate-200 dark:border-slate-700">
+                              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                {selectedResponse.finalResponse
+                                  .replace(/\\n/g, '\n')
+                                  .replace(/\\"/g, '"')
+                                  .replace(/\\\\/g, '\\')}
+                              </ReactMarkdown>
+                            </div>
+                          )}
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="flex justify-between items-center mb-3">
+                          <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-200">Edit Response:</h4>
+                          <div className="flex items-center gap-2">
+                            <Button 
+                              size="sm" 
+                              variant="outline" 
+                              className="flex items-center gap-1" 
+                              onClick={handleCancelEdit}
+                              disabled={isSavingEdit}
+                            >
+                              <X className="h-3.5 w-3.5" />
+                              Cancel
+                            </Button>
+                            <Button 
+                              size="sm" 
+                              variant="default" 
+                              className="flex items-center gap-1" 
+                              onClick={handleSaveEdit}
+                              disabled={isSavingEdit}
+                            >
+                              <Save className="h-3.5 w-3.5" />
+                              {isSavingEdit ? 'Saving...' : 'Save'}
+                            </Button>
+                          </div>
+                        </div>
+                        <div className="prose prose-slate dark:prose-invert max-w-none">
+                          <div className="bg-white dark:bg-slate-800 rounded-md border border-slate-200 dark:border-slate-700">
+                            <textarea
+                              value={editedResponseText}
+                              onChange={(e) => setEditedResponseText(e.target.value)}
+                              className="w-full h-64 p-3 bg-transparent focus:outline-none resize-y text-slate-900 dark:text-slate-50 font-medium"
+                              placeholder="Enter response content..."
+                              disabled={isSavingEdit}
+                            />
+                          </div>
+                        </div>
+                      </>
+                    )}
                   </div>
                 </TabsContent>
                 
