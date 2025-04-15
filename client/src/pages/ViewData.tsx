@@ -531,6 +531,7 @@ export default function ViewData() {
           requirementId: requirementId.toString(),
           rfpName: requirement.rfpName,
           uploadedBy: requirement.uploadedBy,
+          skipSimilaritySearch: true  // Use existing similar questions instead of finding them again
         }),
       });
       

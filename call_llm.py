@@ -5,6 +5,8 @@ from sqlalchemy import text
 from database import engine
 from generate_prompt import create_rfp_prompt, convert_prompt_to_claude, find_similar_matches_and_generate_prompt
 import logging
+import traceback
+import os
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
@@ -449,6 +451,7 @@ def get_llm_responses(requirement_id, model='moa', display_results=True, skip_si
             # Check if we should skip similarity search and use existing matches
             similar_results = []
             if skip_similarity_search:
+                print("\n=== Using Existing Similar Questions ===")
                 print("Skip similarity search flag is set - using existing similar questions")
                 # Get existing similar questions from the database
                 existing_similar_query = text("""
@@ -465,6 +468,8 @@ def get_llm_responses(requirement_id, model='moa', display_results=True, skip_si
                         import ast
                         similar_questions_list = ast.literal_eval(existing_similar[0])
                         
+                        print(f"DEBUG: Similar questions loaded from database (first example): {similar_questions_list[0] if similar_questions_list else 'None'}")
+                        
                         # We'll set similar_questions_list later, but we need similar_results format for prompt creation
                         for idx, sq in enumerate(similar_questions_list):
                             similar_results.append([
@@ -475,11 +480,20 @@ def get_llm_responses(requirement_id, model='moa', display_results=True, skip_si
                                 float(sq['similarity_score'])  # similarity_score
                             ])
                         print(f"Converted {len(similar_questions_list)} existing similar questions for use")
+                        
+                        # Debug - print the first similar result for verification
+                        if similar_results:
+                            print(f"DEBUG: First similar result converted format:")
+                            print(f"  ID: {similar_results[0][0]}")
+                            print(f"  Question: {similar_results[0][1][:50]}...")
+                            print(f"  Response: {similar_results[0][2][:50]}...")
+                            print(f"  Score: {similar_results[0][4]}")
                     else:
                         print("No existing similar questions found - will perform search anyway")
                         skip_similarity_search = False  # Force search if no existing data
                 except Exception as e:
                     print(f"Error retrieving existing similar questions: {str(e)}")
+                    print(f"Exception traceback: {traceback.format_exc()}")
                     skip_similarity_search = False  # Force search if error occurs
             
             # If not skipping or if retrieving existing failed, perform similarity search
@@ -548,9 +562,22 @@ def get_llm_responses(requirement_id, model='moa', display_results=True, skip_si
             # Generate prompts based on model
             if model == 'moa':
                 print("3. Generating responses from all models")
+                print("\n=== Prompt Creation Debug ===")
+                print(f"Creating prompt with: requirement text (length {len(requirement[1])}), category: '{requirement[2]}', and {len(previous_responses)} similar responses")
+                
+                # Debug - show the first previous response if available
+                if previous_responses:
+                    print(f"First previous response data sample:")
+                    print(f"  Requirement: {previous_responses[0]['requirement'][:50]}..." if len(previous_responses[0]['requirement']) > 50 else previous_responses[0]['requirement'])
+                    print(f"  Response: {previous_responses[0]['response'][:50]}..." if len(previous_responses[0]['response']) > 50 else previous_responses[0]['response'])
+                    print(f"  Similarity: {previous_responses[0]['similarity_score']}")
+
                 # Generate responses from all models
                 openai_prompt = create_rfp_prompt(requirement[1], requirement[2], previous_responses)
+                print(f"OpenAI prompt created - Contains {len(openai_prompt)} message objects")
+                
                 claude_prompt = convert_prompt_to_claude(openai_prompt)
+                print(f"Claude prompt created - Contains {len(claude_prompt)} message objects")
 
                 # Use a dictionary to store model responses
                 model_responses = {}
@@ -633,20 +660,36 @@ def get_llm_responses(requirement_id, model='moa', display_results=True, skip_si
 
             else:
                 print(f"3. Generating response from {model}")
+                print("\n=== Single Model Prompt Creation Debug ===")
+                print(f"Creating prompt with: requirement text (length {len(requirement[1])}), category: '{requirement[2]}', and {len(previous_responses)} similar responses")
+                
+                # Debug - show the first previous response if available
+                if previous_responses:
+                    print(f"First previous response data sample:")
+                    print(f"  Requirement: {previous_responses[0]['requirement'][:50]}..." if len(previous_responses[0]['requirement']) > 50 else previous_responses[0]['requirement'])
+                    print(f"  Response: {previous_responses[0]['response'][:50]}..." if len(previous_responses[0]['response']) > 50 else previous_responses[0]['response'])
+                    print(f"  Similarity: {previous_responses[0]['similarity_score']}")
+                
                 # Generate prompt based on the model
                 try:
                     # Get model config to check if it's Anthropic/Claude
                     config = get_model_config(model)
                     normalized_model = config['normalized_name']
+                    print(f"Model '{model}' normalized to '{normalized_model}'")
                     
                     # Claude/Anthropic uses a different prompt format
                     if normalized_model == 'anthropic':
+                        print("Using Claude-specific prompt format")
                         prompt = convert_prompt_to_claude(create_rfp_prompt(requirement[1], requirement[2], previous_responses))
                     else:
+                        print(f"Using standard prompt format for {normalized_model}")
                         prompt = create_rfp_prompt(requirement[1], requirement[2], previous_responses)
                 except ValueError:
                     # Handle non-standard models (like 'moa')
+                    print(f"Model '{model}' not recognized, using standard prompt format")
                     prompt = create_rfp_prompt(requirement[1], requirement[2], previous_responses)
+                
+                print(f"Prompt created - Contains {len(prompt)} message objects")
 
                 try:
                     print(f"Calling LLM API for {model}...")
