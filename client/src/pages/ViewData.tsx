@@ -928,40 +928,55 @@ export default function ViewData() {
               </label>
             </div>
             
-            {/* Generate Response Dropdown */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button 
-                  size="sm" 
-                  className="h-8"
-                  variant="outline"
-                  disabled={selectedItems.length === 0}
-                >
-                  <Sparkles className="h-4 w-4 mr-1.5 text-primary" />
-                  <span>Generate</span>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-52">
-                <DropdownMenuLabel>AI Models</DropdownMenuLabel>
-                <DropdownMenuItem onClick={() => generateResponse('openAI')} className="gap-2">
-                  <Atom className="h-4 w-4 text-blue-500" />
-                  <span>OpenAI</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => generateResponse('claude')} className="gap-2">
-                  <Bot className="h-4 w-4 text-purple-500" />
-                  <span>Anthropic</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => generateResponse('deepseek')} className="gap-2">
-                  <Brain className="h-4 w-4 text-amber-500" />
-                  <span>DeepSeek</span>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => handleBulkAction('generate-moa')} className="gap-2">
-                  <Network className="h-4 w-4 text-green-500" />
-                  <span>Mixture of Agents (MOA)</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            {/* Separate Past Responses and Generate Answer Buttons */}
+            <div className="flex space-x-2">
+              {/* Find Past Responses Button */}
+              <Button 
+                size="sm" 
+                className="h-8"
+                variant="outline"
+                disabled={selectedItems.length === 0}
+                onClick={() => handleBulkAction('find-similar')}
+              >
+                <Search className="h-4 w-4 mr-1.5 text-blue-500" />
+                <span>Past Responses</span>
+              </Button>
+              
+              {/* Generate Answer Dropdown */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button 
+                    size="sm" 
+                    className="h-8"
+                    variant="outline"
+                    disabled={selectedItems.length === 0}
+                  >
+                    <Sparkles className="h-4 w-4 mr-1.5 text-primary" />
+                    <span>Generate Answer</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-52">
+                  <DropdownMenuLabel>AI Models</DropdownMenuLabel>
+                  <DropdownMenuItem onClick={() => generateResponse('openAI')} className="gap-2">
+                    <Atom className="h-4 w-4 text-blue-500" />
+                    <span>OpenAI</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => generateResponse('claude')} className="gap-2">
+                    <Bot className="h-4 w-4 text-purple-500" />
+                    <span>Anthropic</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => generateResponse('deepseek')} className="gap-2">
+                    <Brain className="h-4 w-4 text-amber-500" />
+                    <span>DeepSeek</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => handleBulkAction('generate-moa')} className="gap-2">
+                    <Network className="h-4 w-4 text-green-500" />
+                    <span>Mixture of Agents (MOA)</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
             
             {/* Export Options Dropdown */}
             <DropdownMenu>
@@ -1505,9 +1520,31 @@ export default function ViewData() {
                 </DialogDescription>
               </div>
               
-              {/* Generate Response Button */}
+              {/* Separate Past Responses and Generate Answer Buttons */}
               {selectedResponse && selectedResponseId && (
-                <div className="flex items-center">
+                <div className="flex items-center gap-2">
+                  {/* Past Responses Button */}
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="h-9 px-3 flex gap-2 items-center" 
+                    disabled={isFindingSimilar}
+                    onClick={() => handleFindSimilarMatches(selectedResponseId)}
+                  >
+                    {isFindingSimilar ? (
+                      <>
+                        <RefreshCcw className="h-4 w-4 animate-spin" />
+                        <span>Finding...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Search className="h-4 w-4 text-blue-500" />
+                        <span>Past Responses</span>
+                      </>
+                    )}
+                  </Button>
+                  
+                  {/* Generate Answer Button */}
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button 
@@ -1523,8 +1560,8 @@ export default function ViewData() {
                           </>
                         ) : (
                           <>
-                            <Sparkles className="h-4 w-4" />
-                            <span>Generate Response</span>
+                            <Sparkles className="h-4 w-4 text-primary" />
+                            <span>Generate Answer</span>
                           </>
                         )}
                       </Button>
