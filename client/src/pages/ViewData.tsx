@@ -948,7 +948,8 @@ export default function ViewData() {
       // Find the selected requirements
       const selectedRequirements = excelData.filter(item => selectedItems.includes(item.id || 0));
       
-      for (const [index, requirement] of selectedRequirements.entries()) {
+      for (let index = 0; index < selectedRequirements.length; index++) {
+        const requirement = selectedRequirements[index];
         // Convert model name to provider format if needed
         let provider = model;
         if (model === 'openAI') provider = 'openai';
