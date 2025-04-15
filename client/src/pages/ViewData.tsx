@@ -11,6 +11,8 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
+import CategoryGroup from '@/components/CategoryGroup';
 import { HelpTooltip } from '@/components/HelpTooltip';
 import { 
   MessageSquare, 
@@ -28,6 +30,7 @@ import {
   Zap,
   Square,
   Check,
+  ChevronDown,
   Loader2,
   Filter,
   X,
@@ -54,7 +57,6 @@ import { Progress } from '@/components/ui/progress';
 
 import ReferencePanel from '@/components/ReferencePanel';
 import { ExcelRequirementResponse } from '@shared/schema';
-import { Checkbox } from '@/components/ui/checkbox';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -1576,146 +1578,29 @@ export default function ViewData() {
                 <Skeleton className="h-40 w-full" />
               </div>
             ) : filteredData.length > 0 ? (
-              <div className="space-y-2">
-                {filteredData.map((row: ExcelRequirementResponse, index: number) => {
-                  const isSelected = row.id ? selectedItems.includes(row.id) : false;
+              <div className="space-y-4">
+                {/* Group requirements by category */}
+                {uniqueCategories.map(category => {
+                  // Only process categories with items
+                  const categoryItems = filteredData.filter(item => 
+                    (item.category || 'Uncategorized') === category
+                  );
+                  
+                  if (categoryItems.length === 0) return null;
+                  
+                  // Create a component for each category
                   return (
-                    <Card 
-                      key={row.id || index} 
-                      className={`overflow-hidden border relative transition-all duration-200 ${isSelected ? 'border-blue-400 dark:border-blue-600 shadow-md' : 'border-slate-200 dark:border-slate-700'}`}
-                    >
-                      <CardContent className="p-2 sm:p-3">
-                        <div className="flex items-start">
-                          <div className="mr-2 sm:mr-3 pt-1">
-                            {row.id && (
-                              <Checkbox 
-                                id={`select-${row.id}`}
-                                checked={isSelected}
-                                onCheckedChange={() => toggleSelectItem(row.id || 0)}
-                              />
-                            )}
-                          </div>
-                          
-                          {/* Processing Indicator */}
-                          {row.id && processingIndividualItems[row.id] && (
-                            <div className="absolute top-1 right-1 z-10">
-                              <div className="flex items-center gap-1.5 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-xs rounded-full px-2 py-0.5 shadow-sm border border-blue-200 dark:border-blue-800">
-                                <Loader2 className="h-3 w-3 animate-spin" />
-                                <span>{processingIndividualItems[row.id].stage}</span>
-                              </div>
-                            </div>
-                          )}
-                          
-                          <div className="flex-1 min-w-0">
-                            {/* Compact single-line attributes */}
-                            <div className="flex flex-wrap items-center gap-1 mb-1.5">
-                              {/* ID Badge */}
-                              <Badge variant="secondary" className="text-[10px] sm:text-xs px-1.5 py-0">
-                                ID: {row.id}
-                              </Badge>
-                              
-                              {/* Category Badge */}
-                              <Badge variant="outline" className="text-[10px] sm:text-xs bg-slate-50 text-slate-700 dark:bg-slate-800 dark:text-slate-200 border-slate-200 dark:border-slate-700">
-                                {row.category}
-                              </Badge>
-                              
-                              {/* RFP Badge */}
-                              {row.rfpName && (
-                                <Badge variant="outline" className="text-[10px] sm:text-xs bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-200 border-blue-200 dark:border-blue-800">
-                                  {row.rfpName}
-                                </Badge>
-                              )}
-                              
-                              {/* Status tag with Model Provider */}
-                              <Badge 
-                                variant="outline" 
-                                className={`text-[10px] sm:text-xs px-1.5 py-0 ${
-                                  row.finalResponse ? 
-                                    row.modelProvider === 'openai' ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-200 border-blue-200 dark:border-blue-800' : 
-                                    row.modelProvider === 'anthropic' ? 'bg-purple-50 text-purple-700 dark:bg-purple-950 dark:text-purple-200 border-purple-200 dark:border-purple-800' : 
-                                    row.modelProvider === 'deepseek' ? 'bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-200 border-amber-200 dark:border-amber-800' : 
-                                    row.modelProvider === 'moa' ? 'bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-200 border-green-200 dark:border-green-800' : 
-                                    'bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-200 border-green-200 dark:border-green-800'
-                                  : "bg-slate-50 text-slate-700 dark:bg-slate-800 dark:text-slate-200 border-slate-200 dark:border-slate-700"
-                                }`}
-                              >
-                                {row.finalResponse ? (
-                                  <>
-                                    <Check className="h-3 w-3 mr-0.5" /> 
-                                    {row.modelProvider === 'openai' ? 'OpenAI' : 
-                                     row.modelProvider === 'anthropic' ? 'Anthropic' : 
-                                     row.modelProvider === 'deepseek' ? 'DeepSeek' : 
-                                     row.modelProvider === 'moa' ? 'MOA' : 
-                                     'Generated'}
-                                  </>
-                                ) : (
-                                  'Not Generated'
-                                )}
-                              </Badge>
-                            </div>
-                            
-                            {/* Requirement text */}
-                            <div className="text-sm sm:text-base font-medium text-slate-800 dark:text-slate-100 line-clamp-3 mb-2">
-                              {row.requirement}
-                            </div>
-                            
-                            {/* Action buttons and timestamp in one row */}
-                            <div className="flex items-center justify-between mt-1">
-                              <div className="flex items-center gap-2">
-                                <Button
-                                  size="sm"
-                                  variant={row.finalResponse ? "default" : "outline"}
-                                  className={`h-7 px-2 gap-1 text-xs ${!row.finalResponse ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    if (row.finalResponse) {
-                                      setActiveTab('response');
-                                      handleViewResponse(row);
-                                    }
-                                  }}
-                                  disabled={!row.finalResponse}
-                                  title={row.finalResponse ? "View response" : "No response available yet"}
-                                >
-                                  <MessageSquare className="h-3.5 w-3.5" />
-                                  <span>Response</span>
-                                </Button>
-                                
-                                <Button
-                                  size="sm"
-                                  variant={row.similarQuestions ? "secondary" : "outline"}
-                                  className={`h-7 px-2 gap-1 text-xs ${!row.similarQuestions ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    if (row.similarQuestions) {
-                                      setActiveTab('references');
-                                      handleViewResponse(row);
-                                    }
-                                  }}
-                                  disabled={!row.similarQuestions}
-                                  title={row.similarQuestions ? "View references" : "No references available yet"}
-                                >
-                                  <BookOpen className="h-3.5 w-3.5" />
-                                  <span>References</span>
-                                </Button>
-                              </div>
-                              
-                              {/* Timestamp */}
-                              {row.timestamp && (
-                                <div className="text-[9px] sm:text-[10px] text-slate-500 dark:text-slate-400 ml-auto pl-2">
-                                  {(() => {
-                                    try {
-                                      return formatDistanceToNow(new Date(row.timestamp), { addSuffix: true });
-                                    } catch (e) {
-                                      return String(row.timestamp);
-                                    }
-                                  })()}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
+                    <CategoryGroup 
+                      key={category}
+                      category={category}
+                      items={categoryItems}
+                      selectedItems={selectedItems}
+                      setSelectedItems={setSelectedItems}
+                      processingIndividualItems={processingIndividualItems}
+                      handleViewResponse={handleViewResponse}
+                      toggleSelectItem={toggleSelectItem}
+                      setActiveTab={setActiveTab}
+                    />
                   );
                 })}
               </div>
@@ -1730,7 +1615,7 @@ export default function ViewData() {
           </CardContent>
         </Card>
       </div>
-    
+      
       {/* Detail Dialog */}
       <Dialog open={showResponseDialog} onOpenChange={setShowResponseDialog}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
@@ -1952,3 +1837,4 @@ export default function ViewData() {
     </div>
   );
 }
+
