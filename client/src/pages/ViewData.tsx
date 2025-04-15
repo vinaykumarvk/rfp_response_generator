@@ -1198,8 +1198,7 @@ export default function ViewData() {
                   </div>
                   
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="filter-rfp">RFP Name</Label>
+                    <div>
                       <Select
                         value={filters.rfpName}
                         onValueChange={(value) => setFilters({...filters, rfpName: value})}
@@ -1216,8 +1215,7 @@ export default function ViewData() {
                       </Select>
                     </div>
                     
-                    <div className="space-y-2">
-                      <Label htmlFor="filter-category">Category</Label>
+                    <div>
                       <Select
                         value={filters.category}
                         onValueChange={(value) => setFilters({...filters, category: value})}
@@ -1234,14 +1232,13 @@ export default function ViewData() {
                       </Select>
                     </div>
                     
-                    <div className="space-y-2">
-                      <Label htmlFor="filter-response">Response Status</Label>
+                    <div>
                       <Select
                         value={filters.hasResponse}
                         onValueChange={(value) => setFilters({...filters, hasResponse: value})}
                       >
                         <SelectTrigger id="filter-response" className="w-full">
-                          <SelectValue placeholder="Filter by response" />
+                          <SelectValue placeholder="Response Status" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="all">All Statuses</SelectItem>
@@ -1251,14 +1248,13 @@ export default function ViewData() {
                       </Select>
                     </div>
                     
-                    <div className="space-y-2">
-                      <Label htmlFor="filter-model">Generation Model</Label>
+                    <div>
                       <Select
                         value={filters.generationMode}
                         onValueChange={(value) => setFilters({...filters, generationMode: value})}
                       >
                         <SelectTrigger id="filter-model" className="w-full">
-                          <SelectValue placeholder="Filter by model" />
+                          <SelectValue placeholder="Generation Model" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="all">All Models</SelectItem>
