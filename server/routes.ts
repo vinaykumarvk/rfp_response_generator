@@ -142,7 +142,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Generate response using selected LLM
   app.post('/api/generate-response', async (req: Request, res: Response) => {
     try {
-      const { requirementId, model, requirement, provider, rfpName, uploadedBy } = req.body;
+      const { 
+        requirementId, 
+        model, 
+        requirement, 
+        provider, 
+        rfpName, 
+        uploadedBy,
+        skipSimilaritySearch = false // New flag to skip similarity search
+      } = req.body;
       
       // Log the complete request for debugging
       console.log('==== DETAILED REQUEST DEBUG - /api/generate-response ====');
@@ -193,7 +201,7 @@ try:
     from call_llm import get_llm_responses
     
     # This will generate the response and store it in database
-    get_llm_responses(${requirementId}, '${pythonModel}', False)
+    get_llm_responses(${requirementId}, '${pythonModel}', False, ${skipSimilaritySearch})
     
     # Now fetch the response from database to return
     from sqlalchemy import text

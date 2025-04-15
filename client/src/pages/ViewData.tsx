@@ -236,9 +236,14 @@ export default function ViewData() {
     setShowResponseDialog(true);
   };
   
-  // Function to find similar matches
+  // Function to find similar matches for a single requirement
   const [isFindingSimilar, setIsFindingSimilar] = useState(false);
   const [similarMatches, setSimilarMatches] = useState<any[]>([]);
+  const [bulkFindingProgress, setBulkFindingProgress] = useState({
+    total: 0,
+    completed: 0,
+    isProcessing: false
+  });
   
   const handleFindSimilarMatches = async (requirementId: number) => {
     if (!requirementId) return;
@@ -279,6 +284,15 @@ export default function ViewData() {
         description: `Found ${data.similar_matches?.length || 0} similar requirements.`,
       });
       
+      // If viewing a specific response, switch to the references tab
+      if (selectedResponseId === requirementId && selectedResponse) {
+        setActiveTab('references');
+      }
+      
+      // Refresh the data to reflect the updated similar questions
+      await refetch();
+      
+      return true;
     } catch (error) {
       console.error('Error finding similar matches:', error);
       toast({
@@ -286,8 +300,97 @@ export default function ViewData() {
         description: `Failed to find similar matches: ${error instanceof Error ? error.message : String(error)}`,
         variant: "destructive",
       });
+      return false;
     } finally {
       setIsFindingSimilar(false);
+    }
+  };
+  
+  // Function to find similar matches for multiple requirements in bulk
+  const handleFindSimilarForBulk = async () => {
+    if (selectedItems.length === 0) {
+      toast({
+        title: "No Items Selected",
+        description: "Please select at least one requirement to find similar matches",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    try {
+      // Setup progress tracking
+      setBulkFindingProgress({
+        total: selectedItems.length,
+        completed: 0,
+        isProcessing: true
+      });
+      
+      // Show notification to user
+      toast({
+        title: "Finding Similar Requirements",
+        description: `Processing ${selectedItems.length} requirements...`,
+      });
+      
+      // Process each requirement sequentially
+      const results = [];
+      for (const requirementId of selectedItems) {
+        try {
+          // Call the API for this requirement
+          const response = await fetch(`/api/find-similar-matches/${requirementId}`);
+          
+          if (!response.ok) {
+            console.error(`Error finding similar matches for requirement ${requirementId}: ${response.status} ${response.statusText}`);
+            results.push({ id: requirementId, success: false });
+          } else {
+            const data = await response.json();
+            results.push({ 
+              id: requirementId, 
+              success: !data.error, 
+              matchCount: data.similar_matches?.length || 0 
+            });
+          }
+        } catch (error) {
+          console.error(`Error processing requirement ${requirementId}:`, error);
+          results.push({ id: requirementId, success: false });
+        }
+        
+        // Update progress
+        setBulkFindingProgress(prev => ({
+          ...prev,
+          completed: prev.completed + 1
+        }));
+        
+        // Short delay to avoid overloading the server
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+      
+      // Refresh the data to reflect all updates
+      await refetch();
+      
+      // Count successes and failures
+      const successful = results.filter(r => r.success).length;
+      const failed = results.filter(r => !r.success).length;
+      
+      // Show final notification
+      toast({
+        title: "Similarity Search Complete",
+        description: `Successfully processed ${successful} requirements${failed > 0 ? `, failed: ${failed}` : ''}.`,
+        variant: successful > 0 ? "default" : "destructive",
+      });
+      
+    } catch (error) {
+      console.error('Error in bulk finding similar matches:', error);
+      toast({
+        title: "Bulk Process Error",
+        description: `An error occurred during bulk processing: ${error instanceof Error ? error.message : String(error)}`,
+        variant: "destructive",
+      });
+    } finally {
+      setBulkFindingProgress({
+        total: 0,
+        completed: 0,
+        isProcessing: false
+      });
     }
   };
   
@@ -475,25 +578,15 @@ export default function ViewData() {
       // Set the requirement text for display in the progress area
       setCurrentItemText(requirementItem.requirement || "");
       
-      // Update stage to fetching similar questions
-      setGenerationStage("Fetching similar questions");
-      
-      // First get the similar questions (this happens server-side)
-      // We're simulating stage updates since the actual operations happen on the server
+      // Update to creating prompt stage instead of fetching similar questions
+      // Since similar questions are now fetched separately
+      setGenerationStage("Creating prompt with past responses");
       await new Promise(resolve => setTimeout(resolve, 500)); // simulate brief delay
-      
-      // Update to storing stage
-      setGenerationStage("Storing similar questions");
-      await new Promise(resolve => setTimeout(resolve, 500)); // simulate brief delay
-      
-      // Update to creating prompt stage  
-      setGenerationStage("Creating prompt");
-      await new Promise(resolve => setTimeout(resolve, 500)); // simulate brief delay
-      
+            
       // Update to fetching LLM response stage
       setGenerationStage("Fetching response from LLM");
       
-      // Call the API to generate a response
+      // Call the API to generate a response - note we're not fetching similar questions here anymore
       const response = await fetch('/api/generate-response', {
         method: 'POST',
         headers: {
@@ -504,7 +597,8 @@ export default function ViewData() {
           requirement: requirementItem.requirement,
           provider: model,
           rfpName: requirementItem.rfpName,
-          uploadedBy: requirementItem.uploadedBy
+          uploadedBy: requirementItem.uploadedBy,
+          skipSimilaritySearch: true  // New flag to indicate we should use existing similar questions
         }),
       });
       
@@ -804,7 +898,8 @@ export default function ViewData() {
             requirement: requirement.requirement,
             provider,
             rfpName: requirement.rfpName,
-            uploadedBy: requirement.uploadedBy
+            uploadedBy: requirement.uploadedBy,
+            skipSimilaritySearch: true  // Use existing similar questions instead of finding them again
           }),
         });
 
@@ -867,6 +962,9 @@ export default function ViewData() {
     }
     
     switch (action) {
+      case 'find-similar':
+        handleFindSimilarForBulk();
+        break;
       case 'generate-openai':
         handleGenerateResponses('openai');
         break;
