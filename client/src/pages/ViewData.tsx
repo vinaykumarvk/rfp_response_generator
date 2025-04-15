@@ -1124,6 +1124,56 @@ export default function ViewData() {
               )}
             </Button>
             
+            {/* Sort Dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="h-8"
+                  title="Sort requirements"
+                >
+                  <ArrowUpDown className="h-4 w-4 mr-1.5" />
+                  <span>Sort</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <div className="flex items-center gap-2 px-2 pt-1.5 pb-0.5">
+                  <DropdownMenuLabel className="pb-0">Sort By</DropdownMenuLabel>
+                  <HelpTooltip text="Choose a field to sort the requirements list. Click again to toggle between ascending and descending order." />
+                </div>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => requestSort('id')} className="gap-2">
+                  <Hash className="h-4 w-4" />
+                  <span>ID</span>
+                  {sortConfig.key === 'id' && (
+                    sortConfig.direction === 'asc' ? <ArrowUp className="h-4 w-4 ml-auto" /> : <ArrowDown className="h-4 w-4 ml-auto" />
+                  )}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => requestSort('timestamp')} className="gap-2">
+                  <Calendar className="h-4 w-4" />
+                  <span>Date</span>
+                  {sortConfig.key === 'timestamp' && (
+                    sortConfig.direction === 'asc' ? <ArrowUp className="h-4 w-4 ml-auto" /> : <ArrowDown className="h-4 w-4 ml-auto" />
+                  )}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => requestSort('rfpName')} className="gap-2">
+                  <BookOpen className="h-4 w-4" />
+                  <span>RFP Name</span>
+                  {sortConfig.key === 'rfpName' && (
+                    sortConfig.direction === 'asc' ? <ArrowUp className="h-4 w-4 ml-auto" /> : <ArrowDown className="h-4 w-4 ml-auto" />
+                  )}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => requestSort('category')} className="gap-2">
+                  <Tag className="h-4 w-4" />
+                  <span>Category</span>
+                  {sortConfig.key === 'category' && (
+                    sortConfig.direction === 'asc' ? <ArrowUp className="h-4 w-4 ml-auto" /> : <ArrowDown className="h-4 w-4 ml-auto" />
+                  )}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            
             {/* Refresh Button */}
             <Button 
               size="sm" 
@@ -1317,50 +1367,6 @@ export default function ViewData() {
                   </div>
 
                   <div className="flex flex-wrap gap-2">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          className="h-9 px-2 sm:px-3 flex gap-1.5 items-center"
-                        >
-                          <ArrowUpDown className="h-4 w-4" />
-                          <span className="hidden sm:inline">Sort</span>
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuLabel>Sort By</DropdownMenuLabel>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => requestSort('id')} className="gap-2">
-                          <Hash className="h-4 w-4" />
-                          <span>ID</span>
-                          {sortConfig.key === 'id' && (
-                            sortConfig.direction === 'asc' ? <ArrowUp className="h-4 w-4 ml-auto" /> : <ArrowDown className="h-4 w-4 ml-auto" />
-                          )}
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => requestSort('timestamp')} className="gap-2">
-                          <Calendar className="h-4 w-4" />
-                          <span>Date</span>
-                          {sortConfig.key === 'timestamp' && (
-                            sortConfig.direction === 'asc' ? <ArrowUp className="h-4 w-4 ml-auto" /> : <ArrowDown className="h-4 w-4 ml-auto" />
-                          )}
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => requestSort('rfpName')} className="gap-2">
-                          <BookOpen className="h-4 w-4" />
-                          <span>RFP Name</span>
-                          {sortConfig.key === 'rfpName' && (
-                            sortConfig.direction === 'asc' ? <ArrowUp className="h-4 w-4 ml-auto" /> : <ArrowDown className="h-4 w-4 ml-auto" />
-                          )}
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => requestSort('category')} className="gap-2">
-                          <Tag className="h-4 w-4" />
-                          <span>Category</span>
-                          {sortConfig.key === 'category' && (
-                            sortConfig.direction === 'asc' ? <ArrowUp className="h-4 w-4 ml-auto" /> : <ArrowDown className="h-4 w-4 ml-auto" />
-                          )}
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
 
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
