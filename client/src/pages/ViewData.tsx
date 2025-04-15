@@ -1119,7 +1119,7 @@ export default function ViewData() {
             <Button 
               size="sm" 
               onClick={() => setShowFilters(!showFilters)}
-              className={`h-8 ${areFiltersActive ? 'bg-blue-100 hover:bg-blue-200 dark:bg-blue-900 hover:dark:bg-blue-800 border-blue-300 dark:border-blue-700' : ''}`}
+              className={`h-8 ${areFiltersActive ? 'bg-blue-100 hover:bg-blue-200 dark:bg-blue-900 hover:dark:bg-blue-800 border-blue-300 dark:border-blue-700 text-blue-800 dark:text-blue-200' : ''}`}
               variant={showFilters ? "default" : areFiltersActive ? "default" : "outline"}
               title={areFiltersActive ? "Filters are currently active" : "Toggle filters panel"}
             >
@@ -1128,7 +1128,7 @@ export default function ViewData() {
               {showFilters ? (
                 <X className="h-3 w-3 ml-1" />
               ) : areFiltersActive ? (
-                <Badge className="ml-1.5 h-4 px-1 bg-blue-500 hover:bg-blue-500 text-[10px]">on</Badge>
+                <span className="ml-1.5 h-4 px-1 rounded bg-blue-500 text-white text-[10px] inline-flex items-center">on</span>
               ) : (
                 <ChevronRight className="h-3 w-3 ml-1" />
               )}
