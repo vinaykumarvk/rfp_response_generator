@@ -201,7 +201,7 @@ try:
     from call_llm import get_llm_responses
     
     # This will generate the response and store it in database
-    get_llm_responses(${requirementId}, '${pythonModel}', False, ${skipSimilaritySearch})
+    get_llm_responses(${requirementId}, '${pythonModel}', False, ${skipSimilaritySearch ? 'True' : 'False'})
     
     # Now fetch the response from database to return
     from sqlalchemy import text
