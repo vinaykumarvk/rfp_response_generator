@@ -329,12 +329,9 @@ export default function ViewData() {
     // Reset editing state
     setIsEditingResponse(false);
     
-    // Set the appropriate tab based on what's available
-    if (row.finalResponse) {
-      setActiveTab('response');
-    } else if (row.similarQuestions) {
-      setActiveTab('references');
-    }
+    // Note: We don't override activeTab here anymore
+    // The activeTab is now set by the button that was clicked in CategoryGroup.tsx
+    // and will be preserved when opening the dialog
     
     setShowResponseDialog(true);
   };
