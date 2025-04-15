@@ -32,33 +32,50 @@ export default function ReferencePanel({ responseId, showTitle = true, onReferen
   useEffect(() => {
     const fetchReferences = async () => {
       if (!responseId) {
-        console.log("ReferencePanel: No responseId provided, skipping fetch");
         return;
       }
       
-      console.log(`ReferencePanel: Fetching references for responseId=${responseId}`);
       setLoading(true);
       setError(null);
       
       try {
-        const response = await fetch(`/api/excel-requirements/${responseId}/references`);
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+        
+        const response = await fetch(`/api/excel-requirements/${responseId}/references`, {
+          signal: controller.signal
+        });
+        
+        clearTimeout(timeoutId);
         
         if (!response.ok) {
           throw new Error("Failed to fetch reference data");
         }
         
         const data = await response.json();
-        console.log(`ReferencePanel: Received ${data.length} references:`, data);
         setReferences(data);
-      } catch (error) {
-        console.error("Error fetching references:", error);
-        setError("Could not load reference information");
+      } catch (e) {
+        // Safe type handling for the error
+        const errorMessage = e instanceof Error ? e.message : "Unknown error occurred";
+        const isAbortError = e instanceof Error && e.name === 'AbortError';
+        
+        if (isAbortError) {
+          setError("Request timed out. Please try again.");
+        } else {
+          console.error("Error fetching references:", errorMessage);
+          setError("Could not load reference information");
+        }
       } finally {
         setLoading(false);
       }
     };
     
     fetchReferences();
+    
+    // Cleanup function
+    return () => {
+      setReferences([]);
+    };
   }, [responseId]);
 
   if (!responseId) {
@@ -139,17 +156,12 @@ export default function ReferencePanel({ responseId, showTitle = true, onReferen
     </div>
   );
 
-  // Debug the references data and notify parent component
+  // Notify parent component about the reference count
   useEffect(() => {
-    if (references && references.length > 0) {
-      console.log("ReferencePanel: Reference data structure sample:", references[0]);
-    }
-    
-    // Notify parent component about the reference count
     if (onReferencesLoaded) {
       onReferencesLoaded(references.length);
     }
-  }, [references, onReferencesLoaded]);
+  }, [references.length, onReferencesLoaded]);
 
   return (
     <Card className="mt-6">

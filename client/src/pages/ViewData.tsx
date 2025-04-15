@@ -207,95 +207,115 @@ export default function ViewData() {
            filters.generationMode !== 'all';
   }, [filters]);
 
-  // Apply filters to the data
+  // Apply filters to the data - optimized for performance
   const filteredData = useMemo(() => {
-    // First filter the data
-    const filtered = excelData.filter(row => {
+    // Only run the filter if we have data and active filters
+    if (excelData.length === 0) {
+      return [];
+    }
+    
+    // First check if any filters are active to avoid unnecessary processing
+    const hasActiveFilters = 
+      filters.rfpName !== 'all' || 
+      filters.category !== 'all' || 
+      filters.hasResponse !== 'all' ||
+      filters.generationMode !== 'all';
+    
+    // Filter data - only process if we have active filters
+    const filtered = hasActiveFilters ? excelData.filter(row => {
+      // Early returns for each filter condition to avoid unnecessary checks
+      
       // Filter by RFP name
-      if (filters.rfpName && filters.rfpName !== 'all' && row.rfpName) {
-        if (row.rfpName !== filters.rfpName) {
-          return false;
-        }
+      if (filters.rfpName !== 'all' && row.rfpName && row.rfpName !== filters.rfpName) {
+        return false;
       }
       
       // Filter by category
-      if (filters.category && filters.category !== 'all' && row.category) {
-        if (row.category !== filters.category) {
-          return false;
-        }
+      if (filters.category !== 'all' && row.category && row.category !== filters.category) {
+        return false;
       }
       
       // Filter by response status
       if (filters.hasResponse !== 'all') {
         const hasResponse = !!row.finalResponse;
-        if ((filters.hasResponse === 'yes' && !hasResponse) || 
-            (filters.hasResponse === 'no' && hasResponse)) {
+        if ((filters.hasResponse === 'yes' && !hasResponse) || (filters.hasResponse === 'no' && hasResponse)) {
           return false;
         }
       }
       
       // Filter by generation mode/model provider
-      if (filters.generationMode !== 'all' && filters.generationMode) {
-        // First try using the modelProvider field (preferred approach)
+      if (filters.generationMode !== 'all') {
         if (row.modelProvider) {
+          // Direct comparison when modelProvider is available
           if (row.modelProvider !== filters.generationMode) {
             return false;
           }
-        } 
-        // Fallback to the legacy approach for backward compatibility
-        else {
-          if (filters.generationMode === 'openai' && !row.openaiResponse) {
-            return false;
-          }
-          else if (filters.generationMode === 'anthropic' && !row.anthropicResponse) {
-            return false;
-          }
-          else if (filters.generationMode === 'deepseek' && !row.deepseekResponse) {
-            return false;
-          }
-          else if (filters.generationMode === 'moa' && !row.moaResponse) {
+        } else {
+          // Fallback for legacy data
+          const responseMap = {
+            'openai': row.openaiResponse,
+            'anthropic': row.anthropicResponse,
+            'deepseek': row.deepseekResponse,
+            'moa': row.moaResponse
+          };
+          
+          if (!responseMap[filters.generationMode as keyof typeof responseMap]) {
             return false;
           }
         }
       }
       
       return true;
-    });
+    }) : excelData;
     
-    // Sort the filtered data
-    return [...filtered].sort((a, b) => {
-      // Default to comparing by ID if key doesn't exist
-      if (!a[sortConfig.key as keyof ExcelRequirementResponse] || !b[sortConfig.key as keyof ExcelRequirementResponse]) {
-        return sortConfig.direction === 'asc' ? 
-          (a.id || 0) - (b.id || 0) : 
-          (b.id || 0) - (a.id || 0);
-      }
-      
-      // Handle timestamp specially since it needs date comparison
+    // Only sort if we have data to sort
+    if (filtered.length === 0) {
+      return [];
+    }
+    
+    // Create a sorting function based on the current config
+    const getSortFn = () => {
+      // Handle timestamp specially 
       if (sortConfig.key === 'timestamp') {
-        const dateA = a.timestamp ? new Date(a.timestamp).getTime() : 0;
-        const dateB = b.timestamp ? new Date(b.timestamp).getTime() : 0;
-        return sortConfig.direction === 'asc' ? dateA - dateB : dateB - dateA;
+        return (a: ExcelRequirementResponse, b: ExcelRequirementResponse) => {
+          const dateA = a.timestamp ? new Date(a.timestamp).getTime() : 0;
+          const dateB = b.timestamp ? new Date(b.timestamp).getTime() : 0;
+          return sortConfig.direction === 'asc' ? dateA - dateB : dateB - dateA;
+        };
       }
       
       // Handle string comparisons
-      if (typeof a[sortConfig.key as keyof ExcelRequirementResponse] === 'string') {
-        const valueA = String(a[sortConfig.key as keyof ExcelRequirementResponse] || '').toLowerCase();
-        const valueB = String(b[sortConfig.key as keyof ExcelRequirementResponse] || '').toLowerCase();
-        
-        return sortConfig.direction === 'asc' ?
-          valueA.localeCompare(valueB) :
-          valueB.localeCompare(valueA);
+      if (typeof filtered[0][sortConfig.key as keyof ExcelRequirementResponse] === 'string') {
+        return (a: ExcelRequirementResponse, b: ExcelRequirementResponse) => {
+          const valueA = String(a[sortConfig.key as keyof ExcelRequirementResponse] || '').toLowerCase();
+          const valueB = String(b[sortConfig.key as keyof ExcelRequirementResponse] || '').toLowerCase();
+          
+          return sortConfig.direction === 'asc' ?
+            valueA.localeCompare(valueB) :
+            valueB.localeCompare(valueA);
+        };
       }
       
-      // Handle numeric values
-      const valA = a[sortConfig.key as keyof ExcelRequirementResponse] || 0;
-      const valB = b[sortConfig.key as keyof ExcelRequirementResponse] || 0;
-      
-      return sortConfig.direction === 'asc' ? 
-        Number(valA) - Number(valB) : 
-        Number(valB) - Number(valA);
-    });
+      // Handle numeric values (default)
+      return (a: ExcelRequirementResponse, b: ExcelRequirementResponse) => {
+        // Fallback to ID if the sort key doesn't exist
+        if (!a[sortConfig.key as keyof ExcelRequirementResponse] || !b[sortConfig.key as keyof ExcelRequirementResponse]) {
+          return sortConfig.direction === 'asc' ? 
+            (a.id || 0) - (b.id || 0) : 
+            (b.id || 0) - (a.id || 0);
+        }
+        
+        const valA = a[sortConfig.key as keyof ExcelRequirementResponse] || 0;
+        const valB = b[sortConfig.key as keyof ExcelRequirementResponse] || 0;
+        
+        return sortConfig.direction === 'asc' ? 
+          Number(valA) - Number(valB) : 
+          Number(valB) - Number(valA);
+      };
+    };
+    
+    // Sort using the selected sort function
+    return [...filtered].sort(getSortFn());
   }, [excelData, filters, sortConfig]);
   
   const handleViewResponse = (row: ExcelRequirementResponse) => {
