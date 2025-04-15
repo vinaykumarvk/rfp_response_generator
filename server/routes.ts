@@ -856,6 +856,20 @@ except Exception as e:
         return res.status(400).json({ message: 'Requirement ID is required' });
       }
       
+      // Import the API key validation utility
+      const { isApiKeyAvailable, getMissingApiKeyMessage } = require('./apiKeyUtils');
+      
+      // Check if the API key for the requested model is available
+      if (!isApiKeyAvailable(model)) {
+        const errorMessage = getMissingApiKeyMessage(model);
+        console.error(`API key missing error: ${errorMessage}`);
+        return res.status(400).json({
+          success: false,
+          message: 'API key not available',
+          error: errorMessage
+        });
+      }
+      
       console.log(`Generating LLM response for requirement ID ${requirementId} using model ${model}`);
       
       // Call Python script to generate LLM response
@@ -951,12 +965,12 @@ except Exception as e:
   });
   
   app.get('/api/validate-keys', async (_req: Request, res: Response) => {
+    // Import the API key validation utility
+    const { validateApiKeys, getModelAvailability } = require('./apiKeyUtils');
+    
     // Check if we have the necessary API keys in the environment
-    const apiKeys = {
-      openai: process.env.OPENAI_API_KEY ? true : false,
-      anthropic: process.env.ANTHROPIC_API_KEY ? true : false,
-      deepseek: process.env.DEEPSEEK_API_KEY ? true : false
-    };
+    const apiKeys = validateApiKeys();
+    const modelAvailability = getModelAvailability();
     
     // Check if the database is available
     let databaseAvailable = false;
