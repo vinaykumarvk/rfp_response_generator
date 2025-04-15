@@ -21,9 +21,10 @@ interface Reference {
 interface ReferencePanelProps {
   responseId?: number;
   showTitle?: boolean;
+  onReferencesLoaded?: (count: number) => void;
 }
 
-export default function ReferencePanel({ responseId, showTitle = true }: ReferencePanelProps) {
+export default function ReferencePanel({ responseId, showTitle = true, onReferencesLoaded }: ReferencePanelProps) {
   const [loading, setLoading] = useState(false);
   const [references, setReferences] = useState<Reference[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -138,12 +139,17 @@ export default function ReferencePanel({ responseId, showTitle = true }: Referen
     </div>
   );
 
-  // Debug the references data
+  // Debug the references data and notify parent component
   useEffect(() => {
     if (references && references.length > 0) {
       console.log("ReferencePanel: Reference data structure sample:", references[0]);
     }
-  }, [references]);
+    
+    // Notify parent component about the reference count
+    if (onReferencesLoaded) {
+      onReferencesLoaded(references.length);
+    }
+  }, [references, onReferencesLoaded]);
 
   return (
     <Card className="mt-6">

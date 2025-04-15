@@ -86,6 +86,7 @@ export default function ViewData() {
   const [selectedResponse, setSelectedResponse] = useState<ExcelRequirementResponse | null>(null);
   const [selectedResponseId, setSelectedResponseId] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState('response');
+  const [referenceCount, setReferenceCount] = useState(0);
   const [selectedItems, setSelectedItems] = useState<number[]>([]);
   const [selectAll, setSelectAll] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
@@ -1947,7 +1948,11 @@ export default function ViewData() {
                 </TabsContent>
                 
                 <TabsContent value="references">
-                  <ReferencePanel responseId={selectedResponseId || undefined} showTitle={false} />
+                  <ReferencePanel 
+                    responseId={selectedResponseId || undefined} 
+                    showTitle={false} 
+                    onReferencesLoaded={setReferenceCount}
+                  />
                 </TabsContent>
               </Tabs>
             </div>
