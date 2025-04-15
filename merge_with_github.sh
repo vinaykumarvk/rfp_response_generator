@@ -1,101 +1,49 @@
 #!/bin/bash
+set -e
 
-# Merge cleaned Replit project with GitHub repository
-# Usage: ./merge_with_github.sh /path/to/github/repo
+echo "===== RFP Response Generator - GitHub Merge Helper ====="
+echo "This script will help you merge this optimized codebase with the GitHub repository."
 
-if [ -z "$1" ]; then
-  echo "Error: GitHub repository path not provided!"
-  echo "Usage: ./merge_with_github.sh /path/to/github/repo"
-  exit 1
+# Check if git is installed
+if ! command -v git &> /dev/null; then
+    echo "Error: git is not installed. Please install git first."
+    exit 1
 fi
 
-GITHUB_REPO_PATH="$1"
-
-if [ ! -d "$GITHUB_REPO_PATH" ]; then
-  echo "Error: The provided GitHub repository path does not exist!"
-  echo "Please clone the repository first:"
-  echo "git clone https://github.com/vinaykumarvk/rfp_response_generator_clean.git"
-  exit 1
+# Extract the optimized code
+echo "Step 1: Extracting the optimized codebase..."
+if [ ! -d "rfp_response_generator_v1.2_github_ready" ]; then
+    tar -xzf rfp_response_generator_v1.2_github_ready.tar.gz
 fi
 
-echo "Starting merge process with GitHub repository at: $GITHUB_REPO_PATH"
-echo
+# Ask for the GitHub repository URL
+read -p "Step 2: Enter the GitHub repository URL (e.g., https://github.com/username/repo.git): " repo_url
 
-# Create directory structure if it doesn't exist
-echo "Creating directory structure..."
-mkdir -p "$GITHUB_REPO_PATH/client/src/components"
-mkdir -p "$GITHUB_REPO_PATH/client/src/hooks"
-mkdir -p "$GITHUB_REPO_PATH/client/src/lib"
-mkdir -p "$GITHUB_REPO_PATH/client/src/pages"
-mkdir -p "$GITHUB_REPO_PATH/server"
-mkdir -p "$GITHUB_REPO_PATH/shared"
-mkdir -p "$GITHUB_REPO_PATH/attached_assets"
-echo "Directory structure created."
+if [ -z "$repo_url" ]; then
+    echo "Error: No repository URL provided. Exiting."
+    exit 1
+fi
 
-# Copy core files
-echo "Copying core files..."
+# Create a temporary directory for the merge
+temp_dir=$(mktemp -d)
+echo "Step 3: Cloning the GitHub repository to temporary location..."
+git clone "$repo_url" "$temp_dir"
 
-# Python files
-echo "Copying Python files..."
-cp -v call_llm.py call_llm_simple.py database.py generate_prompt.py find_matches.py "$GITHUB_REPO_PATH/"
-echo "Python files copied."
+# Copy the optimized files to the GitHub repository
+echo "Step 4: Copying optimized files to the GitHub repository..."
+cp -r rfp_response_generator_v1.2_github_ready/* "$temp_dir/"
 
-# Server files
-echo "Copying server files..."
-cp -v server/index.ts server/routes.ts server/storage.ts server/db.ts server/vite.ts "$GITHUB_REPO_PATH/server/"
-cp -v server/field_mapping_fix.js server/field_mapping_fix.d.ts server/deployment_validator.py "$GITHUB_REPO_PATH/server/"
-echo "Server files copied."
+# Commit and push the changes
+echo "Step 5: Committing and pushing changes..."
+cd "$temp_dir"
+git add .
+git commit -m "Update codebase to version 1.2"
 
-# Client files
-echo "Copying client files..."
-cp -rv client/src/components/* "$GITHUB_REPO_PATH/client/src/components/"
-cp -rv client/src/hooks/* "$GITHUB_REPO_PATH/client/src/hooks/"
-cp -rv client/src/lib/* "$GITHUB_REPO_PATH/client/src/lib/"
-cp -rv client/src/pages/* "$GITHUB_REPO_PATH/client/src/pages/"
-cp -v client/src/App.tsx client/src/main.tsx client/src/index.css "$GITHUB_REPO_PATH/client/src/"
-cp -v client/index.html "$GITHUB_REPO_PATH/client/"
-echo "Client files copied."
-
-# Shared files
-echo "Copying shared files..."
-cp -v shared/schema.ts "$GITHUB_REPO_PATH/shared/"
-echo "Shared files copied."
-
-# Configuration files
-echo "Copying configuration files..."
-cp -v package.json postcss.config.js tailwind.config.ts theme.json tsconfig.json vite.config.ts drizzle.config.ts "$GITHUB_REPO_PATH/"
-echo "Configuration files copied."
-
-# Documentation files
-echo "Copying documentation files..."
-cp -v README.md ARCHITECTURE.md VERSION.md .env.example python-requirements.txt GITHUB_PREPARATION.md "$GITHUB_REPO_PATH/"
-echo "Documentation files copied."
-
-# Assets
-echo "Copying attached assets..."
-cp -v attached_assets/intellect_logo.png "$GITHUB_REPO_PATH/attached_assets/"
-echo "Assets copied."
-
-# Copy .gitignore
-echo "Copying .gitignore..."
-cp -v .gitignore "$GITHUB_REPO_PATH/"
-echo ".gitignore copied."
-
-# Create version information file with timestamp
-echo "Creating version information file..."
-VERSION_FILE="$GITHUB_REPO_PATH/VERSION_INFO.txt"
-echo "RFP Response Generator v1.1" > "$VERSION_FILE"
-echo "Updated: $(date)" >> "$VERSION_FILE"
-echo "GitHub Repository: https://github.com/vinaykumarvk/rfp_response_generator_clean" >> "$VERSION_FILE"
-echo "Version information file created at: $VERSION_FILE"
-
-echo
-echo "Merge completed! Files have been copied to: $GITHUB_REPO_PATH"
-echo
-echo "Next steps:"
-echo "1. Navigate to the GitHub repository directory: cd $GITHUB_REPO_PATH"
-echo "2. Review the changes: git status"
-echo "3. Commit the changes: git add . && git commit -m \"Merge cleaned version 1.1 from Replit\""
-echo "4. Push to GitHub: git push origin main"
-echo
-echo "Note: You may need to resolve conflicts if the same files exist in both repositories."
+echo ""
+echo "Step 6: Ready to push! Review the changes above."
+echo "To push changes to GitHub, run these commands:"
+echo "  cd $temp_dir"
+echo "  git push origin main"  # or whichever branch you're using
+echo ""
+echo "If you want to discard this operation, simply delete the temporary directory:"
+echo "  rm -rf $temp_dir"

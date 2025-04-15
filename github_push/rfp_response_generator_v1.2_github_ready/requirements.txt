@@ -1,0 +1,15 @@
+fastapi
+uvicorn
+sqlalchemy
+psycopg2-binary
+openai
+anthropic
+requests
+numpy
+pandas
+scikit-learn
+qdrant-client
+pydantic
+tqdm
+gdown
+openpyxl
