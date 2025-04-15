@@ -1318,6 +1318,7 @@ export default function ViewData() {
       });
     } finally {
       setIsGenerating(false);
+      setIsGeneratingResponse(false); // Ensure we reset the single item generation flag too for MOA
       
       // Reset the bulk generation progress after a delay for UX reasons
       setTimeout(() => {
@@ -1330,6 +1331,7 @@ export default function ViewData() {
         
         // Clear all individual processing indicators after operation completes
         setProcessingIndividualItems({});
+        setProcessingItems([]); // Clear any remaining processing items
       }, 1500);
     }
   };
