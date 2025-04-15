@@ -492,6 +492,9 @@ export default function ViewData() {
   const [generationStage, setGenerationStage] = useState<string>("Initializing");
   const [currentItemText, setCurrentItemText] = useState<string>("");
   
+  // For tracking individual requirements being processed (with their model info)
+  const [processingIndividualItems, setProcessingIndividualItems] = useState<{[key: number]: {stage: string, model: string}}>({});
+  
   // Helper function to get progress bar value based on generation stage
   const getProgressValueByStage = (stage: string): number => {
     switch (stage) {
@@ -575,6 +578,12 @@ export default function ViewData() {
       setProcessedCount(0);
       setGenerationError(null);
       setGenerationStage("Initializing");
+      
+      // Track this individual item's progress
+      setProcessingIndividualItems(prev => ({
+        ...prev,
+        [requirementId]: { stage: "Initializing", model }
+      }));
 
       console.log(`Generating LLM response for requirement ID ${requirementId} using model ${model}`);
       
@@ -591,10 +600,18 @@ export default function ViewData() {
       // Update to creating prompt stage instead of fetching similar questions
       // Since similar questions are now fetched separately
       setGenerationStage("Creating prompt with past responses");
+      setProcessingIndividualItems(prev => ({
+        ...prev,
+        [requirementId]: { ...prev[requirementId], stage: "Creating prompt" }
+      }));
       await new Promise(resolve => setTimeout(resolve, 500)); // simulate brief delay
             
       // Update to fetching LLM response stage
       setGenerationStage("Fetching response from LLM");
+      setProcessingIndividualItems(prev => ({
+        ...prev,
+        [requirementId]: { ...prev[requirementId], stage: "Fetching response" }
+      }));
       
       // Call the API to generate a response - note we're not fetching similar questions here anymore
       const response = await fetch('/api/generate-response', {
@@ -618,6 +635,10 @@ export default function ViewData() {
       
       // Update to saving response stage
       setGenerationStage("Saving response");
+      setProcessingIndividualItems(prev => ({
+        ...prev,
+        [requirementId]: { ...prev[requirementId], stage: "Saving response" }
+      }));
       
       const data = await response.json();
       
@@ -643,8 +664,14 @@ export default function ViewData() {
         setActiveTab('response');
       }
       
-      // Update to completion stage
+      // Update to completion stage 
       setGenerationStage("Process Completed");
+      
+      // Update individual progress indicator to completion
+      setProcessingIndividualItems(prev => ({
+        ...prev,
+        [requirementId]: { ...prev[requirementId], stage: "Completed" }
+      }));
       
       // Clear the current requirement text
       setCurrentItemText("");
