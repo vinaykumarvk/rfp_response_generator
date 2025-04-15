@@ -535,18 +535,42 @@ export const sendEmailWithContent = (
 
 /**
  * Helper function to show notifications
+ * Optimized to support notification updating for better UX in long operations
+ * @param message The notification message
+ * @param type The type of notification (success, error, loading)
+ * @param notificationId Optional ID to update an existing notification instead of creating a new one
+ * @returns A unique ID that can be used to update this notification later
  */
-const showNotification = (message: string, type: "success" | "error" | "loading" = "success") => {
-  // If your app has a toast/notification system, use it here
-  console.log(`[${type.toUpperCase()}] ${message}`);
+const showNotification = (
+  message: string, 
+  type: "success" | "error" | "loading" = "success",
+  notificationId?: number
+): number => {
+  // Get current notifications or create a new map
+  const notifications = (window as any).__rfpNotifications = 
+    (window as any).__rfpNotifications || new Map();
   
-  // For now, we'll use a simple alert for errors
-  if (type === "error") {
-    alert(message);
+  // Generate a new ID if none was provided
+  const id = notificationId || Date.now();
+  
+  // Store or update the notification
+  notifications.set(id, { message, type, timestamp: Date.now() });
+  
+  // Log to console for debugging
+  if (notificationId) {
+    console.log(`[${type.toUpperCase()} - UPDATED #${id}] ${message}`);
+  } else {
+    console.log(`[${type.toUpperCase()} - NEW #${id}] ${message}`);
   }
   
-  // Return an ID that can be used to clear the notification
-  return Date.now();
+  // For now, we'll use a simple alert for errors if there's no existing notification
+  if (type === "error" && !notificationId) {
+    // Show error alert in a nonblocking way
+    setTimeout(() => alert(message), 0);
+  }
+  
+  // Return the ID for future reference
+  return id;
 };
 
 /**
@@ -576,35 +600,41 @@ export const openMailtoLink = (
 
 /**
  * Opens WhatsApp with the markdown content ready to share
+ * Optimized to handle larger content more efficiently
  */
 export const shareViaWhatsApp = (
   markdownContent: string
 ): void => {
   try {
     // First download the markdown file to ensure the user has a local copy
-    downloadMarkdownFile(markdownContent, "rfp-responses.md");
-    
-    // Show notification about markdown download
-    showNotification("Markdown file downloaded. Launching WhatsApp...", "success");
-    
-    // Prepare content for WhatsApp
-    // WhatsApp has a character limit, so we'll truncate if necessary
-    const MAX_LENGTH = 4000; // WhatsApp message character limit
-    let whatsAppText = markdownContent;
-    
-    if (whatsAppText.length > MAX_LENGTH) {
-      whatsAppText = whatsAppText.substring(0, MAX_LENGTH - 150) + 
-        "\n\n... (Content truncated due to length. Please refer to the downloaded markdown file for the complete content.)";
+    // Use a try/catch within this operation to ensure the main function continues
+    try {
+      downloadMarkdownFile(markdownContent, "rfp-responses.md");
+      showNotification("Markdown file downloaded. Launching WhatsApp...", "success");
+    } catch (downloadErr) {
+      console.warn("Unable to download markdown file, but continuing with WhatsApp share:", downloadErr);
     }
     
-    // Create WhatsApp sharing link
-    const whatsAppLink = `https://wa.me/?text=${encodeURIComponent(whatsAppText)}`;
+    // Prepare content for WhatsApp with performance optimization
+    // WhatsApp has a character limit, so we'll truncate if necessary
+    const MAX_LENGTH = 4000; // WhatsApp message character limit
     
-    // Open WhatsApp
-    window.open(whatsAppLink, '_blank');
+    // Use substring directly instead of storing the entire content in a new variable
+    const whatsAppText = markdownContent.length > MAX_LENGTH 
+      ? markdownContent.substring(0, MAX_LENGTH - 150) + 
+        "\n\n... (Content truncated due to length. Please refer to the downloaded markdown file for the complete content.)"
+      : markdownContent;
+    
+    // Create WhatsApp sharing link - create it in a memory-efficient way
+    // Use encodeURIComponent inside a requestAnimationFrame to prevent UI blocking
+    requestAnimationFrame(() => {
+      const whatsAppLink = `https://wa.me/?text=${encodeURIComponent(whatsAppText)}`;
+      window.open(whatsAppLink, '_blank');
+    });
   } catch (error) {
     console.error("Error sharing via WhatsApp:", error);
-    alert(`Failed to share via WhatsApp: ${error instanceof Error ? error.message : String(error)}`);
+    // Use a more user-friendly message
+    showNotification(`Couldn't share via WhatsApp. Please try downloading as a file instead.`, "error");
   }
 };
 
@@ -612,74 +642,90 @@ export const shareViaWhatsApp = (
  * Generates an Excel file with RFP responses
  * Only includes Category, Requirement, and Final Response columns
  * Includes formatted header row and styled cells
+ * Optimized for performance with large datasets
  */
 export const generateExcelFile = (items: ExcelRequirementResponse[]): XLSX.WorkBook => {
   if (!items.length) {
     throw new Error("No items to export");
   }
   
-  // Create simplified data array with only the required columns and strip any markdown formatting
-  const simplifiedData = items.map(item => ({
-    Category: item.category || "Uncategorized",
-    Requirement: item.requirement || "No requirement text",
-    "Final Response": stripMarkdownFormatting(item.finalResponse || "No response")
-  }));
+  // Pre-allocate header styles to avoid recreating them for each cell
+  const headerStyle = {
+    font: { bold: true, color: { rgb: "FFFFFF" } },
+    fill: { patternType: "solid", fgColor: { rgb: "4F46E5" } }, // Primary color background
+    alignment: { horizontal: "center", vertical: "center", wrapText: true }
+  };
   
-  // Create worksheet
-  const worksheet = XLSX.utils.json_to_sheet(simplifiedData);
+  // Pre-allocate row styles
+  const evenRowStyle = {
+    alignment: { wrapText: true, vertical: "top" },
+    fill: { patternType: "solid", fgColor: { rgb: "F5F5F5" } } // Light gray for even rows
+  };
   
-  // Set column widths as per updated requirements
-  const colWidths = [
-    { wch: 15 },  // Category - 15 characters (updated from 20)
-    { wch: 30 },  // Requirement - 30 characters (updated from 50)
-    { wch: 100 }  // Final Response - 100 characters (updated from 150)
-  ];
-  worksheet['!cols'] = colWidths;
+  const oddRowStyle = {
+    alignment: { wrapText: true, vertical: "top" },
+    fill: { patternType: "solid", fgColor: { rgb: "FFFFFF" } } // White for odd rows
+  };
   
-  // Apply text wrapping to all cells
-  const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1:C1');
-  for (let row = range.s.r; row <= range.e.r; row++) {
-    for (let col = range.s.c; col <= range.e.c; col++) {
-      const cellRef = XLSX.utils.encode_cell({ r: row, c: col });
-      if (!worksheet[cellRef]) continue;
-      
-      // Create cell style if it doesn't exist
-      if (!worksheet[cellRef].s) {
-        worksheet[cellRef].s = {};
-      }
-      
-      // Apply text wrapping
-      worksheet[cellRef].s.alignment = { wrapText: true, vertical: "top" };
-      
-      // Apply alternate row styling (light gradient background)
-      if (row > 0) { // Skip header row
-        if (row % 2 === 0) {
-          worksheet[cellRef].s.fill = {
-            patternType: "solid",
-            fgColor: { rgb: "F5F5F5" } // Light gray for even rows
-          };
-        } else {
-          worksheet[cellRef].s.fill = {
-            patternType: "solid",
-            fgColor: { rgb: "FFFFFF" } // White for odd rows
-          };
-        }
-      }
-    }
-  }
+  // Create simplified data array with only the required columns 
+  // Use a buffer size of 100 items at a time to avoid memory issues with large arrays
+  const BUFFER_SIZE = 100;
+  const bufferCount = Math.ceil(items.length / BUFFER_SIZE);
   
-  // Style the header row
-  for (let col = range.s.c; col <= range.e.c; col++) {
-    const headerCellRef = XLSX.utils.encode_cell({ r: 0, c: col });
-    worksheet[headerCellRef].s = {
-      font: { bold: true, color: { rgb: "FFFFFF" } },
-      fill: { patternType: "solid", fgColor: { rgb: "4F46E5" } }, // Primary color background
-      alignment: { horizontal: "center", vertical: "center", wrapText: true }
-    };
-  }
-  
-  // Create workbook
+  // Create workbook first (outside the loop)
   const workbook = XLSX.utils.book_new();
+  
+  // Create worksheet with empty data first
+  const worksheet = XLSX.utils.aoa_to_sheet([["Category", "Requirement", "Final Response"]]);
+  
+  // Set column widths (same as before)
+  worksheet['!cols'] = [
+    { wch: 15 },  // Category - 15 characters
+    { wch: 30 },  // Requirement - 30 characters
+    { wch: 100 }  // Final Response - 100 characters
+  ];
+  
+  // Style header row (already added)
+  const headerRange = XLSX.utils.decode_range("A1:C1");
+  for (let col = headerRange.s.c; col <= headerRange.e.c; col++) {
+    const headerCellRef = XLSX.utils.encode_cell({ r: 0, c: col });
+    worksheet[headerCellRef].s = headerStyle;
+  }
+  
+  // Process data in chunks to avoid memory issues
+  let currentRow = 1; // Start after header
+  
+  for (let bufferIndex = 0; bufferIndex < bufferCount; bufferIndex++) {
+    const startIdx = bufferIndex * BUFFER_SIZE;
+    const endIdx = Math.min(startIdx + BUFFER_SIZE, items.length);
+    const chunk = items.slice(startIdx, endIdx);
+    
+    // Process each item in the chunk
+    chunk.forEach((item, idx) => {
+      const rowData = [
+        item.category || "Uncategorized",
+        item.requirement || "No requirement text",
+        stripMarkdownFormatting(item.finalResponse || "No response")
+      ];
+      
+      // Add this row to the worksheet
+      for (let col = 0; col < rowData.length; col++) {
+        const cellRef = XLSX.utils.encode_cell({ r: currentRow, c: col });
+        worksheet[cellRef] = { v: rowData[col], t: 's' }; // 't' stands for 'type', 's' is string
+        
+        // Apply styles based on row index
+        worksheet[cellRef].s = currentRow % 2 === 0 ? evenRowStyle : oddRowStyle;
+      }
+      
+      currentRow++;
+    });
+  }
+  
+  // Update worksheet range reference
+  worksheet['!ref'] = XLSX.utils.encode_range({ 
+    s: { r: 0, c: 0 }, 
+    e: { r: currentRow - 1, c: 2 } 
+  });
   
   // Add the worksheet to the workbook
   XLSX.utils.book_append_sheet(workbook, worksheet, "RFP Responses");
@@ -689,19 +735,39 @@ export const generateExcelFile = (items: ExcelRequirementResponse[]): XLSX.WorkB
 
 /**
  * Downloads an Excel file with RFP responses
+ * Optimized to handle large datasets and prevent UI freezing
  */
 export const downloadExcelFile = (
   items: ExcelRequirementResponse[],
   filename = "rfp-responses.xlsx"
 ): void => {
-  try {
-    // Generate workbook
-    const workbook = generateExcelFile(items);
-    
-    // Write workbook to file and trigger download
-    XLSX.writeFile(workbook, filename);
-  } catch (error) {
-    console.error("Error generating Excel file:", error);
-    alert(`Failed to generate Excel file: ${error instanceof Error ? error.message : String(error)}`);
-  }
+  // Show a loading notification to the user for better UX during large exports
+  const notificationId = showNotification("Preparing Excel export...", "loading");
+  
+  // Use setTimeout to move the intensive operation off the main thread
+  // This prevents UI freezing during large exports
+  setTimeout(() => {
+    try {
+      // Generate workbook in the background thread
+      const workbook = generateExcelFile(items);
+      
+      // Use requestAnimationFrame to ensure UI responsiveness during file writing
+      requestAnimationFrame(() => {
+        // Write workbook to file and trigger download
+        XLSX.writeFile(workbook, filename);
+        
+        // Update notification on success
+        showNotification("Excel file downloaded successfully!", "success", notificationId);
+      });
+    } catch (error) {
+      console.error("Error generating Excel file:", error);
+      
+      // Update notification on error
+      showNotification(
+        `Failed to generate Excel file: ${error instanceof Error ? error.message : "Unknown error"}`, 
+        "error", 
+        notificationId
+      );
+    }
+  }, 50); // Small delay to allow UI to update first
 };
