@@ -93,6 +93,12 @@ export default function ViewData() {
   const [isFeedbackSubmitting, setIsFeedbackSubmitting] = useState(false);
   const [isGeneratingResponse, setIsGeneratingResponse] = useState(false);
   
+  // Response editing state
+  const [isEditingResponse, setIsEditingResponse] = useState(false);
+  const [editedResponseText, setEditedResponseText] = useState('');
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+  const [originalResponseText, setOriginalResponseText] = useState('');
+  
   // Progress tracking
   const [bulkFindingProgress, setBulkFindingProgress] = useState({
     total: 0,
@@ -295,6 +301,9 @@ export default function ViewData() {
     setSelectedResponseId(row.id);
     setReferenceCount(0); // Reset reference count when opening a new response
     
+    // Reset editing state
+    setIsEditingResponse(false);
+    
     // Set the appropriate tab based on what's available
     if (row.finalResponse) {
       setActiveTab('response');
@@ -303,6 +312,96 @@ export default function ViewData() {
     }
     
     setShowResponseDialog(true);
+  };
+  
+  // Function to start editing response
+  const handleStartEditing = () => {
+    if (selectedResponse?.finalResponse) {
+      // Store original text for undo functionality
+      setOriginalResponseText(selectedResponse.finalResponse
+        .replace(/\\n/g, '\n')
+        .replace(/\\"/g, '"')
+        .replace(/\\\\/g, '\\'));
+      
+      // Initialize editable text
+      setEditedResponseText(selectedResponse.finalResponse
+        .replace(/\\n/g, '\n')
+        .replace(/\\"/g, '"')
+        .replace(/\\\\/g, '\\'));
+      
+      setIsEditingResponse(true);
+    }
+  };
+  
+  // Function to cancel editing
+  const handleCancelEdit = () => {
+    setIsEditingResponse(false);
+    setEditedResponseText('');
+  };
+  
+  // Function to save edited response
+  const handleSaveEdit = async () => {
+    if (!selectedResponseId || !editedResponseText.trim()) {
+      toast({
+        title: "Cannot Save Edit",
+        description: "No response ID or edited content is empty",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    try {
+      setIsSavingEdit(true);
+      
+      // Update the response in the database
+      const response = await fetch(`/api/excel-requirements/${selectedResponseId}/update-response`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          finalResponse: editedResponseText,
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to update response: ${response.status} ${response.statusText}`);
+      }
+      
+      const result = await response.json();
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to update response');
+      }
+      
+      // Update the selected response in the UI
+      if (selectedResponse) {
+        setSelectedResponse({
+          ...selectedResponse,
+          finalResponse: editedResponseText
+        });
+      }
+      
+      // Refresh the data to reflect the update
+      await refetch();
+      
+      // Exit editing mode
+      setIsEditingResponse(false);
+      
+      toast({
+        title: "Response Updated",
+        description: "The response has been successfully updated.",
+      });
+    } catch (error) {
+      console.error('Error updating response:', error);
+      toast({
+        title: "Update Failed",
+        description: `Failed to update response: ${error instanceof Error ? error.message : String(error)}`,
+        variant: "destructive"
+      });
+    } finally {
+      setIsSavingEdit(false);
+    }
   };
   
   // Function to find similar matches for a single requirement
