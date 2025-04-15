@@ -28,6 +28,7 @@ import {
   Zap,
   Square,
   Check,
+  Loader2,
   Filter,
   X,
   ChevronRight,
@@ -706,10 +707,26 @@ export default function ViewData() {
         setTimeout(() => {
           setIsGeneratingResponse(false);
           setIsGenerating(false);
+          // Clear the processing indicator for this requirement after a delay
+          setProcessingIndividualItems(prev => {
+            const newState = {...prev};
+            if (requirementId in newState) {
+              delete newState[requirementId];
+            }
+            return newState;
+          });
         }, 1500);
       } else {
         setIsGeneratingResponse(false);
         setIsGenerating(false);
+        // Clear the processing indicator in case of error
+        setProcessingIndividualItems(prev => {
+          const newState = {...prev};
+          if (requirementId in newState) {
+            delete newState[requirementId];
+          }
+          return newState;
+        });
       }
     }
   };
@@ -1543,6 +1560,16 @@ export default function ViewData() {
                               />
                             )}
                           </div>
+                          
+                          {/* Processing Indicator */}
+                          {row.id && processingIndividualItems[row.id] && (
+                            <div className="absolute top-1 right-1 z-10">
+                              <div className="flex items-center gap-1.5 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-xs rounded-full px-2 py-0.5 shadow-sm border border-blue-200 dark:border-blue-800">
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                                <span>{processingIndividualItems[row.id].stage}</span>
+                              </div>
+                            </div>
+                          )}
                           
                           <div className="flex-1 min-w-0">
                             {/* Compact single-line attributes */}
