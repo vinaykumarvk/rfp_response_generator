@@ -91,6 +91,14 @@ export default function ViewData() {
     isProcessing: false
   });
   
+  // Progress tracking for generation responses
+  const [bulkGenerationProgress, setBulkGenerationProgress] = useState({
+    total: 0,
+    completed: 0,
+    isProcessing: false,
+    model: ''
+  });
+  
   const [requirementsLoadingProgress, setRequirementsLoadingProgress] = useState({
     total: 0,
     loaded: 0,
@@ -775,10 +783,24 @@ export default function ViewData() {
     setGenerationError(null);
     setGenerationStage("Initializing batch processing");
     
+    // Initialize bulk generation progress
+    setBulkGenerationProgress({
+      total: selectedItems.length,
+      completed: 0,
+      isProcessing: true,
+      model: modelProvider
+    });
+    
     const totalItems = selectedItems.length;
     let successCount = 0;
     
     try {
+      // Show notification to user
+      toast({
+        title: "Generating Responses",
+        description: `Processing ${totalItems} requirements with ${modelProvider}...`,
+      });
+      
       // Process items sequentially to avoid overloading the API
       for (let i = 0; i < selectedItems.length; i++) {
         const requirementId = selectedItems[i];
@@ -808,7 +830,12 @@ export default function ViewData() {
           successCount++;
         }
         
+        // Update progress counters
         setProcessedCount(i + 1);
+        setBulkGenerationProgress(prev => ({
+          ...prev,
+          completed: prev.completed + 1
+        }));
       }
       
       // Set final stage
@@ -978,18 +1005,33 @@ export default function ViewData() {
       return;
     }
 
+    // Convert model name to provider format if needed
+    let provider = model;
+    if (model === 'openAI') provider = 'openai';
+    if (model === 'claude') provider = 'anthropic';
+    
+    // Initialize bulk generation progress
+    setBulkGenerationProgress({
+      total: selectedItems.length,
+      completed: 0,
+      isProcessing: true,
+      model: provider
+    });
+    
     setIsGenerating(true);
     
     try {
       // Find the selected requirements
       const selectedRequirements = excelData.filter(item => selectedItems.includes(item.id || 0));
       
+      // Show notification to user
+      toast({
+        title: "Generating Responses",
+        description: `Processing ${selectedRequirements.length} requirements with ${provider}...`,
+      });
+      
       for (let index = 0; index < selectedRequirements.length; index++) {
         const requirement = selectedRequirements[index];
-        // Convert model name to provider format if needed
-        let provider = model;
-        if (model === 'openAI') provider = 'openai';
-        if (model === 'claude') provider = 'anthropic';
         
         // Add this requirement to the individual processing indicators
         setProcessingIndividualItems(prev => ({
@@ -1018,6 +1060,12 @@ export default function ViewData() {
         if (!response.ok) {
           throw new Error(`Failed to generate response for requirement ${requirement.id}`);
         }
+        
+        // Update bulk generation progress
+        setBulkGenerationProgress(prev => ({
+          ...prev,
+          completed: prev.completed + 1
+        }));
 
         const result = await response.json();
         console.log(`Generated response for requirement ${requirement.id}:`, result);
@@ -1061,8 +1109,16 @@ export default function ViewData() {
     } finally {
       setIsGenerating(false);
       
-      // Clear all individual processing indicators after operation completes
+      // Reset the bulk generation progress after a delay for UX reasons
       setTimeout(() => {
+        setBulkGenerationProgress({
+          total: 0,
+          completed: 0,
+          isProcessing: false,
+          model: ''
+        });
+        
+        // Clear all individual processing indicators after operation completes
         setProcessingIndividualItems({});
       }, 1500);
     }
@@ -1130,7 +1186,7 @@ export default function ViewData() {
         </div>
       )}
       
-      {/* Progress bar for bulk operations */}
+      {/* Progress bar for bulk find similar operations */}
       {bulkFindingProgress.isProcessing && (
         <div className="fixed top-0 left-0 right-0 z-50 bg-white dark:bg-slate-800 p-3 shadow-md">
           <div className="max-w-7xl mx-auto">
@@ -1141,6 +1197,22 @@ export default function ViewData() {
               </p>
             </div>
             <Progress value={(bulkFindingProgress.completed / bulkFindingProgress.total) * 100} 
+              className="h-2" />
+          </div>
+        </div>
+      )}
+      
+      {/* Progress bar for bulk generation operations */}
+      {bulkGenerationProgress.isProcessing && (
+        <div className="fixed top-0 left-0 right-0 z-50 bg-white dark:bg-slate-800 p-3 shadow-md">
+          <div className="max-w-7xl mx-auto">
+            <div className="flex items-center gap-3 mb-2">
+              <Loader2 className="animate-spin h-5 w-5 text-primary" />
+              <p className="font-medium text-sm">
+                Generating responses with {bulkGenerationProgress.model} for {bulkGenerationProgress.completed}/{bulkGenerationProgress.total} requirements
+              </p>
+            </div>
+            <Progress value={(bulkGenerationProgress.completed / bulkGenerationProgress.total) * 100} 
               className="h-2" />
           </div>
         </div>
