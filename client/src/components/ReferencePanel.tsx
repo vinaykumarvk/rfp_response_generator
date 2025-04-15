@@ -30,20 +30,60 @@ export default function ReferencePanel({ responseId, showTitle = true, onReferen
   const [error, setError] = useState<string | null>(null);
 
   // Memoize the fetch references function to avoid recreating it on each render
+  // Improved with better error handling and retry logic
   const fetchReferences = useCallback(async (id: number, signal: AbortSignal) => {
-    try {
-      const response = await fetch(`/api/excel-requirements/${id}/references`, {
-        signal: signal
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Failed to fetch reference data: ${response.status} ${response.statusText}`);
+    // Maximum number of retries for transient errors
+    const MAX_RETRIES = 1;
+    let retries = 0;
+    
+    while (retries <= MAX_RETRIES) {
+      try {
+        // Add timeout for fetch operations that hang
+        const response = await fetch(`/api/excel-requirements/${id}/references`, {
+          signal: signal,
+          headers: {
+            'Accept': 'application/json',
+            'Cache-Control': 'no-cache'
+          }
+        });
+        
+        if (!response.ok) {
+          throw new Error(`Failed to fetch reference data: ${response.status} ${response.statusText}`);
+        }
+        
+        // Parse response safely
+        const text = await response.text();
+        if (!text) {
+          return []; // Return empty array if no response body
+        }
+        
+        try {
+          return JSON.parse(text);
+        } catch (parseError) {
+          console.error("Failed to parse reference data:", parseError);
+          throw new Error("Invalid response format from server");
+        }
+      } catch (e) {
+        // Only retry for certain errors that might be transient
+        const isTransientError = 
+          e instanceof Error && 
+          !(e.name === 'AbortError') && 
+          (e.message.includes('network') || e.message.includes('timeout') || e.message.includes('failed'));
+          
+        if (isTransientError && retries < MAX_RETRIES) {
+          retries++;
+          await new Promise(resolve => setTimeout(resolve, 800)); // Wait before retry
+          console.log(`Retrying fetch (${retries}/${MAX_RETRIES})...`);
+          continue;
+        }
+        
+        // Re-throw if we can't retry
+        throw e;
       }
-      
-      return await response.json();
-    } catch (e) {
-      throw e; // Re-throw to be handled by the effect
     }
+    
+    // This should never be reached but TypeScript needs a return
+    return [];
   }, []);
   
   // Effect to load references when responseId changes
@@ -60,7 +100,14 @@ export default function ReferencePanel({ responseId, showTitle = true, onReferen
     
     // Create abort controller for cleanup
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10-second timeout
+    // Use a safer approach for the timeout
+    const timeoutId = setTimeout(() => {
+      try {
+        controller.abort();
+      } catch (err) {
+        console.warn("Could not abort fetch operation:", err);
+      }
+    }, 10000); // 10-second timeout
     
     // Make the request
     fetchReferences(responseId, controller.signal)
@@ -90,11 +137,15 @@ export default function ReferencePanel({ responseId, showTitle = true, onReferen
         }
       });
     
-    // Cleanup function
+    // Cleanup function with improved error handling
     return () => {
       isMounted = false;
       clearTimeout(timeoutId);
-      controller.abort();
+      try {
+        controller.abort();
+      } catch (err) {
+        console.warn("Could not abort fetch operation during cleanup:", err);
+      }
       setReferences([]);
     };
   }, [responseId, fetchReferences]);
