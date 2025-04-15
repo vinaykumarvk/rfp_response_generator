@@ -1998,47 +1998,19 @@ export default function ViewData() {
         </DialogContent>
       </Dialog>
 
-      {/* Floating Action Button for Mobile */}
-      {isMobile && (
-        <div className="fixed bottom-6 right-4 flex flex-col gap-3 z-50">
-          {/* Filter Toggle Button */}
+      {/* Simplified Floating Action Button for Mobile - Only show when items are selected */}
+      {isMobile && selectedItems.length > 0 && (
+        <div className="fixed bottom-6 right-4 z-50">
           <Button 
-            className={`h-14 w-14 rounded-full shadow-lg flex items-center justify-center ${
-              showFilters || areFiltersActive
-                ? 'bg-blue-500 hover:bg-blue-600'
-                : 'bg-slate-700 hover:bg-slate-800'
-            }`}
-            onClick={() => setShowFilters(!showFilters)}
-            title={showFilters ? "Hide Filters" : "Show Filters"}
+            className="h-14 w-14 rounded-full shadow-lg flex items-center justify-center bg-green-600 hover:bg-green-700"
+            onClick={() => handleBulkAction('generate-moa')}
+            title="Generate MOA for Selected"
           >
-            <Filter className="h-6 w-6 text-white" />
-            {areFiltersActive && (
-              <span className="absolute -top-1 -right-1 h-5 w-5 bg-red-500 rounded-full border-2 border-white"></span>
-            )}
+            <Sparkles className="h-6 w-6 text-white" />
+            <Badge className="absolute -top-1 -right-1 h-6 bg-white text-green-600 rounded-full flex items-center justify-center font-bold">
+              {selectedItems.length}
+            </Badge>
           </Button>
-
-          {/* Refresh Button */}
-          <Button 
-            className="h-14 w-14 rounded-full shadow-lg flex items-center justify-center bg-primary hover:bg-primary/90"
-            onClick={handleRefresh}
-            title="Refresh Data"
-          >
-            <RefreshCcw className="h-6 w-6 text-white" />
-          </Button>
-
-          {/* Bulk Actions Button - Only show when items are selected */}
-          {selectedItems.length > 0 && (
-            <Button 
-              className="h-14 w-14 rounded-full shadow-lg flex items-center justify-center bg-green-600 hover:bg-green-700"
-              onClick={() => handleBulkAction('generate-moa')}
-              title="Generate MOA for Selected"
-            >
-              <Sparkles className="h-6 w-6 text-white" />
-              <Badge className="absolute -top-1 -right-1 h-6 bg-white text-green-600 rounded-full flex items-center justify-center font-bold">
-                {selectedItems.length}
-              </Badge>
-            </Button>
-          )}
         </div>
       )}
     </div>
