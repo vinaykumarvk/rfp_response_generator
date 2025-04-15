@@ -535,42 +535,20 @@ export const sendEmailWithContent = (
 
 /**
  * Helper function to show notifications
- * Optimized to support notification updating for better UX in long operations
- * @param message The notification message
- * @param type The type of notification (success, error, loading)
- * @param notificationId Optional ID to update an existing notification instead of creating a new one
- * @returns A unique ID that can be used to update this notification later
+ * Simple implementation that logs to console and shows alerts for errors
  */
 const showNotification = (
   message: string, 
-  type: "success" | "error" | "loading" = "success",
-  notificationId?: number
-): number => {
-  // Get current notifications or create a new map
-  const notifications = (window as any).__rfpNotifications = 
-    (window as any).__rfpNotifications || new Map();
+  type: "success" | "error" | "loading" = "success"
+): void => {
+  // Log to console with better formatting based on type
+  console.log(`[${type.toUpperCase()}] ${message}`);
   
-  // Generate a new ID if none was provided
-  const id = notificationId || Date.now();
-  
-  // Store or update the notification
-  notifications.set(id, { message, type, timestamp: Date.now() });
-  
-  // Log to console for debugging
-  if (notificationId) {
-    console.log(`[${type.toUpperCase()} - UPDATED #${id}] ${message}`);
-  } else {
-    console.log(`[${type.toUpperCase()} - NEW #${id}] ${message}`);
-  }
-  
-  // For now, we'll use a simple alert for errors if there's no existing notification
-  if (type === "error" && !notificationId) {
-    // Show error alert in a nonblocking way
+  // For now, we'll use a simple alert for errors
+  if (type === "error") {
+    // Show error alert in a nonblocking way to prevent UI freeze
     setTimeout(() => alert(message), 0);
   }
-  
-  // Return the ID for future reference
-  return id;
 };
 
 /**
@@ -742,7 +720,7 @@ export const downloadExcelFile = (
   filename = "rfp-responses.xlsx"
 ): void => {
   // Show a loading notification to the user for better UX during large exports
-  const notificationId = showNotification("Preparing Excel export...", "loading");
+  showNotification("Preparing Excel export...", "loading");
   
   // Use setTimeout to move the intensive operation off the main thread
   // This prevents UI freezing during large exports
@@ -757,7 +735,7 @@ export const downloadExcelFile = (
         XLSX.writeFile(workbook, filename);
         
         // Update notification on success
-        showNotification("Excel file downloaded successfully!", "success", notificationId);
+        showNotification("Excel file downloaded successfully!", "success");
       });
     } catch (error) {
       console.error("Error generating Excel file:", error);
@@ -765,8 +743,7 @@ export const downloadExcelFile = (
       // Update notification on error
       showNotification(
         `Failed to generate Excel file: ${error instanceof Error ? error.message : "Unknown error"}`, 
-        "error", 
-        notificationId
+        "error"
       );
     }
   }, 50); // Small delay to allow UI to update first
