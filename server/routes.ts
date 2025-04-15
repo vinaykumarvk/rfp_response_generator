@@ -699,7 +699,27 @@ except Exception as e:
         try {
           // If it's a string (from database), parse it
           if (typeof requirement.similarQuestions === 'string') {
-            similarQuestionsList = JSON.parse(requirement.similarQuestions);
+            try {
+              // Debug logging to help understand the issue
+              const firstChars = requirement.similarQuestions.substring(0, 20);
+              console.log(`Debug - Similar questions for ${id} starts with: ${firstChars}`);
+              
+              // Remove any BOM or invalid characters at the start of the JSON string
+              let cleanedJson = requirement.similarQuestions.trim();
+              if (cleanedJson.startsWith('\uFEFF')) {
+                cleanedJson = cleanedJson.substring(1);
+              }
+              // Handle malformed JSON that might have an extra [ at the beginning
+              if (cleanedJson.startsWith('[[') && cleanedJson.endsWith(']]')) {
+                cleanedJson = cleanedJson.substring(1, cleanedJson.length - 1);
+              }
+              
+              similarQuestionsList = JSON.parse(cleanedJson);
+            } catch (innerError) {
+              console.error(`JSON parsing failed for requirement ${id}, error:`, innerError);
+              console.error(`First 50 chars of problematic JSON: "${requirement.similarQuestions.substring(0, 50)}"`);
+              similarQuestionsList = [];
+            }
           } 
           // If it's already an array, use it directly
           else if (Array.isArray(requirement.similarQuestions)) {
@@ -713,7 +733,7 @@ except Exception as e:
             similarQuestionsList = [];
           }
         } catch (parseError) {
-          console.error(`Error parsing similarQuestions for requirement ${id}:`, parseError);
+          console.error(`Error processing similarQuestions for requirement ${id}:`, parseError);
           similarQuestionsList = [];
         }
       }
