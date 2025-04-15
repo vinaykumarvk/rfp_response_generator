@@ -288,7 +288,10 @@ export default function UploadRequirements() {
         <Dialog open={showDialog} onOpenChange={setShowDialog}>
           <DialogContent className="sm:max-w-md">
             <DialogHeader>
-              <DialogTitle>Upload Options</DialogTitle>
+              <div className="flex items-center gap-2">
+                <DialogTitle>Upload Options</DialogTitle>
+                <HelpTooltip text="Choose how to handle the uploaded requirements. Append adds new requirements while keeping existing ones. Replace will remove all previous requirements and add only the new ones." />
+              </div>
               <DialogDescription>
                 Would you like to append this data to the existing requirements or replace all existing data?
               </DialogDescription>
@@ -325,7 +328,10 @@ export default function UploadRequirements() {
         <div className="grid grid-cols-1 gap-6 sm:gap-8">
           <Card className="shadow-sm hover:shadow-md transition-shadow duration-300">
             <div className="px-4 sm:px-6 py-4 sm:py-5 border-b border-slate-200 dark:border-slate-700">
-              <h3 className="text-base sm:text-lg font-medium text-slate-800 dark:text-slate-200">Upload Requirements Excel File</h3>
+              <div className="flex items-center gap-2">
+                <h3 className="text-base sm:text-lg font-medium text-slate-800 dark:text-slate-200">Upload Requirements Excel File</h3>
+                <HelpTooltip text="Upload your RFP requirements from an Excel file to generate AI-powered responses. The system will analyze your requirements and provide tailored responses." />
+              </div>
               <p className="mt-1 text-xs sm:text-sm text-slate-500 dark:text-slate-400">
                 Upload an Excel file with 'Category' and 'Requirement' columns to view the content.
               </p>
@@ -337,7 +343,10 @@ export default function UploadRequirements() {
                   {/* RFP Information Section */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="rfp-name" className="text-sm font-medium">RFP Name</Label>
+                      <div className="flex items-center gap-2">
+                        <Label htmlFor="rfp-name" className="text-sm font-medium">RFP Name</Label>
+                        <HelpTooltip text="Enter a descriptive name for the RFP document. This helps you identify and filter requirements later." />
+                      </div>
                       <div className="relative">
                         <FileInput className="absolute left-2 top-2.5 h-4 w-4 text-slate-500" />
                         <Input
@@ -350,7 +359,10 @@ export default function UploadRequirements() {
                       </div>
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="uploaded-by" className="text-sm font-medium">Uploaded By</Label>
+                      <div className="flex items-center gap-2">
+                        <Label htmlFor="uploaded-by" className="text-sm font-medium">Uploaded By</Label>
+                        <HelpTooltip text="Enter your name or identifier. This helps track who uploaded which requirements for collaboration purposes." />
+                      </div>
                       <div className="relative">
                         <User className="absolute left-2 top-2.5 h-4 w-4 text-slate-500" />
                         <Input
@@ -420,7 +432,10 @@ export default function UploadRequirements() {
                         <Upload className={`h-6 w-6 ${file ? 'text-primary' : 'text-slate-500 dark:text-slate-400'}`} />
                       </div>
                       <div>
-                        <h4 className="text-md font-medium text-slate-700 dark:text-slate-300">Upload Excel File</h4>
+                        <div className="flex items-center justify-center gap-2">
+                          <h4 className="text-md font-medium text-slate-700 dark:text-slate-300">Upload Excel File</h4>
+                          <HelpTooltip text="Your Excel file must have two specific columns: 'Category' (the type of requirement) and 'Requirement' (the actual request text). The system will automatically extract and process these columns." />
+                        </div>
                         <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1 max-w-md mx-auto">
                           <span className="hidden sm:inline">Drag & drop your Excel file here or click to browse. File must contain 'Category' and 'Requirement' columns.</span>
                           <span className="sm:hidden">Select an Excel file with required columns.</span>
