@@ -1,5 +1,6 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { format, formatDistanceToNow } from 'date-fns';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { generateMarkdownContent, downloadMarkdownFile, sendEmailWithContent, downloadExcelFile } from '@/lib/exportUtils';
@@ -501,14 +502,12 @@ export default function ViewData() {
         });
       }
       
-      // Refresh the data to reflect the updated feedback
+      // Refresh the data to get updated feedback
       await refetch();
       
       toast({
         title: "Feedback Submitted",
-        description: feedback === 'positive' ? 
-          "Thank you for your positive feedback!" : 
-          "Thank you for your feedback. We'll work to improve the response quality.",
+        description: "Your feedback has been recorded successfully.",
       });
     } catch (error) {
       console.error('Error submitting feedback:', error);
@@ -522,176 +521,554 @@ export default function ViewData() {
     }
   };
   
-  // Toggle item selection
   const toggleSelectItem = (id: number) => {
-    setSelectedItems(prev => {
-      if (prev.includes(id)) {
-        return prev.filter(item => item !== id);
-      } else {
-        return [...prev, id];
-      }
-    });
+    setSelectedItems(prev => 
+      prev.includes(id) 
+        ? prev.filter(item => item !== id) 
+        : [...prev, id]
+    );
   };
   
-  // Toggle select all
   const toggleSelectAll = () => {
-    const newSelectAll = !selectAll;
-    setSelectAll(newSelectAll);
-    
-    if (newSelectAll) {
-      // Select all visible items (post-filtering)
-      setSelectedItems(filteredData.map(item => item.id));
-    } else {
-      // Deselect all
+    if (selectAll) {
       setSelectedItems([]);
+    } else {
+      setSelectedItems(filteredData.map(item => item.id || 0).filter(id => id !== 0));
+    }
+    setSelectAll(!selectAll);
+  };
+  
+  const [processingItems, setProcessingItems] = useState<number[]>([]);
+  // Keep only the necessary state for tracking individual items in the UI
+  const [isGenerating, setIsGenerating] = useState(false);
+  
+  // For tracking individual requirements being processed (with their model info)
+  const [processingIndividualItems, setProcessingIndividualItems] = useState<{[key: number]: {stage: string, model: string}}>({}); 
+  
+  // Note: Removed the following unused states that were only needed for the old progress indicator:
+  // - processedCount
+  // - generationError
+  // - generationStage
+  // - currentItemText
+  // - getProgressValueByStage helper function
+  
+  // Function to generate response for a single requirement
+  const generateResponseForRequirement = async (
+    requirementId: number, 
+    modelProvider: 'openai' | 'anthropic' | 'deepseek' | 'moa'
+  ) => {
+    try {
+      // Find the requirement data
+      const requirement = excelData.find(item => item.id === requirementId);
+      
+      if (!requirement) {
+        console.error(`Requirement with ID ${requirementId} not found`);
+        return false;
+      }
+      
+      // Make API call to generate response
+      const response = await fetch('/api/generate-response', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          requirement: requirement.requirement,
+          provider: modelProvider,
+          requirementId: requirementId.toString(),
+          rfpName: requirement.rfpName,
+          uploadedBy: requirement.uploadedBy,
+          skipSimilaritySearch: true  // Use existing similar questions instead of finding them again
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`API returned ${response.status} ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      
+      if (data.error) {
+        throw new Error(data.error);
+      }
+      
+      console.log(`Response generated for requirement ID ${requirementId} with ${modelProvider}`);
+      return true;
+    } catch (error) {
+      console.error(`Error generating response for requirement ${requirementId}:`, error);
+      // Error is logged but not stored in state anymore
+      return false;
     }
   };
   
-  // Create a list of ids that are currently being processed
-  const [processingIndividualItems, setProcessingIndividualItems] = useState<number[]>([]);
-  
-  // Function to generate response for a single requirement
-  const generateResponse = async (model: string, requirementIds?: number[]) => {
-    const ids = requirementIds || selectedItems;
+  // Function to generate response using the LLM API for a single requirement
+  const handleGenerateLlmResponse = async (requirementId: number, model: string = 'moa') => {
+    if (!requirementId) return;
     
-    if (ids.length === 0) {
+    try {
+      // Set both the single response indicator and the progress tracking for visual feedback
+      setIsGeneratingResponse(true);
+      setIsGenerating(true);
+      setProcessingItems([requirementId]);
+      
+      // Track this individual item's progress
+      setProcessingIndividualItems(prev => ({
+        ...prev,
+        [requirementId]: { stage: "Initializing", model }
+      }));
+
+      console.log(`Generating LLM response for requirement ID ${requirementId} using model ${model}`);
+      
+      // Get the requirement data to pass to the API
+      const requirementItem = excelData.find(item => item.id === requirementId);
+      
+      if (!requirementItem) {
+        throw new Error(`Requirement with ID ${requirementId} not found`);
+      }
+      
+      // Update to creating prompt stage
+      setProcessingIndividualItems(prev => ({
+        ...prev,
+        [requirementId]: { ...prev[requirementId], stage: "Creating prompt" }
+      }));
+      await new Promise(resolve => setTimeout(resolve, 500)); // simulate brief delay
+            
+      // Update to fetching LLM response stage
+      setProcessingIndividualItems(prev => ({
+        ...prev,
+        [requirementId]: { ...prev[requirementId], stage: "Fetching response" }
+      }));
+      
+      // Call the API to generate a response
+      const response = await fetch('/api/generate-response', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          requirementId,
+          requirement: requirementItem.requirement,
+          provider: model,
+          rfpName: requirementItem.rfpName,
+          uploadedBy: requirementItem.uploadedBy,
+          skipSimilaritySearch: true  // Use existing similar questions
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to generate response: ${response.status} ${response.statusText}`);
+      }
+      
+      // Update to saving response stage
+      setProcessingIndividualItems(prev => ({
+        ...prev,
+        [requirementId]: { ...prev[requirementId], stage: "Saving response" }
+      }));
+      
+      const data = await response.json();
+      
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to generate response');
+      }
+      
+      // Update the selected response with the generated response
+      if (selectedResponse && selectedResponse.id === requirementId) {
+        setSelectedResponse({
+          ...selectedResponse,
+          finalResponse: data.finalResponse || selectedResponse.finalResponse,
+          openaiResponse: data.openaiResponse || selectedResponse.openaiResponse,
+          anthropicResponse: data.anthropicResponse || selectedResponse.anthropicResponse,
+          deepseekResponse: data.deepseekResponse || selectedResponse.deepseekResponse,
+          moaResponse: data.moaResponse || selectedResponse.moaResponse
+        });
+        
+        // Set tab to response view since we now have a response
+        setActiveTab('response');
+      }
+      
+      // Update individual progress indicator to completion
+      setProcessingIndividualItems(prev => ({
+        ...prev,
+        [requirementId]: { ...prev[requirementId], stage: "Completed" }
+      }));
+      
+      // Show success toast
       toast({
-        title: "No Requirements Selected",
-        description: "Please select at least one requirement to generate a response.",
+        title: "Response Generated",
+        description: `Successfully generated response for requirement ID ${requirementId}`,
+      });
+      
+      console.log("Generated response for requirement " + requirementId + ":", data);
+      
+      // Refresh the data
+      await refetch();
+      
+      return true;
+      
+    } catch (error) {
+      console.error('Error generating LLM response:', error);
+      
+      toast({
+        title: "Generation Error",
+        description: `Failed to generate response: ${error instanceof Error ? error.message : String(error)}`,
         variant: "destructive",
+      });
+      
+      return false;
+    } finally {
+      // Keep status visible for a moment so user can see completion
+      setTimeout(() => {
+        setIsGeneratingResponse(false);
+        setIsGenerating(false);
+        // Clear the processing indicator for this requirement after a delay
+        setProcessingIndividualItems(prev => {
+          const newState = {...prev};
+          if (requirementId in newState) {
+            delete newState[requirementId];
+          }
+          return newState;
+        });
+      }, 1500);
+    }
+  };
+  
+  // Function to handle bulk generation of responses
+  const handleGenerateResponses = async (modelProvider: 'openai' | 'anthropic' | 'deepseek' | 'moa') => {
+    setProcessingItems(selectedItems);
+    setIsGenerating(true);
+    
+    // Initialize bulk generation progress
+    setBulkGenerationProgress({
+      total: selectedItems.length,
+      completed: 0,
+      isProcessing: true,
+      model: modelProvider
+    });
+    
+    const totalItems = selectedItems.length;
+    let successCount = 0;
+    
+    try {
+      // Show notification to user
+      toast({
+        title: "Generating Responses",
+        description: `Processing ${totalItems} requirements with ${modelProvider}...`,
+      });
+      
+      // Process items sequentially to avoid overloading the API
+      for (let i = 0; i < selectedItems.length; i++) {
+        const requirementId = selectedItems[i];
+        const requirement = excelData.find(item => item.id === requirementId);
+        
+        const reqText = requirement?.requirement || "";
+        console.log(`Processing item ${i+1}/${totalItems}: ${reqText.substring(0, 50)}...`);
+        
+        // Add this item to the individual processing indicators
+        setProcessingIndividualItems(prev => ({
+          ...prev,
+          [requirementId]: { 
+            stage: `Generating (${i+1}/${totalItems})`, 
+            model: modelProvider 
+          }
+        }));
+        
+        // Generate response for this requirement
+        const success = await generateResponseForRequirement(requirementId, modelProvider);
+        
+        if (success) {
+          successCount++;
+        }
+        
+        // Update progress counter in the fixed-position bar only
+        setBulkGenerationProgress(prev => ({
+          ...prev,
+          completed: prev.completed + 1
+        }));
+      }
+      
+      // Refresh data after all items are processed
+      await refetch();
+      
+      toast({
+        title: "Response Generation Complete",
+        description: `Successfully generated responses for ${successCount} out of ${totalItems} requirements.`,
+        variant: successCount === totalItems ? "default" : "destructive",
+      });
+    } catch (error) {
+      console.error('Error in bulk generation:', error);
+      
+      toast({
+        title: "Generation Error",
+        description: `Failed to complete response generation: ${error instanceof Error ? error.message : String(error)}`,
+        variant: "destructive",
+      });
+    } finally {
+      // Keep status visible for a moment
+      setTimeout(() => {
+        setIsGenerating(false);
+        setProcessingItems([]);
+        
+        // Clear all individual processing indicators after bulk operation completes
+        setProcessingIndividualItems({});
+      }, 1500);
+    }
+  };
+  
+  // Function to handle exporting selected items as markdown
+  const handleExportToMarkdown = () => {
+    // Get selected items data
+    const selectedData = excelData.filter(item => selectedItems.includes(item.id || 0));
+    
+    if (selectedData.length === 0) {
+      toast({
+        title: "No Data Found",
+        description: "Could not find data for the selected items",
+        variant: "destructive"
       });
       return;
     }
     
-    // Show confirmation if many items selected
-    if (ids.length > 5 && !requirementIds) {
-      const confirmed = confirm(`You are about to generate responses for ${ids.length} requirements using ${model.toUpperCase()} model. This may take some time. Do you want to continue?`);
-      if (!confirmed) {
-        return;
-      }
+    // Generate markdown content
+    const markdownContent = generateMarkdownContent(selectedData);
+    
+    // Create filename based on RFP name if all items are from the same RFP
+    const rfpNames = new Set(selectedData.map(item => item.rfpName || 'unnamed'));
+    const filename = rfpNames.size === 1 
+      ? `${Array.from(rfpNames)[0]}-responses.md` 
+      : `rfp-responses-${new Date().toISOString().split('T')[0]}.md`;
+    
+    // Download the file
+    downloadMarkdownFile(markdownContent, filename);
+    
+    toast({
+      title: "Export Successful",
+      description: `${selectedData.length} items exported to ${filename}`,
+    });
+  };
+  
+  // Function to email the selected responses directly with HTML formatting
+  // and simultaneously generate a markdown file for download
+  const handleEmailMarkdown = () => {
+    // Get selected items data
+    const selectedData = excelData.filter(item => selectedItems.includes(item.id || 0));
+    
+    if (selectedData.length === 0) {
+      toast({
+        title: "No Data Found",
+        description: "Could not find data for the selected items",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    // Create a subject line based on RFP name if all items are from the same RFP
+    const rfpNames = new Set(selectedData.map(item => item.rfpName || 'unnamed'));
+    const rfpNameForFile = rfpNames.size === 1 
+      ? Array.from(rfpNames)[0] 
+      : `multiple-rfps-${new Date().toISOString().split('T')[0]}`;
+    
+    const subject = rfpNames.size === 1 
+      ? `RFP Responses for ${Array.from(rfpNames)[0]}` 
+      : `RFP Responses Export (${selectedData.length} items)`;
+    
+    try {
+      // Generate markdown content
+      const markdownContent = generateMarkdownContent(selectedData);
+      
+      // 1. Generate and download the markdown file
+      const filename = `${rfpNameForFile}-responses.md`;
+      downloadMarkdownFile(markdownContent, filename);
+      
+      // 2. Send email
+      sendEmailWithContent(markdownContent, subject);
+      
+      toast({
+        title: "Email and Markdown Export",
+        description: "Email opened and markdown file downloaded. Please attach the markdown file to your email manually.",
+      });
+    } catch (error) {
+      console.error('Error preparing email:', error);
+      toast({
+        title: "Email Preparation Failed",
+        description: "Failed to prepare email content: " + (error instanceof Error ? error.message : String(error)),
+        variant: "destructive"
+      });
+    }
+  };
+  
+  // Function to export selected items as Excel file
+  const handleExportToExcel = () => {
+    // Get selected items data
+    const selectedData = excelData.filter(item => selectedItems.includes(item.id || 0));
+    
+    if (selectedData.length === 0) {
+      toast({
+        title: "No Data Found",
+        description: "Could not find data for the selected items",
+        variant: "destructive"
+      });
+      return;
     }
     
     try {
-      // Set up progress tracking for bulk operations
-      if (ids.length > 1) {
-        setBulkGenerationProgress({
-          total: ids.length,
-          completed: 0,
-          isProcessing: true,
-          model
-        });
-      } else {
-        // For single item operations
-        setIsGeneratingResponse(true);
-        // Track which item is being processed
-        setProcessingIndividualItems(prev => [...prev, ...ids]);
-      }
+      // Create filename based on RFP name if all items are from the same RFP
+      const rfpNames = new Set(selectedData.map(item => item.rfpName || 'unnamed'));
+      const filename = rfpNames.size === 1 
+        ? `${Array.from(rfpNames)[0]}-responses.xlsx` 
+        : `rfp-responses-${new Date().toISOString().split('T')[0]}.xlsx`;
+      
+      // Download the Excel file
+      downloadExcelFile(selectedData, filename);
+      
+      toast({
+        title: "Excel Export Successful",
+        description: `${selectedData.length} items exported to ${filename}`,
+      });
+    } catch (error) {
+      console.error('Error generating Excel file:', error);
+      toast({
+        title: "Excel Export Failed",
+        description: "Failed to generate Excel file: " + (error instanceof Error ? error.message : String(error)),
+        variant: "destructive"
+      });
+    }
+  };
+  
+  // Function to generate responses using selected model
+  const generateResponse = async (model: string) => {
+    if (selectedItems.length === 0) {
+      toast({
+        title: "No items selected",
+        description: "Please select at least one requirement to generate a response.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Convert model name to provider format if needed
+    let provider = model;
+    if (model === 'openAI') provider = 'openai';
+    if (model === 'claude') provider = 'anthropic';
+    
+    // Initialize bulk generation progress
+    setBulkGenerationProgress({
+      total: selectedItems.length,
+      completed: 0,
+      isProcessing: true,
+      model: provider
+    });
+    
+    setIsGenerating(true);
+    
+    try {
+      // Find the selected requirements
+      const selectedRequirements = excelData.filter(item => selectedItems.includes(item.id || 0));
       
       // Show notification to user
       toast({
-        title: `Generating ${model.toUpperCase()} Responses`,
-        description: `Processing ${ids.length} requirement${ids.length > 1 ? 's' : ''}...`,
+        title: "Generating Responses",
+        description: `Processing ${selectedRequirements.length} requirements with ${provider}...`,
       });
       
-      // Process each requirement sequentially
-      const results = [];
-      for (const requirementId of ids) {
-        try {
-          // Call the API for this requirement
-          const response = await fetch('/api/generate-response', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ 
-              requirement_id: requirementId,
-              model
-            }),
+      for (let index = 0; index < selectedRequirements.length; index++) {
+        const requirement = selectedRequirements[index];
+        
+        // Add this requirement to the individual processing indicators
+        setProcessingIndividualItems(prev => ({
+          ...prev,
+          [requirement.id || 0]: { 
+            stage: `Generating (${index+1}/${selectedRequirements.length})`, 
+            model: provider 
+          }
+        }));
+        
+        const response = await fetch('/api/generate-response', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ 
+            requirementId: requirement.id,
+            requirement: requirement.requirement,
+            provider,
+            rfpName: requirement.rfpName,
+            uploadedBy: requirement.uploadedBy,
+            skipSimilaritySearch: true  // Use existing similar questions instead of finding them again
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error(`Failed to generate response for requirement ${requirement.id}`);
+        }
+        
+        // Update bulk generation progress
+        setBulkGenerationProgress(prev => ({
+          ...prev,
+          completed: prev.completed + 1
+        }));
+
+        const result = await response.json();
+        console.log(`Generated response for requirement ${requirement.id}:`, result);
+        
+        // Show a preview of the response in the console
+        if (result.finalResponse) {
+          console.log(`Response preview: ${result.finalResponse.substring(0, 100)}...`);
+        }
+        
+        // If this is the currently selected response, update it in the UI
+        if (selectedResponse && selectedResponse.id === requirement.id) {
+          setSelectedResponse({
+            ...selectedResponse,
+            finalResponse: result.finalResponse || selectedResponse.finalResponse,
+            openaiResponse: result.openaiResponse || selectedResponse.openaiResponse,
+            anthropicResponse: result.anthropicResponse || selectedResponse.anthropicResponse,
+            deepseekResponse: result.deepseekResponse || selectedResponse.deepseekResponse,
+            moaResponse: result.moaResponse || selectedResponse.moaResponse,
+            modelProvider: result.modelProvider || selectedResponse.modelProvider
           });
           
-          if (!response.ok) {
-            console.error(`Error generating response for requirement ${requirementId}: ${response.status} ${response.statusText}`);
-            results.push({ id: requirementId, success: false });
-          } else {
-            const data = await response.json();
-            
-            // If we're viewing this requirement, update the selected response
-            if (selectedResponseId === requirementId && selectedResponse) {
-              // Refresh the selected response with the new data
-              const resp = await fetch(`/api/excel-requirements/${requirementId}`);
-              if (resp.ok) {
-                const refreshedData = await resp.json();
-                setSelectedResponse(refreshedData);
-                // Switch to the response tab to show the newly generated response
-                setActiveTab('response');
-              }
-            }
-            
-            console.log(`Generated response for requirement ${requirementId}:`, data);
-            results.push({ id: requirementId, success: true });
-          }
-        } catch (error) {
-          console.error(`Error processing requirement ${requirementId}:`, error);
-          results.push({ id: requirementId, success: false });
-        } finally {
-          // Remove from processing list for individual items
-          setProcessingIndividualItems(prev => prev.filter(id => id !== requirementId));
+          // Set tab to response view since we now have a response
+          setActiveTab('response');
         }
-        
-        // Update progress for bulk operations
-        if (ids.length > 1) {
-          setBulkGenerationProgress(prev => ({
-            ...prev,
-            completed: prev.completed + 1
-          }));
-        }
-        
-        // Short delay to avoid overloading the server
-        await new Promise(resolve => setTimeout(resolve, 300));
       }
-      
-      // Refresh the data to reflect all updates
-      await refetch();
-      
-      // Count successes and failures
-      const successful = results.filter(r => r.success).length;
-      const failed = results.filter(r => !r.success).length;
-      
-      // Show final notification
+
       toast({
-        title: "Response Generation Complete",
-        description: `Successfully generated ${successful} response${successful !== 1 ? 's' : ''}${failed > 0 ? `, failed: ${failed}` : ''}.`,
-        variant: successful > 0 ? "default" : "destructive",
+        title: "Success",
+        description: `Generated responses for ${selectedRequirements.length} requirements using ${model}`,
       });
-      
+
+      // Refresh the data to show new responses
+      refetch();
     } catch (error) {
-      console.error('Error in bulk generating responses:', error);
+      console.error('Error generating response:', error);
       toast({
-        title: "Generation Error",
-        description: `An error occurred during response generation: ${error instanceof Error ? error.message : String(error)}`,
-        variant: "destructive",
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to generate response",
+        variant: "destructive"
       });
     } finally {
-      // Clear all processing states
-      if (ids.length > 1) {
+      setIsGenerating(false);
+      
+      // Reset the bulk generation progress after a delay for UX reasons
+      setTimeout(() => {
         setBulkGenerationProgress({
           total: 0,
           completed: 0,
           isProcessing: false,
           model: ''
         });
-      } else {
-        setIsGeneratingResponse(false);
-      }
+        
+        // Clear all individual processing indicators after operation completes
+        setProcessingIndividualItems({});
+      }, 1500);
     }
   };
-  
-  // Handle bulk actions
-  const handleBulkAction = async (action: string) => {
+
+  const handleBulkAction = (action: string) => {
     if (selectedItems.length === 0) {
       toast({
         title: "No Items Selected",
-        description: "Please select at least one item to perform this action.",
+        description: "Please select at least one item first",
         variant: "destructive",
       });
       return;
@@ -699,133 +1076,35 @@ export default function ViewData() {
     
     switch (action) {
       case 'find-similar':
-        await handleFindSimilarForBulk();
+        handleFindSimilarForBulk();
+        break;
+      case 'generate-openai':
+        handleGenerateResponses('openai');
+        break;
+      case 'generate-anthropic':
+        handleGenerateResponses('anthropic');
+        break;
+      case 'generate-deepseek':
+        handleGenerateResponses('deepseek');
         break;
       case 'generate-moa':
-        await generateResponse('moa');
-        break;
-      case 'delete':
-        // Confirm deletion
-        if (confirm(`Are you sure you want to delete ${selectedItems.length} selected requirements? This action cannot be undone.`)) {
-          try {
-            // Call API to delete the selected items
-            const response = await fetch('/api/excel-requirements/bulk-delete', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({ ids: selectedItems }),
-            });
-            
-            if (!response.ok) {
-              throw new Error(`Failed to delete requirements: ${response.status} ${response.statusText}`);
-            }
-            
-            const result = await response.json();
-            
-            // Clear the selected items
-            setSelectedItems([]);
-            setSelectAll(false);
-            
-            // Refresh the data
-            await refetch();
-            
-            toast({
-              title: "Deletion Complete",
-              description: `Successfully deleted ${result.deleted || selectedItems.length} requirements.`,
-            });
-          } catch (error) {
-            console.error('Error deleting requirements:', error);
-            toast({
-              title: "Deletion Error",
-              description: `Failed to delete requirements: ${error instanceof Error ? error.message : String(error)}`,
-              variant: "destructive",
-            });
-          }
-        }
+        handleGenerateResponses('moa');
         break;
       case 'print':
-        try {
-          // Get the selected items
-          const selectedData = excelData.filter(item => selectedItems.includes(item.id));
-          
-          // Generate the markdown content
-          const markdownContent = generateMarkdownContent(selectedData);
-          
-          // Download as markdown file
-          downloadMarkdownFile(markdownContent, 'selected_requirements.md');
-          
-          toast({
-            title: "Export Complete",
-            description: `Successfully exported ${selectedItems.length} requirements as Markdown.`,
-          });
-        } catch (error) {
-          console.error('Error exporting to markdown:', error);
-          toast({
-            title: "Export Error",
-            description: `Failed to export as Markdown: ${error instanceof Error ? error.message : String(error)}`,
-            variant: "destructive",
-          });
-        }
+        handleExportToMarkdown();
         break;
       case 'excel':
-        try {
-          // Get the selected items
-          const selectedData = excelData.filter(item => selectedItems.includes(item.id));
-          
-          // Download as Excel file
-          await downloadExcelFile(selectedData, 'selected_requirements.xlsx');
-          
-          toast({
-            title: "Export Complete",
-            description: `Successfully exported ${selectedItems.length} requirements as Excel.`,
-          });
-        } catch (error) {
-          console.error('Error exporting to Excel:', error);
-          toast({
-            title: "Export Error",
-            description: `Failed to export as Excel: ${error instanceof Error ? error.message : String(error)}`,
-            variant: "destructive",
-          });
-        }
+        handleExportToExcel();
         break;
       case 'mail':
-        try {
-          // Get the selected items
-          const selectedData = excelData.filter(item => selectedItems.includes(item.id));
-          
-          // Generate the markdown content
-          const markdownContent = generateMarkdownContent(selectedData);
-          
-          // Show email dialog
-          const email = prompt("Enter the email address to send the requirements to:", "");
-          if (email) {
-            // Validate email
-            if (!/\S+@\S+\.\S+/.test(email)) {
-              throw new Error("Invalid email address");
-            }
-            
-            // Send email
-            await sendEmailWithContent(
-              email, 
-              `RFP Requirements Export (${selectedItems.length} items)`, 
-              markdownContent
-            );
-            
-            toast({
-              title: "Email Sent",
-              description: `Successfully sent ${selectedItems.length} requirements to ${email}.`,
-            });
-          }
-        } catch (error) {
-          console.error('Error sending email:', error);
-          toast({
-            title: "Email Error",
-            description: `Failed to send email: ${error instanceof Error ? error.message : String(error)}`,
-            variant: "destructive",
-          });
-        }
+        handleEmailMarkdown();
         break;
+      case 'delete':
+        console.log('Delete items:', selectedItems);
+        alert(`Delete answers for ${selectedItems.length} selected items`);
+        break;
+      default:
+        console.log('Unknown action:', action);
     }
   };
   
@@ -852,15 +1131,13 @@ export default function ViewData() {
         <div className="fixed top-0 left-0 right-0 z-50 bg-white dark:bg-slate-800 p-3 shadow-md">
           <div className="max-w-7xl mx-auto">
             <div className="flex items-center gap-3 mb-2">
-              <Search className="animate-pulse h-5 w-5 text-primary" />
+              <Loader2 className="animate-spin h-5 w-5 text-primary" />
               <p className="font-medium text-sm">
-                Finding similar requirements ({bulkFindingProgress.completed} of {bulkFindingProgress.total} processed)
+                Fetching similar responses for {bulkFindingProgress.completed}/{bulkFindingProgress.total} requirements
               </p>
             </div>
-            <Progress 
-              value={(bulkFindingProgress.completed / bulkFindingProgress.total) * 100} 
-              className="h-2" 
-            />
+            <Progress value={(bulkFindingProgress.completed / bulkFindingProgress.total) * 100} 
+              className="h-2" />
           </div>
         </div>
       )}
@@ -870,132 +1147,220 @@ export default function ViewData() {
         <div className="fixed top-0 left-0 right-0 z-50 bg-white dark:bg-slate-800 p-3 shadow-md">
           <div className="max-w-7xl mx-auto">
             <div className="flex items-center gap-3 mb-2">
-              <Sparkles className="animate-pulse h-5 w-5 text-primary" />
+              <Loader2 className="animate-spin h-5 w-5 text-primary" />
               <p className="font-medium text-sm">
-                Generating {bulkGenerationProgress.model.toUpperCase()} responses 
-                ({bulkGenerationProgress.completed} of {bulkGenerationProgress.total} processed)
+                Generating responses with {bulkGenerationProgress.model} for {bulkGenerationProgress.completed}/{bulkGenerationProgress.total} requirements
               </p>
             </div>
-            <Progress 
-              value={(bulkGenerationProgress.completed / bulkGenerationProgress.total) * 100} 
-              className="h-2" 
-            />
+            <Progress value={(bulkGenerationProgress.completed / bulkGenerationProgress.total) * 100} 
+              className="h-2" />
           </div>
         </div>
       )}
       
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">View Requirements Data</h1>
-          <p className="text-slate-700 dark:text-slate-300">
-            View, filter, and generate responses for uploaded RFP requirements.
-          </p>
-        </div>
-        
-        <div className="flex flex-wrap items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowFilters(!showFilters)}
-            className="flex items-center gap-1.5"
-          >
-            {showFilters ? (
-              <>
-                <X className="h-4 w-4" />
-                <span>Hide Filters</span>
-              </>
-            ) : (
-              <>
-                <Filter className="h-4 w-4" />
-                <span>Show Filters</span>
-                {areFiltersActive && (
-                  <span className="flex h-2 w-2 rounded-full bg-blue-500" />
-                )}
-              </>
-            )}
-          </Button>
+      {/* Sticky header with all controls */}
+      <div className="sticky top-0 z-20 bg-slate-50 dark:bg-slate-900 py-3 px-4 -mx-4 sm:-mx-6 md:-mx-8 lg:-mx-10 shadow-md">
+        <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <h1 className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-primary to-primary/70 text-transparent bg-clip-text">View Requirements</h1>
+            
+            <p className="text-sm text-slate-500 dark:text-slate-400 whitespace-nowrap">
+              {filteredData.length} {filteredData.length === 1 ? 'item' : 'items'}
+              {filteredData.length !== excelData.length ? 
+                <Badge variant="outline" className="font-normal ml-1">
+                  Filtered from {excelData.length}
+                </Badge> : ''
+              }
+            </p>
+          </div>
           
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => handleBulkAction('find-similar')}
-            className="flex items-center gap-1.5"
-            disabled={selectedItems.length === 0 || bulkFindingProgress.isProcessing}
-          >
-            {bulkFindingProgress.isProcessing ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                <span>Processing...</span>
-              </>
-            ) : (
-              <>
-                <Search className="h-4 w-4" />
-                <span>Find Similar</span>
-              </>
-            )}
-          </Button>
-          
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleRefresh}
-            className="flex items-center gap-1.5"
-          >
-            <RefreshCcw className="h-4 w-4" />
-            <span className="hidden sm:inline">Refresh</span>
-          </Button>
-          
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={toggleSelectAll}
-            className="flex items-center gap-1.5"
-          >
-            {selectAll ? (
-              <>
-                <Square className="h-4 w-4" />
-                <span>Deselect All</span>
-              </>
-            ) : (
-              <>
-                <CheckSquare className="h-4 w-4" />
-                <span>Select All</span>
-              </>
-            )}
-          </Button>
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Select All Checkbox */}
+            <div className="flex items-center mr-2 border-r border-slate-200 dark:border-slate-700 pr-3">
+              <Checkbox 
+                id="select-all-universal" 
+                checked={selectAll}
+                onCheckedChange={toggleSelectAll}
+              />
+              <label htmlFor="select-all-universal" className="ml-2 whitespace-nowrap text-sm font-medium text-slate-700 dark:text-slate-300">
+                Select All
+              </label>
+            </div>
+            
+            {/* Separate Past Responses and Generate Answer Buttons */}
+            <div className="flex space-x-2">
+              {/* Find Past Responses Button */}
+              <Button 
+                size="sm" 
+                className="h-8"
+                variant="outline"
+                disabled={selectedItems.length === 0}
+                onClick={() => handleBulkAction('find-similar')}
+              >
+                <Search className="h-4 w-4 mr-1.5 text-blue-500" />
+                <span>Past Responses</span>
+              </Button>
+              
+              {/* Generate Answer Dropdown */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button 
+                    size="sm" 
+                    className="h-8"
+                    variant="outline"
+                    disabled={selectedItems.length === 0}
+                  >
+                    <Sparkles className="h-4 w-4 mr-1.5 text-primary" />
+                    <span>Generate Answer</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-52">
+                  <DropdownMenuLabel>AI Models</DropdownMenuLabel>
+                  <DropdownMenuItem onClick={() => generateResponse('openAI')} className="gap-2">
+                    <Atom className="h-4 w-4 text-blue-500" />
+                    <span>OpenAI</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => generateResponse('claude')} className="gap-2">
+                    <Bot className="h-4 w-4 text-purple-500" />
+                    <span>Anthropic</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => generateResponse('deepseek')} className="gap-2">
+                    <Brain className="h-4 w-4 text-amber-500" />
+                    <span>DeepSeek</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => handleBulkAction('generate-moa')} className="gap-2">
+                    <Network className="h-4 w-4 text-green-500" />
+                    <span>Mixture of Agents (MOA)</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+            
+            {/* Export Options Dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button 
+                  size="sm"
+                  className="h-8"
+                  variant="outline"
+                  disabled={selectedItems.length === 0}
+                >
+                  <FileText className="h-4 w-4 mr-1.5" />
+                  <span>Export</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-40">
+                <DropdownMenuItem onClick={handleExportToMarkdown} className="gap-2">
+                  <Printer className="h-4 w-4" />
+                  <span>Markdown</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleExportToExcel} className="gap-2">
+                  <FileText className="h-4 w-4" />
+                  <span>Excel</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleEmailMarkdown} className="gap-2">
+                  <Mail className="h-4 w-4" />
+                  <span>Email</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            
+            {/* Filters Button */}
+            <Button 
+              size="sm" 
+              onClick={() => setShowFilters(!showFilters)}
+              className={`h-8 ${areFiltersActive ? 'bg-blue-100 hover:bg-blue-200 dark:bg-blue-900 hover:dark:bg-blue-800 border-blue-300 dark:border-blue-700 text-blue-800 dark:text-blue-200' : ''}`}
+              variant={showFilters ? "default" : areFiltersActive ? "default" : "outline"}
+              title={areFiltersActive ? "Filters are currently active" : "Toggle filters panel"}
+            >
+              <Filter className={`h-4 w-4 mr-1.5 ${areFiltersActive ? 'text-blue-600 dark:text-blue-400' : ''}`} />
+              <span>Filters</span>
+              {showFilters ? (
+                <X className="h-3 w-3 ml-1" />
+              ) : areFiltersActive ? (
+                <span className="ml-1.5 h-4 px-1 rounded bg-blue-500 text-white text-[10px] inline-flex items-center">on</span>
+              ) : (
+                <ChevronRight className="h-3 w-3 ml-1" />
+              )}
+            </Button>
+            
+            {/* Sort Dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="h-8"
+                  title="Sort requirements"
+                >
+                  <ArrowUpDown className="h-4 w-4 mr-1.5" />
+                  <span>Sort</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <div className="flex items-center gap-2 px-2 pt-1.5 pb-0.5">
+                  <DropdownMenuLabel className="pb-0">Sort By</DropdownMenuLabel>
+                  <HelpTooltip text="Choose a field to sort the requirements list. Click again to toggle between ascending and descending order." />
+                </div>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => requestSort('id')} className="gap-2">
+                  <Hash className="h-4 w-4" />
+                  <span>ID</span>
+                  {sortConfig.key === 'id' && (
+                    sortConfig.direction === 'asc' ? <ArrowUp className="h-4 w-4 ml-auto" /> : <ArrowDown className="h-4 w-4 ml-auto" />
+                  )}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => requestSort('timestamp')} className="gap-2">
+                  <Calendar className="h-4 w-4" />
+                  <span>Date</span>
+                  {sortConfig.key === 'timestamp' && (
+                    sortConfig.direction === 'asc' ? <ArrowUp className="h-4 w-4 ml-auto" /> : <ArrowDown className="h-4 w-4 ml-auto" />
+                  )}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => requestSort('rfpName')} className="gap-2">
+                  <BookOpen className="h-4 w-4" />
+                  <span>RFP Name</span>
+                  {sortConfig.key === 'rfpName' && (
+                    sortConfig.direction === 'asc' ? <ArrowUp className="h-4 w-4 ml-auto" /> : <ArrowDown className="h-4 w-4 ml-auto" />
+                  )}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => requestSort('category')} className="gap-2">
+                  <Tag className="h-4 w-4" />
+                  <span>Category</span>
+                  {sortConfig.key === 'category' && (
+                    sortConfig.direction === 'asc' ? <ArrowUp className="h-4 w-4 ml-auto" /> : <ArrowDown className="h-4 w-4 ml-auto" />
+                  )}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            
+            {/* Refresh Button */}
+            <Button 
+              size="sm" 
+              onClick={handleRefresh}
+              className="h-8 px-3"
+              variant="outline"
+              title="Refresh all data from database"
+              disabled={loading}
+            >
+              {loading ? (
+                <>
+                  <RefreshCcw className="h-4 w-4 mr-1.5 animate-spin" />
+                  <span>Refreshing...</span>
+                </>
+              ) : (
+                <>
+                  <RefreshCcw className="h-4 w-4 mr-1.5" />
+                  <span>Refresh Data</span>
+                </>
+              )}
+            </Button>
+          </div>
         </div>
       </div>
       
-      <div className="relative transition-all duration-300">
-        {/* Selection summary bar - only shown when items are selected */}
-        {selectedItems.length > 0 && (
-          <div className="mb-4 p-3 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 flex justify-between items-center">
-            <div className="flex items-center gap-2">
-              <CheckSquare className="h-4 w-4 text-primary" />
-              <p className="text-sm font-medium">
-                {filteredData.length} {filteredData.length === 1 ? 'item' : 'items'}
-                {filteredData.length !== excelData.length ? 
-                  <span className="text-slate-500"> (filtered from {excelData.length})</span> : 
-                  ''
-                }
-                <span className="mx-1 text-slate-400">\</span>
-                <span className="text-primary font-semibold">{selectedItems.length} selected</span>
-              </p>
-            </div>
-            
-            <div className="flex items-center gap-2">
-              <Button 
-                size="sm" 
-                variant="ghost" 
-                onClick={() => setSelectedItems([])}
-                className="h-8 text-xs"
-              >
-                Clear Selection
-              </Button>
-            </div>
-          </div>
-        )}
-      
+      <div className="relative">
         <Card className="shadow-sm">
           {/* Filters panel - optimized for mobile with collapsible sections */}
           {showFilters && (
@@ -1102,40 +1467,39 @@ export default function ViewData() {
                             size="sm" 
                             className="h-9 px-2 sm:px-3 flex gap-1.5 items-center" 
                             disabled={selectedItems.length === 0}
-                          >
-                            <Sparkles className="h-4 w-4" />
-                            <span className="hidden sm:inline">Generate</span>
-                            {selectedItems.length > 0 && (
-                              <Badge className="ml-1 h-5 bg-white text-primary">{selectedItems.length}</Badge>
-                            )}
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuLabel className="flex items-center gap-2">
-                            Generate with LLM
-                            <HelpTooltip text="Generate responses for multiple selected requirements at once using your preferred AI model." />
-                          </DropdownMenuLabel>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem onClick={() => generateResponse('openAI')} className="gap-2">
-                            <Atom className="h-4 w-4 text-blue-500" />
-                            <span>OpenAI</span>
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => generateResponse('claude')} className="gap-2">
-                            <Bot className="h-4 w-4 text-purple-500" />
-                            <span>Anthropic</span>
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => generateResponse('deepseek')} className="gap-2">
-                            <Brain className="h-4 w-4 text-amber-500" />
-                            <span>DeepSeek</span>
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem onClick={() => handleBulkAction('generate-moa')} className="gap-2">
-                            <Network className="h-4 w-4 text-green-500" />
-                            <span>MOA (Mixture of Agents)</span>
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
+                        >
+                          <Sparkles className="h-4 w-4" />
+                          <span className="hidden sm:inline">Generate</span>
+                          {selectedItems.length > 0 && (
+                            <Badge className="ml-1 h-5 bg-white text-primary">{selectedItems.length}</Badge>
+                          )}
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuLabel className="flex items-center gap-2">
+                          Generate with LLM
+                          <HelpTooltip text="Generate responses for multiple selected requirements at once using your preferred AI model." />
+                        </DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => generateResponse('openAI')} className="gap-2">
+                          <Atom className="h-4 w-4 text-blue-500" />
+                          <span>OpenAI</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => generateResponse('claude')} className="gap-2">
+                          <Bot className="h-4 w-4 text-purple-500" />
+                          <span>Anthropic</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => generateResponse('deepseek')} className="gap-2">
+                          <Brain className="h-4 w-4 text-amber-500" />
+                          <span>DeepSeek</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => handleBulkAction('generate-moa')} className="gap-2">
+                          <Network className="h-4 w-4 text-green-500" />
+                          <span>MOA (Mixture of Agents)</span>
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
                   
                   {/* Mobile-friendly accordion for filters */}
@@ -1402,6 +1766,7 @@ export default function ViewData() {
                   </div>
 
                   <div className="flex flex-wrap gap-2">
+
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button 
@@ -1448,6 +1813,7 @@ export default function ViewData() {
           {/* Progress indicator now replaced by fixed-position bar at the top of the screen */}
           
           <CardContent className="p-4 max-h-[calc(100vh-200px)] overflow-y-auto">
+            
             {/* Content display */}
             {loading ? (
               <div className="space-y-4">
@@ -1541,36 +1907,51 @@ export default function ViewData() {
                       >
                         {isGeneratingResponse ? (
                           <>
-                            <Sparkles className="h-4 w-4 animate-spin" />
+                            <RefreshCcw className="h-4 w-4 animate-spin" />
                             <span>Generating...</span>
                           </>
                         ) : (
                           <>
-                            <Sparkles className="h-4 w-4 text-green-500" />
-                            <span>Generate</span>
+                            <Sparkles className="h-4 w-4 text-primary" />
+                            <span>Generate Answer</span>
                           </>
                         )}
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuLabel>Generate with AI Model</DropdownMenuLabel>
+                      <DropdownMenuLabel className="flex items-center gap-2">
+                        Generate with LLM
+                        <HelpTooltip text="Select an AI model to generate a response for this requirement. Different models have unique strengths." />
+                      </DropdownMenuLabel>
                       <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={() => generateResponse('openAI', [selectedResponseId])} className="gap-2">
+                      <DropdownMenuItem onClick={() => handleGenerateLlmResponse(selectedResponseId, 'openai')} className="gap-2">
                         <Atom className="h-4 w-4 text-blue-500" />
-                        <span>OpenAI</span>
+                        <div className="flex items-center gap-2">
+                          <span>OpenAI</span>
+                          <HelpTooltip text="OpenAI's GPT models are good at providing concise, well-structured responses with accurate technical details." side="right" />
+                        </div>
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => generateResponse('claude', [selectedResponseId])} className="gap-2">
+                      <DropdownMenuItem onClick={() => handleGenerateLlmResponse(selectedResponseId, 'claude')} className="gap-2">
                         <Bot className="h-4 w-4 text-purple-500" />
-                        <span>Anthropic</span>
+                        <div className="flex items-center gap-2">
+                          <span>Anthropic</span>
+                          <HelpTooltip text="Anthropic's Claude models excel at nuanced explanations and compliance-focused content with careful reasoning." side="right" />
+                        </div>
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => generateResponse('deepseek', [selectedResponseId])} className="gap-2">
+                      <DropdownMenuItem onClick={() => handleGenerateLlmResponse(selectedResponseId, 'deepseek')} className="gap-2">
                         <Brain className="h-4 w-4 text-amber-500" />
-                        <span>DeepSeek</span>
+                        <div className="flex items-center gap-2">
+                          <span>DeepSeek</span>
+                          <HelpTooltip text="DeepSeek models are especially good with technical content and can provide detailed, specialized responses." side="right" />
+                        </div>
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={() => generateResponse('moa', [selectedResponseId])} className="gap-2">
+                      <DropdownMenuItem onClick={() => handleGenerateLlmResponse(selectedResponseId, 'moa')} className="gap-2">
                         <Network className="h-4 w-4 text-green-500" />
-                        <span>MOA (Mixture of Agents)</span>
+                        <div className="flex items-center gap-2">
+                          <span>Mixture of Agents (MOA)</span>
+                          <HelpTooltip text="MOA combines responses from all three models above to create a comprehensive answer that leverages the strengths of each model. This usually produces the best overall results." side="right" />
+                        </div>
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
@@ -1580,209 +1961,115 @@ export default function ViewData() {
           </DialogHeader>
           
           {selectedResponse && (
-            <div className="mt-2">
-              <div className="mb-6">
-                <div className="flex flex-col gap-3">
-                  <div>
-                    <h3 className="text-base font-medium">Requirement</h3>
-                    <div className="mt-1 text-sm text-slate-900 dark:text-slate-200 bg-slate-50 dark:bg-slate-800 p-3 rounded-md">
-                      {selectedResponse.requirement || "No requirement text available"}
-                    </div>
-                  </div>
-                  
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                    <div className="bg-slate-50 dark:bg-slate-800 p-2 rounded flex items-center gap-2">
-                      <span className="text-slate-500 dark:text-slate-400">Category:</span>
-                      <span className="font-medium">{selectedResponse.category || "Uncategorized"}</span>
-                    </div>
-                    
-                    <div className="bg-slate-50 dark:bg-slate-800 p-2 rounded flex items-center gap-2">
-                      <span className="text-slate-500 dark:text-slate-400">RFP:</span>
-                      <span className="font-medium">{selectedResponse.rfpName || "Unknown"}</span>
-                    </div>
-                  </div>
+            <div className="space-y-4 py-2">
+              <div className="flex space-x-4 mb-4">
+                <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-md flex-1">
+                  <h4 className="text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">ID:</h4>
+                  <p className="text-slate-900 dark:text-slate-100 font-medium">{selectedResponse.id}</p>
+                </div>
+                <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-md flex-1">
+                  <h4 className="text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">Category:</h4>
+                  <p className="text-slate-900 dark:text-slate-100 font-medium">{selectedResponse.category}</p>
                 </div>
               </div>
               
-              <Tabs defaultValue={activeTab} value={activeTab} onValueChange={setActiveTab} className="mt-6">
-                <TabsList className="grid grid-cols-4 mb-4">
-                  <TabsTrigger value="response" className="font-medium">
-                    <div className="flex items-center gap-1.5">
-                      <MessageSquare className="h-4 w-4" />
-                      <span>Response</span>
-                    </div>
+              <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-md mb-4">
+                <h4 className="text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">Requirement:</h4>
+                <p className="text-slate-900 dark:text-slate-100">{selectedResponse.requirement}</p>
+              </div>
+              
+              <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-md mb-4">
+                <h4 className="text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">AI Model Used:</h4>
+                <p className="text-slate-900 dark:text-slate-100">
+                  {selectedResponse.modelProvider === "openai" ? "OpenAI" :
+                   selectedResponse.modelProvider === "anthropic" ? "Anthropic/Claude" :
+                   selectedResponse.modelProvider === "deepseek" ? "DeepSeek" :
+                   selectedResponse.modelProvider === "moa" ? "Mixture of Agents (MOA)" :
+                   selectedResponse.modelProvider || "Not specified"}
+                </p>
+              </div>
+              
+              <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                <TabsList className="grid w-full grid-cols-2 mb-6">
+                  <TabsTrigger 
+                    value="response" 
+                    className="flex items-center gap-2"
+                    disabled={!selectedResponse?.finalResponse}
+                  >
+                    <MessageSquare className="h-4 w-4" />
+                    Response
+                    {!selectedResponse?.finalResponse && <span className="ml-1 text-xs opacity-60">(Not available)</span>}
                   </TabsTrigger>
-                  <TabsTrigger value="references" className="font-medium">
-                    <div className="flex items-center gap-1.5">
-                      <BookOpen className="h-4 w-4" />
-                      <span>References</span>
-                    </div>
-                  </TabsTrigger>
-                  <TabsTrigger value="openai" className="font-medium">
-                    <div className="flex items-center gap-1.5">
-                      <Atom className="h-4 w-4 text-blue-500" />
-                      <span>OpenAI</span>
-                    </div>
-                  </TabsTrigger>
-                  <TabsTrigger value="claude" className="font-medium">
-                    <div className="flex items-center gap-1.5">
-                      <Bot className="h-4 w-4 text-purple-500" />
-                      <span>Claude</span>
-                    </div>
+                  <TabsTrigger 
+                    value="references" 
+                    className="flex items-center gap-2"
+                    disabled={!selectedResponse?.similarQuestions}
+                  >
+                    <BookOpen className="h-4 w-4" />
+                    References
+                    {selectedResponse?.similarQuestions && (
+                      <Badge variant="secondary" className="ml-1">
+                        {Array.isArray(selectedResponse.similarQuestions) ? selectedResponse.similarQuestions.length : 0}
+                      </Badge>
+                    )}
                   </TabsTrigger>
                 </TabsList>
                 
-                <TabsContent value="response" className="space-y-4">
-                  {selectedResponse.finalResponse ? (
-                    <>
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <div className="flex items-center mb-2">
-                            <div className="p-1 px-2 text-xs font-medium bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400 rounded">
-                              <div className="flex items-center gap-1">
-                                {selectedResponse.modelProvider === 'moa' ? (
-                                  <Network className="h-3.5 w-3.5" />
-                                ) : selectedResponse.modelProvider === 'openai' ? (
-                                  <Atom className="h-3.5 w-3.5" />
-                                ) : selectedResponse.modelProvider === 'anthropic' ? (
-                                  <Bot className="h-3.5 w-3.5" />
-                                ) : selectedResponse.modelProvider === 'deepseek' ? (
-                                  <Brain className="h-3.5 w-3.5" />
-                                ) : (
-                                  <Sparkles className="h-3.5 w-3.5" />
-                                )}
-                                <span>Generated with {selectedResponse.modelProvider === 'moa' ? 'MOA' : 
-                                  selectedResponse.modelProvider === 'openai' ? 'OpenAI' : 
-                                  selectedResponse.modelProvider === 'anthropic' ? 'Claude' :
-                                  selectedResponse.modelProvider === 'deepseek' ? 'DeepSeek' : 
-                                  'AI Assistance'}</span>
-                              </div>
-                            </div>
-                          </div>
-                          <div className="prose prose-slate dark:prose-invert max-w-none">
-                            <ReactMarkdown
-                              remarkPlugins={[remarkGfm]}
-                            >
-                              {selectedResponse.finalResponse || "No response generated yet."}
-                            </ReactMarkdown>
-                          </div>
+                <TabsContent value="response">
+                  <div className="p-4 bg-slate-50 dark:bg-slate-900 rounded-md mb-4">
+                    <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-3">Response:</h4>
+                    <div className="prose prose-slate dark:prose-invert max-w-none text-slate-900 dark:text-slate-50 font-medium">
+                      {selectedResponse.finalResponse && (
+                        <div className="bg-white dark:bg-slate-800 p-3 rounded-md border border-slate-200 dark:border-slate-700">
+                          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                            {selectedResponse.finalResponse
+                              .replace(/\\n/g, '\n')
+                              .replace(/\\"/g, '"')
+                              .replace(/\\\\/g, '\\')}
+                          </ReactMarkdown>
                         </div>
-                      </div>
-                      <div className="flex items-center justify-end gap-2 mt-4">
-                        <span className="text-sm text-slate-500 mr-2">Was this response helpful?</span>
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          onClick={() => handleFeedbackSubmit(selectedResponse.id, 'positive')}
-                          disabled={isFeedbackSubmitting || selectedResponse.feedback === 'positive'}
-                          className={`h-8 ${selectedResponse.feedback === 'positive' ? 'bg-green-50 text-green-700 border-green-200' : ''}`}
-                        >
-                          <ThumbsUp className="h-4 w-4" />
-                        </Button>
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          onClick={() => handleFeedbackSubmit(selectedResponse.id, 'negative')}
-                          disabled={isFeedbackSubmitting || selectedResponse.feedback === 'negative'}
-                          className={`h-8 ${selectedResponse.feedback === 'negative' ? 'bg-red-50 text-red-700 border-red-200' : ''}`}
-                        >
-                          <ThumbsDown className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </>
-                  ) : (
-                    <div className="p-8 text-center border border-dashed rounded-md border-slate-300 dark:border-slate-700">
-                      <Sparkles className="h-8 w-8 mx-auto mb-4 text-slate-400" />
-                      <h3 className="text-lg font-medium mb-2">No Response Generated Yet</h3>
-                      <p className="text-slate-600 dark:text-slate-400 mb-4">Generate a response to see the final answer here.</p>
-                      <Button onClick={() => generateResponse('moa', [selectedResponseId])}>
-                        Generate with MOA
-                      </Button>
+                      )}
                     </div>
-                  )}
+                  </div>
                 </TabsContent>
                 
-                <TabsContent value="references" className="space-y-4">
-                  <ReferencePanel 
-                    requirementId={selectedResponseId} 
-                    similarQuestions={selectedResponse?.similarQuestions || []}
-                    isFindingSimilar={isFindingSimilar}
-                    onFindSimilar={() => handleFindSimilarMatches(selectedResponseId)}
-                  />
-                </TabsContent>
-                
-                <TabsContent value="openai" className="space-y-4">
-                  {selectedResponse.openaiResponse ? (
-                    <div className="prose prose-slate dark:prose-invert max-w-none">
-                      <ReactMarkdown
-                        remarkPlugins={[remarkGfm]}
-                      >
-                        {selectedResponse.openaiResponse}
-                      </ReactMarkdown>
-                    </div>
-                  ) : (
-                    <div className="p-8 text-center border border-dashed rounded-md border-slate-300 dark:border-slate-700">
-                      <Atom className="h-8 w-8 mx-auto mb-4 text-blue-500" />
-                      <h3 className="text-lg font-medium mb-2">No OpenAI Response</h3>
-                      <p className="text-slate-600 dark:text-slate-400 mb-4">Generate a response with OpenAI to see results here.</p>
-                      <Button onClick={() => generateResponse('openAI', [selectedResponseId])}>
-                        Generate with OpenAI
-                      </Button>
-                    </div>
-                  )}
-                </TabsContent>
-                
-                <TabsContent value="claude" className="space-y-4">
-                  {selectedResponse.anthropicResponse ? (
-                    <div className="prose prose-slate dark:prose-invert max-w-none">
-                      <ReactMarkdown
-                        remarkPlugins={[remarkGfm]}
-                      >
-                        {selectedResponse.anthropicResponse}
-                      </ReactMarkdown>
-                    </div>
-                  ) : (
-                    <div className="p-8 text-center border border-dashed rounded-md border-slate-300 dark:border-slate-700">
-                      <Bot className="h-8 w-8 mx-auto mb-4 text-purple-500" />
-                      <h3 className="text-lg font-medium mb-2">No Claude Response</h3>
-                      <p className="text-slate-600 dark:text-slate-400 mb-4">Generate a response with Claude to see results here.</p>
-                      <Button onClick={() => generateResponse('claude', [selectedResponseId])}>
-                        Generate with Claude
-                      </Button>
-                    </div>
-                  )}
+                <TabsContent value="references">
+                  <ReferencePanel responseId={selectedResponseId || undefined} showTitle={false} />
                 </TabsContent>
               </Tabs>
             </div>
           )}
           
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setShowResponseDialog(false)}
-            >
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Return to List
-            </Button>
+          <DialogFooter className="flex items-center justify-between sm:justify-between">
+            <DialogClose asChild>
+              <Button type="button" variant="secondary" className="flex items-center gap-2">
+                <ArrowLeft className="h-4 w-4" />
+                Back to List
+              </Button>
+            </DialogClose>
             
-            {/* Feedback buttons - shown only when there's a final response */}
             {selectedResponse && selectedResponse.finalResponse && (
-              <div className="flex items-center gap-2">
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={() => handleFeedbackSubmit(selectedResponse.id, 'positive')}
-                  disabled={isFeedbackSubmitting || selectedResponse.feedback === 'positive'}
-                  className={`h-8 ${selectedResponse.feedback === 'positive' ? 'bg-green-50 text-green-700 border-green-200' : ''}`}
+              <div className="flex items-center space-x-2">
+                <span className="text-sm text-slate-500 mr-1">Feedback:</span>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={selectedResponse.feedback === 'positive' ? 'default' : 'outline'}
+                  className={`p-2 ${selectedResponse.feedback === 'positive' ? 'bg-green-600 hover:bg-green-700' : ''}`}
+                  onClick={() => handleFeedbackSubmit(selectedResponse.id || 0, 'positive')}
+                  disabled={isFeedbackSubmitting}
+                  title="I like this response"
                 >
                   <ThumbsUp className="h-4 w-4" />
                 </Button>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={() => handleFeedbackSubmit(selectedResponse.id, 'negative')}
-                  disabled={isFeedbackSubmitting || selectedResponse.feedback === 'negative'}
-                  className={`h-8 ${selectedResponse.feedback === 'negative' ? 'bg-red-50 text-red-700 border-red-200' : ''}`}
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={selectedResponse.feedback === 'negative' ? 'default' : 'outline'}
+                  className={`p-2 ${selectedResponse.feedback === 'negative' ? 'bg-red-600 hover:bg-red-700' : ''}`}
+                  onClick={() => handleFeedbackSubmit(selectedResponse.id || 0, 'negative')}
+                  disabled={isFeedbackSubmitting}
+                  title="I don't like this response"
                 >
                   <ThumbsDown className="h-4 w-4" />
                 </Button>
@@ -1838,3 +2125,4 @@ export default function ViewData() {
     </div>
   );
 }
+
