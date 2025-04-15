@@ -293,6 +293,7 @@ export default function ViewData() {
   const handleViewResponse = (row: ExcelRequirementResponse) => {
     setSelectedResponse(row);
     setSelectedResponseId(row.id);
+    setReferenceCount(0); // Reset reference count when opening a new response
     
     // Set the appropriate tab based on what's available
     if (row.finalResponse) {
@@ -1921,11 +1922,9 @@ export default function ViewData() {
                   >
                     <BookOpen className="h-4 w-4" />
                     References
-                    {selectedResponse?.similarQuestions && (
-                      <Badge variant="secondary" className="ml-1">
-                        {Array.isArray(selectedResponse.similarQuestions) ? selectedResponse.similarQuestions.length : 0}
-                      </Badge>
-                    )}
+                    <Badge variant="secondary" className="ml-1">
+                      {referenceCount}
+                    </Badge>
                   </TabsTrigger>
                 </TabsList>
                 
