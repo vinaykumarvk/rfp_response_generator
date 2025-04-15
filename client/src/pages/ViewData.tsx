@@ -531,36 +531,18 @@ export default function ViewData() {
   };
   
   const [processingItems, setProcessingItems] = useState<number[]>([]);
-  const [processedCount, setProcessedCount] = useState(0);
+  // Keep only the necessary state for tracking individual items in the UI
   const [isGenerating, setIsGenerating] = useState(false);
-  const [generationError, setGenerationError] = useState<string | null>(null);
-  const [generationStage, setGenerationStage] = useState<string>("Initializing");
-  const [currentItemText, setCurrentItemText] = useState<string>("");
   
   // For tracking individual requirements being processed (with their model info)
-  const [processingIndividualItems, setProcessingIndividualItems] = useState<{[key: number]: {stage: string, model: string}}>({});
+  const [processingIndividualItems, setProcessingIndividualItems] = useState<{[key: number]: {stage: string, model: string}}>({}); 
   
-  // Helper function to get progress bar value based on generation stage
-  const getProgressValueByStage = (stage: string): number => {
-    switch (stage) {
-      case "Initializing":
-        return 5;
-      case "Fetching similar questions":
-        return 20;
-      case "Storing similar questions":
-        return 35;
-      case "Creating prompt":
-        return 50;
-      case "Fetching response from LLM":
-        return 70;
-      case "Saving response":
-        return 90;
-      case "Process Completed":
-        return 100;
-      default:
-        return 50;
-    }
-  };
+  // Note: Removed the following unused states that were only needed for the old progress indicator:
+  // - processedCount
+  // - generationError
+  // - generationStage
+  // - currentItemText
+  // - getProgressValueByStage helper function
   
   // Function to generate response for a single requirement
   const generateResponseForRequirement = async (
@@ -606,7 +588,7 @@ export default function ViewData() {
       return true;
     } catch (error) {
       console.error(`Error generating response for requirement ${requirementId}:`, error);
-      setGenerationError(error instanceof Error ? error.message : String(error));
+      // Error is logged but not stored in state anymore
       return false;
     }
   };
@@ -620,9 +602,6 @@ export default function ViewData() {
       setIsGeneratingResponse(true);
       setIsGenerating(true);
       setProcessingItems([requirementId]);
-      setProcessedCount(0);
-      setGenerationError(null);
-      setGenerationStage("Initializing");
       
       // Track this individual item's progress
       setProcessingIndividualItems(prev => ({
@@ -639,12 +618,7 @@ export default function ViewData() {
         throw new Error(`Requirement with ID ${requirementId} not found`);
       }
       
-      // Set the requirement text for display in the progress area
-      setCurrentItemText(requirementItem.requirement || "");
-      
-      // Update to creating prompt stage instead of fetching similar questions
-      // Since similar questions are now fetched separately
-      setGenerationStage("Creating prompt with past responses");
+      // Update to creating prompt stage
       setProcessingIndividualItems(prev => ({
         ...prev,
         [requirementId]: { ...prev[requirementId], stage: "Creating prompt" }
@@ -652,13 +626,12 @@ export default function ViewData() {
       await new Promise(resolve => setTimeout(resolve, 500)); // simulate brief delay
             
       // Update to fetching LLM response stage
-      setGenerationStage("Fetching response from LLM");
       setProcessingIndividualItems(prev => ({
         ...prev,
         [requirementId]: { ...prev[requirementId], stage: "Fetching response" }
       }));
       
-      // Call the API to generate a response - note we're not fetching similar questions here anymore
+      // Call the API to generate a response
       const response = await fetch('/api/generate-response', {
         method: 'POST',
         headers: {
@@ -670,7 +643,7 @@ export default function ViewData() {
           provider: model,
           rfpName: requirementItem.rfpName,
           uploadedBy: requirementItem.uploadedBy,
-          skipSimilaritySearch: true  // New flag to indicate we should use existing similar questions
+          skipSimilaritySearch: true  // Use existing similar questions
         }),
       });
       
@@ -679,7 +652,6 @@ export default function ViewData() {
       }
       
       // Update to saving response stage
-      setGenerationStage("Saving response");
       setProcessingIndividualItems(prev => ({
         ...prev,
         [requirementId]: { ...prev[requirementId], stage: "Saving response" }
@@ -690,9 +662,6 @@ export default function ViewData() {
       if (!data.success) {
         throw new Error(data.error || 'Failed to generate response');
       }
-      
-      // Mark as processed for progress bar
-      setProcessedCount(1);
       
       // Update the selected response with the generated response
       if (selectedResponse && selectedResponse.id === requirementId) {
@@ -709,17 +678,11 @@ export default function ViewData() {
         setActiveTab('response');
       }
       
-      // Update to completion stage 
-      setGenerationStage("Process Completed");
-      
       // Update individual progress indicator to completion
       setProcessingIndividualItems(prev => ({
         ...prev,
         [requirementId]: { ...prev[requirementId], stage: "Completed" }
       }));
-      
-      // Clear the current requirement text
-      setCurrentItemText("");
       
       // Show success toast
       toast({
@@ -736,7 +699,6 @@ export default function ViewData() {
       
     } catch (error) {
       console.error('Error generating LLM response:', error);
-      setGenerationError(error instanceof Error ? error.message : String(error));
       
       toast({
         title: "Generation Error",
@@ -747,23 +709,10 @@ export default function ViewData() {
       return false;
     } finally {
       // Keep status visible for a moment so user can see completion
-      if (!generationError) {
-        setTimeout(() => {
-          setIsGeneratingResponse(false);
-          setIsGenerating(false);
-          // Clear the processing indicator for this requirement after a delay
-          setProcessingIndividualItems(prev => {
-            const newState = {...prev};
-            if (requirementId in newState) {
-              delete newState[requirementId];
-            }
-            return newState;
-          });
-        }, 1500);
-      } else {
+      setTimeout(() => {
         setIsGeneratingResponse(false);
         setIsGenerating(false);
-        // Clear the processing indicator in case of error
+        // Clear the processing indicator for this requirement after a delay
         setProcessingIndividualItems(prev => {
           const newState = {...prev};
           if (requirementId in newState) {
@@ -771,7 +720,7 @@ export default function ViewData() {
           }
           return newState;
         });
-      }
+      }, 1500);
     }
   };
   
