@@ -251,10 +251,41 @@ except Exception as e:
           if (jsonStartIndex >= 0 && jsonEndIndex > jsonStartIndex) {
             const jsonPart = pythonApiResponse.stdout.substring(jsonStartIndex, jsonEndIndex);
             console.log('Extracted JSON:', jsonPart);
-            responseData = JSON.parse(jsonPart);
+            const rawResponseData = JSON.parse(jsonPart);
+            
+            // Process the response based on the model type
+            console.log('Processing response with field mapping for model:', modelProvider);
+            
+            // Normalize model name
+            const normalizedModelProvider = modelProvider.toLowerCase() === 'claude' 
+              ? 'anthropic' 
+              : modelProvider.toLowerCase();
+              
+            // Apply field mapping to standardize model-specific responses
+            const mappedFields = mapPythonResponseToDbFields(rawResponseData, normalizedModelProvider);
+            console.log('Mapped fields:', mappedFields);
+            
+            // Create a response with all available fields
+            responseData = {
+              ...rawResponseData,
+              ...mappedFields
+            };
+            
+            console.log('Final processed response data keys:', Object.keys(responseData));
           } else {
             // Try to parse the entire output as JSON
-            responseData = JSON.parse(pythonApiResponse.stdout);
+            const rawResponseData = JSON.parse(pythonApiResponse.stdout);
+            
+            // Apply the same mapping for consistent handling
+            const normalizedModelProvider = modelProvider.toLowerCase() === 'claude' 
+              ? 'anthropic' 
+              : modelProvider.toLowerCase();
+              
+            const mappedFields = mapPythonResponseToDbFields(rawResponseData, normalizedModelProvider);
+            responseData = {
+              ...rawResponseData,
+              ...mappedFields
+            };
           }
         } catch (parseError) {
           console.error('Failed to parse Python script response as JSON:', parseError);
@@ -413,9 +444,17 @@ with engine.connect() as connection:
             const dbData = JSON.parse(dbResponse.stdout);
             const actualResponse = dbData.response;
             
+            // Use the field mapping utility for consistent field handling
+            const mappedFields = mapPythonResponseToDbFields(
+              { anthropic_response: actualResponse }, 
+              'anthropic'
+            );
+            
+            console.log('Direct DB call - mapped fields:', mappedFields);
+            
             responseContent = {
-              finalResponse: actualResponse,
-              anthropicResponse: actualResponse,
+              finalResponse: mappedFields.finalResponse || actualResponse,
+              anthropicResponse: mappedFields.anthropicResponse || actualResponse,
               modelProvider: 'anthropic'
             };
           } catch (directCallError) {
