@@ -1367,7 +1367,7 @@ export default function ViewData() {
             <div className="sticky top-[60px] z-10 border-b border-slate-200 dark:border-slate-700">
               <div className="p-3 bg-white/95 dark:bg-slate-900/95 backdrop-blur-sm">
                 <div className="space-y-4">
-                  <div className="flex justify-between items-center">
+                  <div className="flex flex-col xs:flex-row justify-between items-start xs:items-center gap-2 xs:gap-0">
                     <div className="flex items-center gap-2">
                       <h3 className="font-medium text-base">Filter Requirements</h3>
                       <HelpTooltip text="Use these filters to narrow down the list of requirements based on different criteria. You can filter by RFP name, category, response status, and AI model type." />
@@ -1565,7 +1565,7 @@ export default function ViewData() {
                       </Accordion>
                     </div>
                   ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
                       <div className="space-y-1.5">
                         <div className="flex items-center gap-2">
                           <Label htmlFor="filter-rfp" className="text-sm">RFP Name</Label>
