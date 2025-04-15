@@ -794,6 +794,14 @@ export default function ViewData() {
   const handleGenerateLlmResponse = async (requirementId: number, model: string = 'moa') => {
     if (!requirementId) return;
     
+    // Clear any lingering progress indicators first
+    setBulkGenerationProgress({
+      total: 0,
+      completed: 0,
+      isProcessing: false,
+      model: ''
+    });
+    
     try {
       // Set both the single response indicator and the progress tracking for visual feedback
       setIsGeneratingResponse(true);
@@ -932,6 +940,13 @@ export default function ViewData() {
       return;
     }
     
+    // Reset any stale progress indicators before starting
+    setIsGeneratingResponse(false);
+    setBulkGenerationProgress(prev => ({
+      ...prev,
+      isProcessing: false
+    }));
+    
     setProcessingItems(selectedItems);
     setIsGenerating(true);
     
@@ -1041,10 +1056,19 @@ export default function ViewData() {
       // Keep status visible for a moment
       setTimeout(() => {
         setIsGenerating(false);
+        setIsGeneratingResponse(false); // Explicitly reset the response generation flag for MOA
         setProcessingItems([]);
         
         // Clear all individual processing indicators after bulk operation completes
         setProcessingIndividualItems({});
+        
+        // Also force reset the bulk generation progress indicators
+        setBulkGenerationProgress({
+          total: 0,
+          completed: 0,
+          isProcessing: false,
+          model: ''
+        });
       }, 1500);
     }
   };
@@ -1214,6 +1238,13 @@ export default function ViewData() {
       });
       return;
     }
+    
+    // Reset any stale progress indicators before starting
+    setIsGeneratingResponse(false);
+    setBulkGenerationProgress(prev => ({
+      ...prev,
+      isProcessing: false
+    }));
 
     // Convert model name to provider format if needed
     let provider = model;
