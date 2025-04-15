@@ -756,6 +756,15 @@ export default function ViewData() {
         // Update stage with the current item number and total
         setGenerationStage(`Processing item ${i+1} of ${totalItems}`);
         
+        // Add this item to the individual processing indicators
+        setProcessingIndividualItems(prev => ({
+          ...prev,
+          [requirementId]: { 
+            stage: `Generating (${i+1}/${totalItems})`, 
+            model: modelProvider 
+          }
+        }));
+        
         // Generate response for this requirement
         const success = await generateResponseForRequirement(requirementId, modelProvider);
         
@@ -795,6 +804,9 @@ export default function ViewData() {
       setTimeout(() => {
         setIsGenerating(false);
         setProcessingItems([]);
+        
+        // Clear all individual processing indicators after bulk operation completes
+        setProcessingIndividualItems({});
       }, 1500);
     }
   };
@@ -936,11 +948,20 @@ export default function ViewData() {
       // Find the selected requirements
       const selectedRequirements = excelData.filter(item => selectedItems.includes(item.id || 0));
       
-      for (const requirement of selectedRequirements) {
+      for (const [index, requirement] of selectedRequirements.entries()) {
         // Convert model name to provider format if needed
         let provider = model;
         if (model === 'openAI') provider = 'openai';
         if (model === 'claude') provider = 'anthropic';
+        
+        // Add this requirement to the individual processing indicators
+        setProcessingIndividualItems(prev => ({
+          ...prev,
+          [requirement.id || 0]: { 
+            stage: `Generating (${index+1}/${selectedRequirements.length})`, 
+            model: provider 
+          }
+        }));
         
         const response = await fetch('/api/generate-response', {
           method: 'POST',
@@ -1002,6 +1023,11 @@ export default function ViewData() {
       });
     } finally {
       setIsGenerating(false);
+      
+      // Clear all individual processing indicators after operation completes
+      setTimeout(() => {
+        setProcessingIndividualItems({});
+      }, 1500);
     }
   };
 
