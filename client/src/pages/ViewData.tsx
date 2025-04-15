@@ -1712,6 +1712,10 @@ export default function ViewData() {
                           <Mail className="h-4 w-4" />
                           <span>Email Responses</span>
                         </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleBulkAction('whatsapp')} className="gap-2">
+                          <MessageSquare className="h-4 w-4 text-green-500" />
+                          <span>Share via WhatsApp</span>
+                        </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem onClick={() => handleBulkAction('delete')} className="text-red-600 gap-2">
                           <Trash2 className="h-4 w-4" />

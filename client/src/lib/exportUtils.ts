@@ -575,8 +575,43 @@ export const openMailtoLink = (
 };
 
 /**
+ * Opens WhatsApp with the markdown content ready to share
+ */
+export const shareViaWhatsApp = (
+  markdownContent: string
+): void => {
+  try {
+    // First download the markdown file to ensure the user has a local copy
+    downloadMarkdownFile(markdownContent, "rfp-responses.md");
+    
+    // Show notification about markdown download
+    showNotification("Markdown file downloaded. Launching WhatsApp...", "success");
+    
+    // Prepare content for WhatsApp
+    // WhatsApp has a character limit, so we'll truncate if necessary
+    const MAX_LENGTH = 4000; // WhatsApp message character limit
+    let whatsAppText = markdownContent;
+    
+    if (whatsAppText.length > MAX_LENGTH) {
+      whatsAppText = whatsAppText.substring(0, MAX_LENGTH - 150) + 
+        "\n\n... (Content truncated due to length. Please refer to the downloaded markdown file for the complete content.)";
+    }
+    
+    // Create WhatsApp sharing link
+    const whatsAppLink = `https://wa.me/?text=${encodeURIComponent(whatsAppText)}`;
+    
+    // Open WhatsApp
+    window.open(whatsAppLink, '_blank');
+  } catch (error) {
+    console.error("Error sharing via WhatsApp:", error);
+    alert(`Failed to share via WhatsApp: ${error instanceof Error ? error.message : String(error)}`);
+  }
+};
+
+/**
  * Generates an Excel file with RFP responses
  * Only includes Category, Requirement, and Final Response columns
+ * Includes formatted header row and styled cells
  */
 export const generateExcelFile = (items: ExcelRequirementResponse[]): XLSX.WorkBook => {
   if (!items.length) {
@@ -593,13 +628,55 @@ export const generateExcelFile = (items: ExcelRequirementResponse[]): XLSX.WorkB
   // Create worksheet
   const worksheet = XLSX.utils.json_to_sheet(simplifiedData);
   
-  // Set column widths for better readability
+  // Set column widths as per requirements
   const colWidths = [
-    { wch: 20 },  // Category
-    { wch: 40 },  // Requirement
-    { wch: 70 }   // Final Response
+    { wch: 20 },  // Category - 20 characters
+    { wch: 50 },  // Requirement - 50 characters
+    { wch: 150 }  // Final Response - 150 characters
   ];
   worksheet['!cols'] = colWidths;
+  
+  // Apply text wrapping to all cells
+  const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1:C1');
+  for (let row = range.s.r; row <= range.e.r; row++) {
+    for (let col = range.s.c; col <= range.e.c; col++) {
+      const cellRef = XLSX.utils.encode_cell({ r: row, c: col });
+      if (!worksheet[cellRef]) continue;
+      
+      // Create cell style if it doesn't exist
+      if (!worksheet[cellRef].s) {
+        worksheet[cellRef].s = {};
+      }
+      
+      // Apply text wrapping
+      worksheet[cellRef].s.alignment = { wrapText: true, vertical: "top" };
+      
+      // Apply alternate row styling (light gradient background)
+      if (row > 0) { // Skip header row
+        if (row % 2 === 0) {
+          worksheet[cellRef].s.fill = {
+            patternType: "solid",
+            fgColor: { rgb: "F5F5F5" } // Light gray for even rows
+          };
+        } else {
+          worksheet[cellRef].s.fill = {
+            patternType: "solid",
+            fgColor: { rgb: "FFFFFF" } // White for odd rows
+          };
+        }
+      }
+    }
+  }
+  
+  // Style the header row
+  for (let col = range.s.c; col <= range.e.c; col++) {
+    const headerCellRef = XLSX.utils.encode_cell({ r: 0, c: col });
+    worksheet[headerCellRef].s = {
+      font: { bold: true, color: { rgb: "FFFFFF" } },
+      fill: { patternType: "solid", fgColor: { rgb: "4F46E5" } }, // Primary color background
+      alignment: { horizontal: "center", vertical: "center", wrapText: true }
+    };
+  }
   
   // Create workbook
   const workbook = XLSX.utils.book_new();
