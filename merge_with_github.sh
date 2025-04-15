@@ -81,13 +81,21 @@ echo "Copying .gitignore..."
 cp -v .gitignore "$GITHUB_REPO_PATH/"
 echo ".gitignore copied."
 
+# Create version information file with timestamp
+echo "Creating version information file..."
+VERSION_FILE="$GITHUB_REPO_PATH/VERSION_INFO.txt"
+echo "RFP Response Generator v1.1" > "$VERSION_FILE"
+echo "Updated: $(date)" >> "$VERSION_FILE"
+echo "GitHub Repository: https://github.com/vinaykumarvk/rfp_response_generator_clean" >> "$VERSION_FILE"
+echo "Version information file created at: $VERSION_FILE"
+
 echo
 echo "Merge completed! Files have been copied to: $GITHUB_REPO_PATH"
 echo
 echo "Next steps:"
 echo "1. Navigate to the GitHub repository directory: cd $GITHUB_REPO_PATH"
 echo "2. Review the changes: git status"
-echo "3. Commit the changes: git add . && git commit -m \"Merge cleaned version 1.0 from Replit\""
+echo "3. Commit the changes: git add . && git commit -m \"Merge cleaned version 1.1 from Replit\""
 echo "4. Push to GitHub: git push origin main"
 echo
 echo "Note: You may need to resolve conflicts if the same files exist in both repositories."
