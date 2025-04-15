@@ -414,7 +414,7 @@ If any check fails, revise the response accordingly."""
 
     return [system_message, user_message, validation_message]
 
-def get_llm_responses(requirement_id, model='moa', display_results=True):
+def get_llm_responses(requirement_id, model='moa', display_results=True, skip_similarity_search=False):
     """
     Get LLM responses for a given requirement.
 
@@ -423,6 +423,7 @@ def get_llm_responses(requirement_id, model='moa', display_results=True):
         model: Model to use ('openAI', 'deepseek', 'anthropic'/'claude', or 'moa')
                If 'moa', responses from all models will be synthesized
         display_results: Whether to display the results after fetching
+        skip_similarity_search: If True, skips finding similar matches and uses existing ones in the database
     """
     print(f"\n\n==== RESPONSE GENERATION PROCESS ====")
     print(f"Processing requirement ID: {requirement_id}")
@@ -445,45 +446,83 @@ def get_llm_responses(requirement_id, model='moa', display_results=True):
 
             print("1. Retrieved requirement details from database")
 
-            # Find similar matches and generate prompts
-            similar_query = text("""
-                WITH requirement_embedding AS (
-                    SELECT embedding 
-                    FROM embeddings 
-                    WHERE requirement = (
-                        SELECT requirement 
-                        FROM excel_requirement_responses 
-                        WHERE id = :req_id
+            # Check if we should skip similarity search and use existing matches
+            similar_results = []
+            if skip_similarity_search:
+                print("Skip similarity search flag is set - using existing similar questions")
+                # Get existing similar questions from the database
+                existing_similar_query = text("""
+                    SELECT similar_questions
+                    FROM excel_requirement_responses
+                    WHERE id = :req_id
+                """)
+                
+                try:
+                    existing_similar = connection.execute(existing_similar_query, {"req_id": requirement_id}).fetchone()
+                    if existing_similar and existing_similar[0]:
+                        print("Found existing similar questions in database")
+                        # Parse the existing similar questions string back to a list
+                        import ast
+                        similar_questions_list = ast.literal_eval(existing_similar[0])
+                        
+                        # We'll set similar_questions_list later, but we need similar_results format for prompt creation
+                        for idx, sq in enumerate(similar_questions_list):
+                            similar_results.append([
+                                idx,                          # id
+                                sq['question'],               # matched_requirement
+                                sq['response'],               # matched_response
+                                "",                           # category
+                                float(sq['similarity_score'])  # similarity_score
+                            ])
+                        print(f"Converted {len(similar_questions_list)} existing similar questions for use")
+                    else:
+                        print("No existing similar questions found - will perform search anyway")
+                        skip_similarity_search = False  # Force search if no existing data
+                except Exception as e:
+                    print(f"Error retrieving existing similar questions: {str(e)}")
+                    skip_similarity_search = False  # Force search if error occurs
+            
+            # If not skipping or if retrieving existing failed, perform similarity search
+            if not skip_similarity_search:
+                # Find similar matches and generate prompts
+                similar_query = text("""
+                    WITH requirement_embedding AS (
+                        SELECT embedding 
+                        FROM embeddings 
+                        WHERE requirement = (
+                            SELECT requirement 
+                            FROM excel_requirement_responses 
+                            WHERE id = :req_id
+                        )
+                        LIMIT 1
                     )
-                    LIMIT 1
-                )
-                SELECT 
-                    e.id,
-                    e.requirement as matched_requirement,
-                    e.response as matched_response,
-                    e.category,
-                    CASE 
-                        WHEN re.embedding IS NOT NULL AND e.embedding IS NOT NULL 
-                        THEN 1 - (e.embedding <=> re.embedding)
-                        ELSE 0.0
-                    END as similarity_score
-                FROM embeddings e
-                CROSS JOIN requirement_embedding re
-                WHERE e.embedding IS NOT NULL
-                ORDER BY similarity_score DESC
-                LIMIT 5;
-            """)
+                    SELECT 
+                        e.id,
+                        e.requirement as matched_requirement,
+                        e.response as matched_response,
+                        e.category,
+                        CASE 
+                            WHEN re.embedding IS NOT NULL AND e.embedding IS NOT NULL 
+                            THEN 1 - (e.embedding <=> re.embedding)
+                            ELSE 0.0
+                        END as similarity_score
+                    FROM embeddings e
+                    CROSS JOIN requirement_embedding re
+                    WHERE e.embedding IS NOT NULL
+                    ORDER BY similarity_score DESC
+                    LIMIT 5;
+                """)
 
-            try:
-                similar_results = connection.execute(similar_query, {"req_id": requirement_id}).fetchall()
-                print("2. Retrieved similar questions from database")
+                try:
+                    similar_results = connection.execute(similar_query, {"req_id": requirement_id}).fetchall()
+                    print("2. Retrieved similar questions from database")
 
-                if not similar_results:
-                    print("Warning: No similar questions found")
+                    if not similar_results:
+                        print("Warning: No similar questions found")
+                        similar_results = []
+                except Exception as e:
+                    print(f"Warning: Error fetching similar questions: {str(e)}")
                     similar_results = []
-            except Exception as e:
-                print(f"Warning: Error fetching similar questions: {str(e)}")
-                similar_results = []
 
             # Format previous responses and similar questions
             previous_responses = []
@@ -681,5 +720,7 @@ if __name__ == "__main__":
     requirement_id = int(sys.argv[1]) if len(sys.argv) > 1 else 1
     model = sys.argv[2] if len(sys.argv) > 2 else 'moa'
     display_results = len(sys.argv) <= 3 or sys.argv[3].lower() != 'false'
+    # Default to not skipping similarity search
+    skip_similarity_search = len(sys.argv) > 4 and sys.argv[4].lower() == 'true'
 
-    get_llm_responses(requirement_id, model, display_results)
+    get_llm_responses(requirement_id, model, display_results, skip_similarity_search)
