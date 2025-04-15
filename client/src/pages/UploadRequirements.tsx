@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import * as XLSX from 'xlsx';
+import { HelpTooltip } from "@/components/HelpTooltip";
 
 // Define the structure of our parsed Excel data
 interface ExcelRow {
