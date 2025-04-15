@@ -39,7 +39,6 @@ import {
   ChevronDown,
   Loader2,
   Filter,
-  X,
   ChevronRight,
   Atom,
   Bot,
@@ -55,7 +54,10 @@ import {
   FileText,
   ThumbsUp,
   ThumbsDown,
-  Search
+  Search,
+  Edit,
+  Save,
+  X as CloseIcon
 } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useToast } from '@/hooks/use-toast';
@@ -1420,7 +1422,7 @@ export default function ViewData() {
               <Filter className={`h-4 w-4 mr-1.5 ${areFiltersActive ? 'text-blue-600 dark:text-blue-400' : ''}`} />
               <span>Filters</span>
               {showFilters ? (
-                <X className="h-3 w-3 ml-1" />
+                <CloseIcon className="h-3 w-3 ml-1" />
               ) : areFiltersActive ? (
                 <span className="ml-1.5 h-4 px-1 rounded bg-blue-500 text-white text-[10px] inline-flex items-center">on</span>
               ) : (
