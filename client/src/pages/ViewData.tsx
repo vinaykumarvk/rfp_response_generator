@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { format, formatDistanceToNow } from 'date-fns';
 import ReactMarkdown from 'react-markdown';
@@ -94,6 +94,9 @@ export default function ViewData() {
   const [showFilters, setShowFilters] = useState(false);
   const [isFeedbackSubmitting, setIsFeedbackSubmitting] = useState(false);
   const [isGeneratingResponse, setIsGeneratingResponse] = useState(false);
+  
+  // Requirements cache for performance optimization
+  const requirementsCache = React.useRef<Map<number, ExcelRequirementResponse>>(new Map());
   
   // Response editing state
   const [isEditingResponse, setIsEditingResponse] = useState(false);
@@ -491,7 +494,7 @@ export default function ViewData() {
     }
   };
   
-  // Function to find similar matches for multiple requirements in bulk
+  // Function to find similar matches for multiple requirements in bulk - optimized version
   const handleFindSimilarForBulk = async () => {
     if (selectedItems.length === 0) {
       toast({
@@ -516,37 +519,72 @@ export default function ViewData() {
         description: `Processing ${selectedItems.length} requirements...`,
       });
       
-      // Process each requirement sequentially
+      // Optimized bulk processing with concurrency control
       const results = [];
-      for (const requirementId of selectedItems) {
-        try {
-          // Call the API for this requirement
-          const response = await fetch(`/api/find-similar-matches/${requirementId}`);
-          
-          if (!response.ok) {
-            console.error(`Error finding similar matches for requirement ${requirementId}: ${response.status} ${response.statusText}`);
-            results.push({ id: requirementId, success: false });
-          } else {
+      const BATCH_SIZE = 3; // Process 3 requests at a time for better performance while avoiding server overload
+      
+      // Split the items into batches
+      for (let i = 0; i < selectedItems.length; i += BATCH_SIZE) {
+        const batch = selectedItems.slice(i, i + BATCH_SIZE);
+        
+        // Process a batch concurrently
+        const batchPromises = batch.map(async (requirementId) => {
+          try {
+            // Add 20ms delay between requests within a batch to reduce load spikes
+            const delayIndex = batch.indexOf(requirementId);
+            if (delayIndex > 0) {
+              await new Promise(resolve => setTimeout(resolve, delayIndex * 20));
+            }
+            
+            // Call the API for this requirement with timeout
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+            
+            const response = await fetch(`/api/find-similar-matches/${requirementId}`, {
+              signal: controller.signal
+            });
+            
+            clearTimeout(timeoutId);
+            
+            if (!response.ok) {
+              return { 
+                id: requirementId, 
+                success: false,
+                error: `HTTP ${response.status}: ${response.statusText}`
+              };
+            }
+            
             const data = await response.json();
-            results.push({ 
+            return { 
               id: requirementId, 
               success: !data.error, 
-              matchCount: data.similar_matches?.length || 0 
-            });
+              matchCount: data.similar_matches?.length || 0,
+              error: data.error
+            };
+          } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            return { 
+              id: requirementId, 
+              success: false,
+              error: errorMessage
+            };
           }
-        } catch (error) {
-          console.error(`Error processing requirement ${requirementId}:`, error);
-          results.push({ id: requirementId, success: false });
-        }
+        });
         
-        // Update progress
+        // Wait for the batch to complete
+        const batchResults = await Promise.all(batchPromises);
+        results.push(...batchResults);
+        
+        // Update progress for the batch
         setBulkFindingProgress(prev => ({
           ...prev,
-          completed: prev.completed + 1
+          completed: Math.min(prev.completed + batch.length, prev.total)
         }));
         
-        // Short delay to avoid overloading the server
-        await new Promise(resolve => setTimeout(resolve, 100));
+        // Short delay between batches
+        if (i + BATCH_SIZE < selectedItems.length) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
       }
       
       // Refresh the data to reflect all updates
@@ -562,6 +600,12 @@ export default function ViewData() {
         description: `Successfully processed ${successful} requirements${failed > 0 ? `, failed: ${failed}` : ''}.`,
         variant: successful > 0 ? "default" : "destructive",
       });
+      
+      // Log errors for troubleshooting if needed
+      const errors = results.filter(r => !r.success && r.error);
+      if (errors.length > 0) {
+        console.log('Some requirements failed processing:', errors);
+      }
       
     } catch (error) {
       console.error('Error in bulk finding similar matches:', error);
@@ -676,47 +720,72 @@ export default function ViewData() {
   // - getProgressValueByStage helper function
   
   // Function to generate response for a single requirement
+  // Optimized function for generating response for a single requirement
   const generateResponseForRequirement = async (
     requirementId: number, 
     modelProvider: 'openai' | 'anthropic' | 'deepseek' | 'moa'
   ) => {
     try {
-      // Find the requirement data
-      const requirement = excelData.find(item => item.id === requirementId);
+      // Find the requirement data - using memoized lookup if available
+      let requirement = requirementsCache.current.get(requirementId);
+      
+      if (!requirement) {
+        // Fall back to finding in the dataset if not in cache
+        requirement = excelData.find(item => item.id === requirementId);
+        
+        // Store in cache for future use
+        if (requirement) {
+          requirementsCache.current.set(requirementId, requirement);
+        }
+      }
       
       if (!requirement) {
         console.error(`Requirement with ID ${requirementId} not found`);
         return false;
       }
       
-      // Make API call to generate response
-      const response = await fetch('/api/generate-response', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          requirement: requirement.requirement,
-          provider: modelProvider,
-          requirementId: requirementId.toString(),
-          rfpName: requirement.rfpName,
-          uploadedBy: requirement.uploadedBy,
-          skipSimilaritySearch: true  // Use existing similar questions instead of finding them again
-        }),
-      });
+      // Make API call to generate response with timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60-second timeout for LLM calls
       
-      if (!response.ok) {
-        throw new Error(`API returned ${response.status} ${response.statusText}`);
+      try {
+        const response = await fetch('/api/generate-response', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          signal: controller.signal,
+          body: JSON.stringify({
+            requirement: requirement.requirement,
+            provider: modelProvider,
+            requirementId: requirementId.toString(),
+            rfpName: requirement.rfpName,
+            uploadedBy: requirement.uploadedBy,
+            skipSimilaritySearch: true  // Use existing similar questions instead of finding them again
+          }),
+        });
+        
+        clearTimeout(timeoutId);
+        
+        if (!response.ok) {
+          throw new Error(`API returned ${response.status} ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        
+        if (data.error) {
+          throw new Error(data.error);
+        }
+        
+        return true;
+      } catch (err) {
+        // Handle abort error specifically
+        if (err instanceof Error && err.name === 'AbortError') {
+          console.error(`Request timeout for requirement ${requirementId}`);
+          throw new Error(`Request timed out after 60 seconds`);
+        }
+        throw err; // Re-throw for other errors to be caught by outer catch
       }
-      
-      const data = await response.json();
-      
-      if (data.error) {
-        throw new Error(data.error);
-      }
-      
-      console.log(`Response generated for requirement ID ${requirementId} with ${modelProvider}`);
-      return true;
     } catch (error) {
       console.error(`Error generating response for requirement ${requirementId}:`, error);
       // Error is logged but not stored in state anymore
@@ -855,8 +924,17 @@ export default function ViewData() {
     }
   };
   
-  // Function to handle bulk generation of responses
+  // Optimized function to handle bulk generation of responses
   const handleGenerateResponses = async (modelProvider: 'openai' | 'anthropic' | 'deepseek' | 'moa') => {
+    if (selectedItems.length === 0) {
+      toast({
+        title: "No Items Selected",
+        description: "Please select at least one requirement to generate responses",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     setProcessingItems(selectedItems);
     setIsGenerating(true);
     
@@ -878,35 +956,72 @@ export default function ViewData() {
         description: `Processing ${totalItems} requirements with ${modelProvider}...`,
       });
       
-      // Process items sequentially to avoid overloading the API
-      for (let i = 0; i < selectedItems.length; i++) {
-        const requirementId = selectedItems[i];
-        const requirement = excelData.find(item => item.id === requirementId);
+      // For LLM requests, we want to be careful with concurrency to avoid rate limits
+      // So we'll process items in small batches with throttling
+      const BATCH_SIZE = modelProvider === 'moa' ? 1 : 2; // MOA makes 3 API calls, so use smaller batch size
+      
+      // Cache the requirements lookup for performance
+      const requirementsMap = new Map(
+        excelData
+          .filter(item => selectedItems.includes(item.id || 0))
+          .map(item => [item.id, item])
+      );
+      
+      // Process items in small concurrent batches
+      for (let i = 0; i < selectedItems.length; i += BATCH_SIZE) {
+        const currentBatch = selectedItems.slice(i, i + BATCH_SIZE);
         
-        const reqText = requirement?.requirement || "";
-        console.log(`Processing item ${i+1}/${totalItems}: ${reqText.substring(0, 50)}...`);
-        
-        // Add this item to the individual processing indicators
-        setProcessingIndividualItems(prev => ({
-          ...prev,
-          [requirementId]: { 
-            stage: `Generating (${i+1}/${totalItems})`, 
-            model: modelProvider 
+        // Process this batch with limited concurrency
+        const batchPromises = currentBatch.map(async (requirementId, batchIndex) => {
+          try {
+            // Stagger requests within batch by 200ms to reduce API load spikes
+            if (batchIndex > 0) {
+              await new Promise(resolve => setTimeout(resolve, batchIndex * 200));
+            }
+            
+            const requirement = requirementsMap.get(requirementId);
+            
+            if (!requirement) {
+              console.warn(`Requirement ID ${requirementId} not found in data cache`);
+              return false;
+            }
+            
+            const reqText = requirement.requirement || "";
+            const shortText = reqText.length > 50 ? reqText.substring(0, 50) + '...' : reqText;
+            
+            // Add this item to the individual processing indicators
+            setProcessingIndividualItems(prev => ({
+              ...prev,
+              [requirementId]: { 
+                stage: `Processing ${i + batchIndex + 1}/${totalItems}`, 
+                model: modelProvider 
+              }
+            }));
+            
+            // Generate response for this requirement
+            return await generateResponseForRequirement(requirementId, modelProvider);
+          } catch (error) {
+            console.error(`Error in batch processing for req ${requirementId}:`, error);
+            return false;
           }
-        }));
+        });
         
-        // Generate response for this requirement
-        const success = await generateResponseForRequirement(requirementId, modelProvider);
+        // Wait for the current batch to complete
+        const batchResults = await Promise.all(batchPromises);
         
-        if (success) {
-          successCount++;
-        }
+        // Count successes in this batch
+        successCount += batchResults.filter(Boolean).length;
         
-        // Update progress counter in the fixed-position bar only
+        // Update progress counter
         setBulkGenerationProgress(prev => ({
           ...prev,
-          completed: prev.completed + 1
+          completed: Math.min(prev.completed + currentBatch.length, prev.total)
         }));
+        
+        // Small delay between batches to avoid overloading the server
+        if (i + BATCH_SIZE < selectedItems.length) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
       }
       
       // Refresh data after all items are processed
