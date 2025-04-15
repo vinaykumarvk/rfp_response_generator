@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { format, formatDistanceToNow } from 'date-fns';
 import ReactMarkdown from 'react-markdown';
@@ -84,6 +84,19 @@ export default function ViewData() {
   const [isFeedbackSubmitting, setIsFeedbackSubmitting] = useState(false);
   const [isGeneratingResponse, setIsGeneratingResponse] = useState(false);
   
+  // Progress tracking
+  const [bulkFindingProgress, setBulkFindingProgress] = useState({
+    total: 0,
+    completed: 0,
+    isProcessing: false
+  });
+  
+  const [requirementsLoadingProgress, setRequirementsLoadingProgress] = useState({
+    total: 0,
+    loaded: 0,
+    isLoading: false
+  });
+  
   // Filters
   const [filters, setFilters] = useState({
     rfpName: 'all',
@@ -104,6 +117,34 @@ export default function ViewData() {
   const { data: excelData = [], isLoading: loading, refetch } = useQuery<ExcelRequirementResponse[]>({
     queryKey: ['/api/excel-requirements'],
   });
+  
+  // Set initial loading state
+  React.useEffect(() => {
+    // Initially set loading state to true when component mounts
+    setRequirementsLoadingProgress({
+      total: 0,
+      loaded: 0,
+      isLoading: true
+    });
+  }, []);
+  
+  // Update loading indicator for requirements when loading state changes
+  React.useEffect(() => {
+    if (loading) {
+      // Set loading state when starting to load
+      setRequirementsLoadingProgress(prev => ({
+        ...prev,
+        isLoading: true
+      }));
+    } else if (excelData.length > 0) {
+      // Update requirements loading progress when data arrives
+      setRequirementsLoadingProgress({
+        total: excelData.length,
+        loaded: excelData.length,
+        isLoading: false
+      });
+    }
+  }, [loading, excelData.length]);
   
   // Extract unique RFP names and categories
   const uniqueRfpNames = useMemo(() => {
@@ -249,11 +290,6 @@ export default function ViewData() {
   // Function to find similar matches for a single requirement
   const [isFindingSimilar, setIsFindingSimilar] = useState(false);
   const [similarMatches, setSimilarMatches] = useState<any[]>([]);
-  const [bulkFindingProgress, setBulkFindingProgress] = useState({
-    total: 0,
-    completed: 0,
-    isProcessing: false
-  });
   
   const handleFindSimilarMatches = async (requirementId: number) => {
     if (!requirementId) return;
@@ -1078,6 +1114,38 @@ export default function ViewData() {
   
   return (
     <div className="space-y-4">
+      {/* Progress bar for requirements loading */}
+      {requirementsLoadingProgress.isLoading && (
+        <div className="fixed top-0 left-0 right-0 z-50 bg-white dark:bg-slate-800 p-3 shadow-md">
+          <div className="max-w-7xl mx-auto">
+            <div className="flex items-center gap-3 mb-2">
+              <Loader2 className="animate-spin h-5 w-5 text-primary" />
+              <p className="font-medium text-sm">
+                Loading requirements data {requirementsLoadingProgress.loaded > 0 ? 
+                  `(${requirementsLoadingProgress.loaded} items)` : '...'}
+              </p>
+            </div>
+            <Progress value={loading ? 30 : 100} className="h-2" />
+          </div>
+        </div>
+      )}
+      
+      {/* Progress bar for bulk operations */}
+      {bulkFindingProgress.isProcessing && (
+        <div className="fixed top-0 left-0 right-0 z-50 bg-white dark:bg-slate-800 p-3 shadow-md">
+          <div className="max-w-7xl mx-auto">
+            <div className="flex items-center gap-3 mb-2">
+              <Loader2 className="animate-spin h-5 w-5 text-primary" />
+              <p className="font-medium text-sm">
+                Fetching similar responses for {bulkFindingProgress.completed}/{bulkFindingProgress.total} requirements
+              </p>
+            </div>
+            <Progress value={(bulkFindingProgress.completed / bulkFindingProgress.total) * 100} 
+              className="h-2" />
+          </div>
+        </div>
+      )}
+      
       {/* Sticky header with all controls */}
       <div className="sticky top-0 z-20 bg-slate-50 dark:bg-slate-900 py-3 px-4 -mx-4 sm:-mx-6 md:-mx-8 lg:-mx-10 shadow-md">
         <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
