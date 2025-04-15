@@ -1,0 +1,3 @@
+-- Run this script to restore the similar_questions table if needed
+-- Created on Tue 15 Apr 2025 01:41:25 PM UTC
+-- Example usage: psql $DATABASE_URL -f restore_similar_questions.sql
