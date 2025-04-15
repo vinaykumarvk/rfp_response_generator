@@ -1922,9 +1922,11 @@ export default function ViewData() {
                   >
                     <BookOpen className="h-4 w-4" />
                     References
-                    <Badge variant="secondary" className="ml-1">
-                      {referenceCount}
-                    </Badge>
+                    {referenceCount > 0 && (
+                      <Badge variant="secondary" className="ml-1">
+                        {referenceCount}
+                      </Badge>
+                    )}
                   </TabsTrigger>
                 </TabsList>
                 
