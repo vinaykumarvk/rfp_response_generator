@@ -1632,71 +1632,7 @@ export default function ViewData() {
             </div>
           )}
 
-          {/* Progress indicator for generation */}
-          {isGenerating && (
-            <div className="sticky top-[120px] z-10 p-4 border-b border-slate-100 dark:border-slate-700 bg-white/95 dark:bg-slate-900/95 backdrop-blur-sm">
-              <div className="space-y-4">
-                {/* Stage and Progress Percentage */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center">
-                    <Sparkles className="h-4 w-4 text-blue-500 mr-2" />
-                    <span className="font-medium text-sm">
-                      {processingItems.length > 1 
-                        ? `Generating responses (${processedCount}/${processingItems.length})` 
-                        : generationStage
-                      }
-                    </span>
-                  </div>
-                  <span className="text-xs font-medium text-slate-500">
-                    {processingItems.length > 1 
-                      ? `${Math.round((processedCount / processingItems.length) * 100)}%` 
-                      : generationStage === "Process Completed" ? "100%" : "In progress..."
-                    }
-                  </span>
-                </div>
-                
-                {/* Visual Progress Bar */}
-                <div className="relative h-3 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-700">
-                  <div 
-                    className="h-full w-full flex-1 bg-gradient-to-r from-primary to-primary/70 animate-pulse transition-all duration-500 ease-in-out" 
-                    style={{ 
-                      transform: `translateX(-${100 - (processingItems.length > 1 
-                        ? (processedCount / processingItems.length) * 100 
-                        : generationStage === "Process Completed" ? 100 : getProgressValueByStage(generationStage))}%)` 
-                    }}
-                  />
-                </div>
-                
-                {/* Current Stage Info */}
-                <div className="text-xs text-slate-500 dark:text-slate-400 mt-1 flex items-center justify-between">
-                  <span>{generationStage}</span>
-                  {processingItems.length > 1 && processedCount > 0 && (
-                    <span className="text-xs font-medium text-primary">
-                      Item {processedCount} of {processingItems.length}
-                    </span>
-                  )}
-                </div>
-                
-                {/* Current Processing Item */}
-                {currentItemText && (
-                  <div className="mt-2 text-xs border-l-2 border-primary pl-2 py-1 bg-blue-50 dark:bg-blue-900/30 rounded shadow-sm">
-                    <div className="font-medium mb-1 text-primary flex items-center">
-                      <FileText className="h-3 w-3 mr-1" />
-                      <span>Current requirement:</span>
-                    </div>
-                    <div className="line-clamp-2 text-slate-700 dark:text-slate-200 font-medium">{currentItemText}</div>
-                  </div>
-                )}
-                
-                {/* Error display */}
-                {generationError && (
-                  <div className="text-xs text-red-500 mt-1">
-                    Error: {generationError}
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
+          {/* Progress indicator now replaced by fixed-position bar at the top of the screen */}
           
           <CardContent className="p-4 max-h-[calc(100vh-200px)] overflow-y-auto">
             
