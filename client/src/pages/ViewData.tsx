@@ -13,6 +13,12 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import CategoryGroup from '@/components/CategoryGroup';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import { HelpTooltip } from '@/components/HelpTooltip';
 import { 
   MessageSquare, 
@@ -1356,7 +1362,7 @@ export default function ViewData() {
       
       <div className="relative">
         <Card className="shadow-sm">
-          {/* Filters panel - making it stick to top under the main header */}
+          {/* Filters panel - optimized for mobile with collapsible sections */}
           {showFilters && (
             <div className="sticky top-[60px] z-10 border-b border-slate-200 dark:border-slate-700">
               <div className="p-3 bg-white/95 dark:bg-slate-900/95 backdrop-blur-sm">
@@ -1409,91 +1415,242 @@ export default function ViewData() {
                     </DropdownMenu>
                   </div>
                   
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                      <div className="flex items-center gap-2">
-                        <Label htmlFor="filter-rfp" className="text-sm">RFP Name</Label>
-                        <HelpTooltip text="Filter requirements by their source RFP document name. Choose 'All RFPs' to see requirements across all documents." />
-                      </div>
-                      <Select
-                        value={filters.rfpName}
-                        onValueChange={(value) => setFilters({...filters, rfpName: value})}
-                      >
-                        <SelectTrigger id="filter-rfp" className="w-full">
-                          <SelectValue placeholder="Select RFP name" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">All RFPs</SelectItem>
-                          {uniqueRfpNames.filter(name => name).map(name => (
-                            <SelectItem key={name} value={name}>{name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                  {/* Mobile-friendly accordion for filters */}
+                  {isMobile ? (
+                    <div className="rounded-md border border-slate-200 dark:border-slate-700 overflow-hidden">
+                      {/* RFP Name Accordion */}
+                      <Accordion type="single" collapsible className="w-full">
+                        <AccordionItem value="rfp-name" className="border-0 border-b">
+                          <AccordionTrigger className="px-3 py-2 hover:no-underline hover:bg-slate-50 dark:hover:bg-slate-800">
+                            <div className="flex items-center gap-2">
+                              <FileText className="h-4 w-4 text-slate-500" />
+                              <span className="text-sm font-medium">RFP Name</span>
+                              {filters.rfpName !== 'all' && (
+                                <Badge variant="outline" className="ml-2 text-[10px]">
+                                  {filters.rfpName}
+                                </Badge>
+                              )}
+                            </div>
+                          </AccordionTrigger>
+                          <AccordionContent className="px-3 py-2">
+                            <div className="space-y-1">
+                              <Label className="text-xs text-slate-500 dark:text-slate-400">
+                                Select RFP
+                              </Label>
+                              <Select
+                                value={filters.rfpName}
+                                onValueChange={(value) => setFilters({...filters, rfpName: value})}
+                              >
+                                <SelectTrigger className="h-8 text-xs">
+                                  <SelectValue placeholder="Select RFP" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="all">All RFPs</SelectItem>
+                                  {uniqueRfpNames.filter(name => name).map(name => (
+                                    <SelectItem key={name} value={name}>{name}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </AccordionContent>
+                        </AccordionItem>
+                        
+                        {/* Category Accordion */}
+                        <AccordionItem value="category" className="border-0 border-b">
+                          <AccordionTrigger className="px-3 py-2 hover:no-underline hover:bg-slate-50 dark:hover:bg-slate-800">
+                            <div className="flex items-center gap-2">
+                              <Tag className="h-4 w-4 text-slate-500" />
+                              <span className="text-sm font-medium">Category</span>
+                              {filters.category !== 'all' && (
+                                <Badge variant="outline" className="ml-2 text-[10px]">
+                                  {filters.category}
+                                </Badge>
+                              )}
+                            </div>
+                          </AccordionTrigger>
+                          <AccordionContent className="px-3 py-2">
+                            <div className="space-y-1">
+                              <Label className="text-xs text-slate-500 dark:text-slate-400">
+                                Select Category
+                              </Label>
+                              <Select
+                                value={filters.category}
+                                onValueChange={(value) => setFilters({...filters, category: value})}
+                              >
+                                <SelectTrigger className="h-8 text-xs">
+                                  <SelectValue placeholder="Select Category" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="all">All Categories</SelectItem>
+                                  {uniqueCategories.filter(category => category).map(category => (
+                                    <SelectItem key={category} value={category}>{category}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </AccordionContent>
+                        </AccordionItem>
+                        
+                        {/* Response Status Accordion */}
+                        <AccordionItem value="response-status" className="border-0 border-b">
+                          <AccordionTrigger className="px-3 py-2 hover:no-underline hover:bg-slate-50 dark:hover:bg-slate-800">
+                            <div className="flex items-center gap-2">
+                              <MessageSquare className="h-4 w-4 text-slate-500" />
+                              <span className="text-sm font-medium">Response Status</span>
+                              {filters.hasResponse !== 'all' && (
+                                <Badge variant="outline" className="ml-2 text-[10px]">
+                                  {filters.hasResponse === 'yes' ? 'Has Response' : 'No Response'}
+                                </Badge>
+                              )}
+                            </div>
+                          </AccordionTrigger>
+                          <AccordionContent className="px-3 py-2">
+                            <div className="space-y-1">
+                              <Label className="text-xs text-slate-500 dark:text-slate-400">
+                                Filter by Status
+                              </Label>
+                              <Select
+                                value={filters.hasResponse}
+                                onValueChange={(value) => setFilters({...filters, hasResponse: value})}
+                              >
+                                <SelectTrigger className="h-8 text-xs">
+                                  <SelectValue placeholder="Filter by Status" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="all">All Requirements</SelectItem>
+                                  <SelectItem value="yes">Has Response</SelectItem>
+                                  <SelectItem value="no">No Response</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </AccordionContent>
+                        </AccordionItem>
+                        
+                        {/* Model Provider Accordion */}
+                        <AccordionItem value="model-provider" className="border-0">
+                          <AccordionTrigger className="px-3 py-2 hover:no-underline hover:bg-slate-50 dark:hover:bg-slate-800">
+                            <div className="flex items-center gap-2">
+                              <Sparkles className="h-4 w-4 text-slate-500" />
+                              <span className="text-sm font-medium">Model Provider</span>
+                              {filters.generationMode !== 'all' && (
+                                <Badge variant="outline" className="ml-2 text-[10px]">
+                                  {filters.generationMode}
+                                </Badge>
+                              )}
+                            </div>
+                          </AccordionTrigger>
+                          <AccordionContent className="px-3 py-2">
+                            <div className="space-y-1">
+                              <Label className="text-xs text-slate-500 dark:text-slate-400">
+                                Filter by Model
+                              </Label>
+                              <Select
+                                value={filters.generationMode}
+                                onValueChange={(value) => setFilters({...filters, generationMode: value})}
+                              >
+                                <SelectTrigger className="h-8 text-xs">
+                                  <SelectValue placeholder="Filter by Model" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="all">All Models</SelectItem>
+                                  <SelectItem value="openai">OpenAI</SelectItem>
+                                  <SelectItem value="anthropic">Anthropic</SelectItem>
+                                  <SelectItem value="deepseek">Deepseek</SelectItem>
+                                  <SelectItem value="moa">MOA</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </AccordionContent>
+                        </AccordionItem>
+                      </Accordion>
                     </div>
-                    
-                    <div className="space-y-1.5">
-                      <div className="flex items-center gap-2">
-                        <Label htmlFor="filter-category" className="text-sm">Category</Label>
-                        <HelpTooltip text="Filter by functional category (e.g., Technical, Reporting, Security). Categories are taken directly from the uploaded Excel file." />
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <div className="flex items-center gap-2">
+                          <Label htmlFor="filter-rfp" className="text-sm">RFP Name</Label>
+                          <HelpTooltip text="Filter requirements by their source RFP document name. Choose 'All RFPs' to see requirements across all documents." />
+                        </div>
+                        <Select
+                          value={filters.rfpName}
+                          onValueChange={(value) => setFilters({...filters, rfpName: value})}
+                        >
+                          <SelectTrigger id="filter-rfp" className="w-full">
+                            <SelectValue placeholder="Select RFP name" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">All RFPs</SelectItem>
+                            {uniqueRfpNames.filter(name => name).map(name => (
+                              <SelectItem key={name} value={name}>{name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
-                      <Select
-                        value={filters.category}
-                        onValueChange={(value) => setFilters({...filters, category: value})}
-                      >
-                        <SelectTrigger id="filter-category" className="w-full">
-                          <SelectValue placeholder="Select category" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">All Categories</SelectItem>
-                          {uniqueCategories.filter(category => category).map(category => (
-                            <SelectItem key={category} value={category}>{category}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    
-                    <div className="space-y-1.5">
-                      <div className="flex items-center gap-2">
-                        <Label htmlFor="filter-response" className="text-sm">Response Status</Label>
-                        <HelpTooltip text="Filter to see only requirements that already have AI-generated responses or only those still needing responses." />
+                      
+                      <div className="space-y-1.5">
+                        <div className="flex items-center gap-2">
+                          <Label htmlFor="filter-category" className="text-sm">Category</Label>
+                          <HelpTooltip text="Filter by functional category (e.g., Technical, Reporting, Security). Categories are taken directly from the uploaded Excel file." />
+                        </div>
+                        <Select
+                          value={filters.category}
+                          onValueChange={(value) => setFilters({...filters, category: value})}
+                        >
+                          <SelectTrigger id="filter-category" className="w-full">
+                            <SelectValue placeholder="Select category" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">All Categories</SelectItem>
+                            {uniqueCategories.filter(category => category).map(category => (
+                              <SelectItem key={category} value={category}>{category}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
-                      <Select
-                        value={filters.hasResponse}
-                        onValueChange={(value) => setFilters({...filters, hasResponse: value})}
-                      >
-                        <SelectTrigger id="filter-response" className="w-full">
-                          <SelectValue placeholder="Response Status" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">All Statuses</SelectItem>
-                          <SelectItem value="yes">Has Response</SelectItem>
-                          <SelectItem value="no">No Response</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    
-                    <div className="space-y-1.5">
-                      <div className="flex items-center gap-2">
-                        <Label htmlFor="filter-model" className="text-sm">AI Model</Label>
-                        <HelpTooltip text="Filter to see only responses generated by a specific AI model. MOA combines all three models for the most comprehensive answers." />
+                      
+                      <div className="space-y-1.5">
+                        <div className="flex items-center gap-2">
+                          <Label htmlFor="filter-response" className="text-sm">Response Status</Label>
+                          <HelpTooltip text="Filter to see only requirements that already have AI-generated responses or only those still needing responses." />
+                        </div>
+                        <Select
+                          value={filters.hasResponse}
+                          onValueChange={(value) => setFilters({...filters, hasResponse: value})}
+                        >
+                          <SelectTrigger id="filter-response" className="w-full">
+                            <SelectValue placeholder="Response Status" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">All Statuses</SelectItem>
+                            <SelectItem value="yes">Has Response</SelectItem>
+                            <SelectItem value="no">No Response</SelectItem>
+                          </SelectContent>
+                        </Select>
                       </div>
-                      <Select
-                        value={filters.generationMode}
-                        onValueChange={(value) => setFilters({...filters, generationMode: value})}
-                      >
-                        <SelectTrigger id="filter-model" className="w-full">
-                          <SelectValue placeholder="Generation Model" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">All Models</SelectItem>
-                          <SelectItem value="openai">OpenAI</SelectItem>
-                          <SelectItem value="anthropic">Anthropic</SelectItem>
-                          <SelectItem value="deepseek">Deepseek</SelectItem>
-                          <SelectItem value="moa">MOA</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      
+                      <div className="space-y-1.5">
+                        <div className="flex items-center gap-2">
+                          <Label htmlFor="filter-model" className="text-sm">AI Model</Label>
+                          <HelpTooltip text="Filter to see only responses generated by a specific AI model. MOA combines all three models for the most comprehensive answers." />
+                        </div>
+                        <Select
+                          value={filters.generationMode}
+                          onValueChange={(value) => setFilters({...filters, generationMode: value})}
+                        >
+                          <SelectTrigger id="filter-model" className="w-full">
+                            <SelectValue placeholder="Generation Model" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">All Models</SelectItem>
+                            <SelectItem value="openai">OpenAI</SelectItem>
+                            <SelectItem value="anthropic">Anthropic</SelectItem>
+                            <SelectItem value="deepseek">Deepseek</SelectItem>
+                            <SelectItem value="moa">MOA</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </div>
-                  </div>
+                  )}
                   
                   <div className="flex justify-between pt-2">
                     <Button 
@@ -1834,6 +1991,50 @@ export default function ViewData() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Floating Action Button for Mobile */}
+      {isMobile && (
+        <div className="fixed bottom-6 right-6 flex flex-col gap-2">
+          {/* Refresh Button */}
+          <Button 
+            className="h-12 w-12 rounded-full shadow-lg flex items-center justify-center bg-primary hover:bg-primary/90"
+            onClick={handleRefresh}
+            title="Refresh Data"
+          >
+            <RefreshCcw className="h-5 w-5 text-white" />
+          </Button>
+
+          {/* Filter Toggle Button */}
+          <Button 
+            className={`h-12 w-12 rounded-full shadow-lg flex items-center justify-center ${
+              showFilters || areFiltersActive
+                ? 'bg-blue-500 hover:bg-blue-600'
+                : 'bg-slate-700 hover:bg-slate-800'
+            }`}
+            onClick={() => setShowFilters(!showFilters)}
+            title={showFilters ? "Hide Filters" : "Show Filters"}
+          >
+            <Filter className="h-5 w-5 text-white" />
+            {areFiltersActive && (
+              <span className="absolute -top-1 -right-1 h-4 w-4 bg-red-500 rounded-full border-2 border-white"></span>
+            )}
+          </Button>
+
+          {/* Bulk Actions Button - Only show when items are selected */}
+          {selectedItems.length > 0 && (
+            <Button 
+              className="h-12 w-12 rounded-full shadow-lg flex items-center justify-center bg-green-500 hover:bg-green-600"
+              onClick={() => handleBulkAction('generate-moa')}
+              title="Generate MOA for Selected"
+            >
+              <Sparkles className="h-5 w-5 text-white" />
+              <Badge className="absolute -top-1 -right-1 h-5 bg-white text-green-600 rounded-full">
+                {selectedItems.length}
+              </Badge>
+            </Button>
+          )}
+        </div>
+      )}
     </div>
   );
 }
