@@ -628,11 +628,11 @@ export const generateExcelFile = (items: ExcelRequirementResponse[]): XLSX.WorkB
   // Create worksheet
   const worksheet = XLSX.utils.json_to_sheet(simplifiedData);
   
-  // Set column widths as per requirements
+  // Set column widths as per updated requirements
   const colWidths = [
-    { wch: 20 },  // Category - 20 characters
-    { wch: 50 },  // Requirement - 50 characters
-    { wch: 150 }  // Final Response - 150 characters
+    { wch: 15 },  // Category - 15 characters (updated from 20)
+    { wch: 30 },  // Requirement - 30 characters (updated from 50)
+    { wch: 100 }  // Final Response - 100 characters (updated from 150)
   ];
   worksheet['!cols'] = colWidths;
   
