@@ -727,10 +727,7 @@ export default function ViewData() {
   // Function to handle bulk generation of responses
   const handleGenerateResponses = async (modelProvider: 'openai' | 'anthropic' | 'deepseek' | 'moa') => {
     setProcessingItems(selectedItems);
-    setProcessedCount(0);
     setIsGenerating(true);
-    setGenerationError(null);
-    setGenerationStage("Initializing batch processing");
     
     // Initialize bulk generation progress
     setBulkGenerationProgress({
@@ -755,13 +752,8 @@ export default function ViewData() {
         const requirementId = selectedItems[i];
         const requirement = excelData.find(item => item.id === requirementId);
         
-        // Set the current requirement text for display
         const reqText = requirement?.requirement || "";
-        setCurrentItemText(reqText);
         console.log(`Processing item ${i+1}/${totalItems}: ${reqText.substring(0, 50)}...`);
-        
-        // Update stage with the current item number and total
-        setGenerationStage(`Processing item ${i+1} of ${totalItems}`);
         
         // Add this item to the individual processing indicators
         setProcessingIndividualItems(prev => ({
@@ -779,19 +771,12 @@ export default function ViewData() {
           successCount++;
         }
         
-        // Update progress counters
-        setProcessedCount(i + 1);
+        // Update progress counter in the fixed-position bar only
         setBulkGenerationProgress(prev => ({
           ...prev,
           completed: prev.completed + 1
         }));
       }
-      
-      // Set final stage
-      setGenerationStage("Batch processing completed");
-      
-      // Clear the current requirement text
-      setCurrentItemText("");
       
       // Refresh data after all items are processed
       await refetch();
@@ -803,8 +788,6 @@ export default function ViewData() {
       });
     } catch (error) {
       console.error('Error in bulk generation:', error);
-      setGenerationError(error instanceof Error ? error.message : String(error));
-      setGenerationStage("Error occurred during processing");
       
       toast({
         title: "Generation Error",
