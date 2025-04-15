@@ -1809,7 +1809,7 @@ export default function ViewData() {
                       })}
                       className="flex items-center gap-1"
                     >
-                      <X className="h-4 w-4" />
+                      <CloseIcon className="h-4 w-4" />
                       Reset Filters
                     </Button>
                     
@@ -2120,7 +2120,7 @@ export default function ViewData() {
                               onClick={handleCancelEdit}
                               disabled={isSavingEdit}
                             >
-                              <X className="h-3.5 w-3.5" />
+                              <CloseIcon className="h-3.5 w-3.5" />
                               Cancel
                             </Button>
                             <Button 
