@@ -3,30 +3,12 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations } from "drizzle-orm";
 
-export const users = pgTable("users", {
-  id: serial("id").primaryKey(),
-  username: text("username").notNull().unique(),
-  password: text("password").notNull(),
-});
-
-export const rfpResponses = pgTable("rfp_responses", {
-  id: serial("id").primaryKey(),
-  clientName: text("client_name").notNull(),
-  clientIndustry: text("client_industry").notNull(),
-  rfpTitle: text("rfp_title").notNull(),
-  rfpId: text("rfp_id"),
-  submissionDate: date("submission_date").notNull(),
-  budgetRange: text("budget_range"),
-  projectSummary: text("project_summary").notNull(),
-  companyName: text("company_name").notNull(),
-  pointOfContact: text("point_of_contact").notNull(),
-  companyStrengths: text("company_strengths"),
-  selectedTemplate: text("selected_template").notNull(),
-  customizations: text("customizations"),
-  generatedContent: text("generated_content"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  lastUpdated: timestamp("last_updated").defaultNow().notNull(),
-});
+// Note: The following tables were removed as they're not being used:
+// - users
+// - rfp_responses
+// - similar_questions
+// - excel_requirements
+// Reference to the original schema can be found in database_backups.
 
 export const excelRequirementResponses = pgTable("excel_requirement_responses", {
   id: serial("id").primaryKey(),
@@ -83,17 +65,6 @@ export const referenceResponsesRelations = relations(referenceResponses, ({ one 
 }));
 
 // Insert schemas
-export const insertUserSchema = createInsertSchema(users).pick({
-  username: true,
-  password: true,
-});
-
-export const insertRfpResponseSchema = createInsertSchema(rfpResponses).omit({
-  id: true,
-  createdAt: true,
-  lastUpdated: true,
-});
-
 export const insertExcelRequirementResponseSchema = createInsertSchema(excelRequirementResponses).omit({
   id: true,
   timestamp: true,
@@ -105,12 +76,6 @@ export const insertReferenceResponseSchema = createInsertSchema(referenceRespons
 });
 
 // Types
-export type InsertUser = z.infer<typeof insertUserSchema>;
-export type User = typeof users.$inferSelect;
-
-export type InsertRfpResponse = z.infer<typeof insertRfpResponseSchema>;
-export type RfpResponse = typeof rfpResponses.$inferSelect;
-
 export type InsertExcelRequirementResponse = z.infer<typeof insertExcelRequirementResponseSchema>;
 export type ExcelRequirementResponse = typeof excelRequirementResponses.$inferSelect;
 

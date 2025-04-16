@@ -692,17 +692,61 @@ except Exception as e:
         return res.status(404).json({ message: "Requirement not found" });
       }
       
-      if (requirement.similarQuestions && Array.isArray(requirement.similarQuestions)) {
-        console.log(`Found ${requirement.similarQuestions.length} similar questions in database for requirement ${id}`);
-        
+      // Check if similarQuestions exists and parse it if it's a string
+      let similarQuestionsList = [];
+      
+      if (requirement.similarQuestions) {
+        try {
+          // If it's a string (from database), parse it
+          if (typeof requirement.similarQuestions === 'string') {
+            try {
+              // Debug logging to help understand the issue
+              const firstChars = requirement.similarQuestions.substring(0, 20);
+              console.log(`Debug - Similar questions for ${id} starts with: ${firstChars}`);
+              
+              // Remove any BOM or invalid characters at the start of the JSON string
+              let cleanedJson = requirement.similarQuestions.trim();
+              if (cleanedJson.startsWith('\uFEFF')) {
+                cleanedJson = cleanedJson.substring(1);
+              }
+              // Handle malformed JSON that might have an extra [ at the beginning
+              if (cleanedJson.startsWith('[[') && cleanedJson.endsWith(']]')) {
+                cleanedJson = cleanedJson.substring(1, cleanedJson.length - 1);
+              }
+              
+              similarQuestionsList = JSON.parse(cleanedJson);
+            } catch (innerError) {
+              console.error(`JSON parsing failed for requirement ${id}, error:`, innerError);
+              console.error(`First 50 chars of problematic JSON: "${requirement.similarQuestions.substring(0, 50)}"`);
+              similarQuestionsList = [];
+            }
+          } 
+          // If it's already an array, use it directly
+          else if (Array.isArray(requirement.similarQuestions)) {
+            similarQuestionsList = requirement.similarQuestions;
+          }
+          
+          if (Array.isArray(similarQuestionsList) && similarQuestionsList.length > 0) {
+            console.log(`Found ${similarQuestionsList.length} similar questions in database for requirement ${id}`);
+          } else {
+            console.log(`No valid similar questions found for requirement ${id}`);
+            similarQuestionsList = [];
+          }
+        } catch (parseError) {
+          console.error(`Error processing similarQuestions for requirement ${id}:`, parseError);
+          similarQuestionsList = [];
+        }
+      }
+      
+      if (similarQuestionsList.length > 0) {
         // Format the similar questions data to match the Reference interface expected by the frontend
-        const references = requirement.similarQuestions.map((item: any, index: number) => ({
+        const references = similarQuestionsList.map((item: any, index: number) => ({
           id: index + 1,
           responseId: id,
           category: item.category || 'Unknown',
-          requirement: item.requirement || '',
+          requirement: item.question || item.requirement || '',
           response: item.response || '',
-          reference: item.id ? `#${item.id}` : undefined,
+          reference: item.reference || (item.id ? `#${item.id}` : undefined),
           score: item.similarity_score || 0
         }));
         
@@ -812,6 +856,20 @@ except Exception as e:
         return res.status(400).json({ message: 'Requirement ID is required' });
       }
       
+      // Import the API key validation utility
+      const { isApiKeyAvailable, getMissingApiKeyMessage } = require('./apiKeyUtils');
+      
+      // Check if the API key for the requested model is available
+      if (!isApiKeyAvailable(model)) {
+        const errorMessage = getMissingApiKeyMessage(model);
+        console.error(`API key missing error: ${errorMessage}`);
+        return res.status(400).json({
+          success: false,
+          message: 'API key not available',
+          error: errorMessage
+        });
+      }
+      
       console.log(`Generating LLM response for requirement ID ${requirementId} using model ${model}`);
       
       // Call Python script to generate LLM response
@@ -907,12 +965,12 @@ except Exception as e:
   });
   
   app.get('/api/validate-keys', async (_req: Request, res: Response) => {
+    // Import the API key validation utility
+    const { validateApiKeys, getModelAvailability } = require('./apiKeyUtils');
+    
     // Check if we have the necessary API keys in the environment
-    const apiKeys = {
-      openai: process.env.OPENAI_API_KEY ? true : false,
-      anthropic: process.env.ANTHROPIC_API_KEY ? true : false,
-      deepseek: process.env.DEEPSEEK_API_KEY ? true : false
-    };
+    const apiKeys = validateApiKeys();
+    const modelAvailability = getModelAvailability();
     
     // Check if the database is available
     let databaseAvailable = false;

@@ -900,6 +900,22 @@ export default function ViewData() {
       // Refresh the data
       await refetch();
       
+      // Fetch the updated response directly to ensure we have the latest data
+      if (selectedResponse && selectedResponse.id === requirementId) {
+        try {
+          const updatedResponseData = await fetch(`/api/excel-requirements/${requirementId}`);
+          if (updatedResponseData.ok) {
+            const updatedResponse = await updatedResponseData.json();
+            if (updatedResponse && updatedResponse.id === requirementId) {
+              // Update the selected response with the freshly fetched data
+              setSelectedResponse(updatedResponse);
+            }
+          }
+        } catch (fetchError) {
+          console.error('Error fetching updated response:', fetchError);
+        }
+      }
+      
       return true;
       
     } catch (error) {

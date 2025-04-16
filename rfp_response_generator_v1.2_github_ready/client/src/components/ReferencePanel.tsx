@@ -99,11 +99,24 @@ export default function ReferencePanel({ responseId, showTitle = true, onReferen
     setError(null);
     
     // Create abort controller for cleanup
-    const controller = new AbortController();
+    let controller: AbortController;
+    try {
+      controller = new AbortController();
+    } catch (err) {
+      // In case AbortController is not available in the environment
+      console.warn("AbortController not available:", err);
+      controller = { 
+        signal: { aborted: false } as AbortSignal,
+        abort: () => {} 
+      } as AbortController;
+    }
+    
     // Use a safer approach for the timeout
     const timeoutId = setTimeout(() => {
       try {
-        controller.abort();
+        if (controller && typeof controller.abort === 'function') {
+          controller.abort();
+        }
       } catch (err) {
         console.warn("Could not abort fetch operation:", err);
       }
@@ -142,7 +155,9 @@ export default function ReferencePanel({ responseId, showTitle = true, onReferen
       isMounted = false;
       clearTimeout(timeoutId);
       try {
-        controller.abort();
+        if (controller && typeof controller.abort === 'function') {
+          controller.abort();
+        }
       } catch (err) {
         console.warn("Could not abort fetch operation during cleanup:", err);
       }
