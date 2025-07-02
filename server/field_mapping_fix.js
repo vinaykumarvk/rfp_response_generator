@@ -41,68 +41,72 @@ export function mapPythonResponseToDbFields(pythonOutput, provider) {
     }
   });
   
-  // Default to generated_response for finalResponse if available
-  if (pythonOutput.generated_response) {
-    mappedFields.finalResponse = pythonOutput.generated_response;
-    console.log(`Found generated_response (${pythonOutput.generated_response.length} chars), using as finalResponse`);
+  // Check for finalResponse directly (Python returns camelCase)
+  if (pythonOutput.finalResponse) {
+    mappedFields.finalResponse = pythonOutput.finalResponse;
+    console.log(`Found finalResponse (${pythonOutput.finalResponse.length} chars), using as finalResponse`);
   }
   
-  // Map model-specific fields based on provider
-  if (provider === "openai" && pythonOutput.openai_response) {
-    mappedFields.openaiResponse = pythonOutput.openai_response;
-    console.log(`Found openai_response (${pythonOutput.openai_response.length} chars), mapped to openaiResponse`);
+  // Map model-specific fields based on provider (Python returns camelCase)
+  if (provider === "openai" && pythonOutput.openaiResponse) {
+    mappedFields.openaiResponse = pythonOutput.openaiResponse;
+    console.log(`Found openaiResponse (${pythonOutput.openaiResponse.length} chars), mapped to openaiResponse`);
     
     // For single-model response, also set as finalResponse if not already set
     if (!mappedFields.finalResponse) {
-      mappedFields.finalResponse = pythonOutput.openai_response;
-      console.log("Using openai_response as finalResponse");
+      mappedFields.finalResponse = pythonOutput.openaiResponse;
+      console.log("Using openaiResponse as finalResponse");
     }
   }
   
-  if (provider === "anthropic" && pythonOutput.anthropic_response) {
-    mappedFields.anthropicResponse = pythonOutput.anthropic_response;
-    console.log(`Found anthropic_response (${pythonOutput.anthropic_response.length} chars), mapped to anthropicResponse`);
+  if (provider === "anthropic" && pythonOutput.anthropicResponse) {
+    mappedFields.anthropicResponse = pythonOutput.anthropicResponse;
+    console.log(`Found anthropicResponse (${pythonOutput.anthropicResponse.length} chars), mapped to anthropicResponse`);
     
     // For single-model response, also set as finalResponse if not already set
     if (!mappedFields.finalResponse) {
-      mappedFields.finalResponse = pythonOutput.anthropic_response;
-      console.log("Using anthropic_response as finalResponse");
+      mappedFields.finalResponse = pythonOutput.anthropicResponse;
+      console.log("Using anthropicResponse as finalResponse");
     }
   }
   
-  if (provider === "deepseek" && pythonOutput.deepseek_response) {
-    mappedFields.deepseekResponse = pythonOutput.deepseek_response;
-    console.log(`Found deepseek_response (${pythonOutput.deepseek_response.length} chars), mapped to deepseekResponse`);
+  if (provider === "deepseek" && pythonOutput.deepseekResponse) {
+    mappedFields.deepseekResponse = pythonOutput.deepseekResponse;
+    console.log(`Found deepseekResponse (${pythonOutput.deepseekResponse.length} chars), mapped to deepseekResponse`);
     
     // For single-model response, also set as finalResponse if not already set
     if (!mappedFields.finalResponse) {
-      mappedFields.finalResponse = pythonOutput.deepseek_response;
-      console.log("Using deepseek_response as finalResponse");
+      mappedFields.finalResponse = pythonOutput.deepseekResponse;
+      console.log("Using deepseekResponse as finalResponse");
     }
   }
   
   if (provider === "moa") {
     // MOA might store individual model responses separately and also a combined version
     
-    // Individual model responses
-    if (pythonOutput.openai_response) {
-      mappedFields.openaiResponse = pythonOutput.openai_response;
-      console.log(`Found openai_response in MOA result (${pythonOutput.openai_response.length} chars)`);
+    // Individual model responses (Python returns camelCase)
+    if (pythonOutput.openaiResponse) {
+      mappedFields.openaiResponse = pythonOutput.openaiResponse;
+      console.log(`Found openaiResponse in MOA result (${pythonOutput.openaiResponse.length} chars)`);
     }
     
-    if (pythonOutput.anthropic_response) {
-      mappedFields.anthropicResponse = pythonOutput.anthropic_response;
-      console.log(`Found anthropic_response in MOA result (${pythonOutput.anthropic_response.length} chars)`);
+    if (pythonOutput.anthropicResponse) {
+      mappedFields.anthropicResponse = pythonOutput.anthropicResponse;
+      console.log(`Found anthropicResponse in MOA result (${pythonOutput.anthropicResponse.length} chars)`);
     }
     
-    // Combined MOA response
-    // Either use generated_response or create one from individual responses
-    if (pythonOutput.generated_response) {
-      mappedFields.moaResponse = pythonOutput.generated_response;
-      mappedFields.finalResponse = pythonOutput.generated_response;
-      console.log(`Using generated_response (${pythonOutput.generated_response.length} chars) as moaResponse and finalResponse`);
+    if (pythonOutput.deepseekResponse) {
+      mappedFields.deepseekResponse = pythonOutput.deepseekResponse;
+      console.log(`Found deepseekResponse in MOA result (${pythonOutput.deepseekResponse.length} chars)`);
+    }
+    
+    // Combined MOA response (Python returns camelCase)
+    if (pythonOutput.finalResponse) {
+      mappedFields.moaResponse = pythonOutput.finalResponse;
+      mappedFields.finalResponse = pythonOutput.finalResponse;
+      console.log(`Using finalResponse (${pythonOutput.finalResponse.length} chars) as moaResponse and finalResponse`);
     } else if (mappedFields.openaiResponse && mappedFields.anthropicResponse) {
-      // Combine responses if no generated_response is available
+      // Combine responses if no finalResponse is available
       const combinedResponse = `## Combined MOA Response\n\n### OpenAI:\n${mappedFields.openaiResponse}\n\n### Anthropic:\n${mappedFields.anthropicResponse}`;
       mappedFields.moaResponse = combinedResponse;
       mappedFields.finalResponse = combinedResponse;
