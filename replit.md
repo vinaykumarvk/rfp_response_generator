@@ -98,10 +98,28 @@ The RFP Response Generator is an advanced AI-powered application that leverages 
 - **Vector Search**: Efficient similarity matching with configurable parameters
 - **Batch Processing**: Support for bulk operations to handle large RFP sets
 
+## Recent Changes
+
+### July 02, 2025 - Anti-Hallucination Enhancement
+- **Enhanced Prompt Structure**: Added mandatory source attribution requirements to prevent LLM hallucination
+- **Source Citation Requirements**: All factual claims must now reference specific example numbers (e.g., "Example 1", "Example 2")
+- **Strict Sourcing Constraints**: Added multiple validation layers requiring content to be traceable to provided examples
+- **Hallucination Prevention**: Implemented comprehensive checks including SOURCE VALIDATION and HALLUCINATION CHECK in prompt validation
+- **Content Rules**: Enhanced with MANDATORY reference requirements and STRICT SOURCING constraints
+- **Output Requirements**: Added SOURCE ATTRIBUTION mandate for all factual claims
+
+### Key Anti-Hallucination Features Added:
+1. **Content Rules**: MANDATORY citation of specific example numbers for all claims
+2. **Critical Constraints**: STRICT SOURCING requirement - no content without example support  
+3. **Output Requirements**: SOURCE ATTRIBUTION with example format guidance
+4. **Instructions**: CRITICAL citation requirement in user instructions
+5. **Validation**: SOURCE VALIDATION and HALLUCINATION CHECK in response review
+
 ## Changelog
 
 ```
 Changelog:
+- July 02, 2025. Enhanced prompts with source attribution to prevent hallucination
 - July 02, 2025. Initial setup
 ```
 
