@@ -158,10 +158,12 @@ const CategoryGroup: React.FC<CategoryGroupProps> = ({
                         <Badge 
                           variant="outline" 
                           className={`text-[10px] sm:text-xs px-1.5 py-0 ${
-                            row.finalResponse ? getModelColorClasses(row.modelProvider) : "bg-slate-50 text-slate-700 dark:bg-slate-800 dark:text-slate-200 border-slate-200 dark:border-slate-700"
+                            (row.finalResponse || row.openaiResponse || row.anthropicResponse || row.deepseekResponse || row.moaResponse) ? 
+                            getModelColorClasses(row.modelProvider) : 
+                            "bg-slate-50 text-slate-700 dark:bg-slate-800 dark:text-slate-200 border-slate-200 dark:border-slate-700"
                           }`}
                         >
-                          {row.finalResponse ? (
+                          {(row.finalResponse || row.openaiResponse || row.anthropicResponse || row.deepseekResponse || row.moaResponse) ? (
                             <>
                               <Check className="h-3 w-3 mr-0.5" /> 
                               {row.modelProvider === 'openai' ? 'OpenAI' : 
@@ -186,17 +188,17 @@ const CategoryGroup: React.FC<CategoryGroupProps> = ({
                         <div className="flex items-center gap-2">
                           <Button
                             size="sm"
-                            variant={row.finalResponse ? "default" : "outline"}
-                            className={`h-7 px-2 gap-1 text-xs ${!row.finalResponse ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            variant={(row.finalResponse || row.openaiResponse || row.anthropicResponse || row.deepseekResponse || row.moaResponse) ? "default" : "outline"}
+                            className={`h-7 px-2 gap-1 text-xs ${!(row.finalResponse || row.openaiResponse || row.anthropicResponse || row.deepseekResponse || row.moaResponse) ? 'opacity-50 cursor-not-allowed' : ''}`}
                             onClick={(e) => {
                               e.stopPropagation();
-                              if (row.finalResponse) {
+                              if (row.finalResponse || row.openaiResponse || row.anthropicResponse || row.deepseekResponse || row.moaResponse) {
                                 setActiveTab('response');
                                 handleViewResponse(row);
                               }
                             }}
-                            disabled={!row.finalResponse}
-                            title={row.finalResponse ? "View response" : "No response available yet"}
+                            disabled={!(row.finalResponse || row.openaiResponse || row.anthropicResponse || row.deepseekResponse || row.moaResponse)}
+                            title={(row.finalResponse || row.openaiResponse || row.anthropicResponse || row.deepseekResponse || row.moaResponse) ? "View response" : "No response available yet"}
                           >
                             <MessageSquare className="h-3.5 w-3.5" />
                             <span>Response</span>

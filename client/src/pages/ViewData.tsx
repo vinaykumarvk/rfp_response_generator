@@ -95,6 +95,18 @@ export default function ViewData() {
   const [isFeedbackSubmitting, setIsFeedbackSubmitting] = useState(false);
   const [isGeneratingResponse, setIsGeneratingResponse] = useState(false);
   
+  // Helper function to check if any response exists
+  const hasAnyResponse = (response: ExcelRequirementResponse | null) => {
+    if (!response) return false;
+    return !!(response.finalResponse || response.openaiResponse || response.anthropicResponse || response.deepseekResponse || response.moaResponse);
+  };
+  
+  // Helper function to get the best available response text
+  const getBestResponse = (response: ExcelRequirementResponse | null) => {
+    if (!response) return null;
+    return response.finalResponse || response.openaiResponse || response.anthropicResponse || response.deepseekResponse || response.moaResponse || null;
+  };
+  
   // Requirements cache for performance optimization
   const requirementsCache = React.useRef<Map<number, ExcelRequirementResponse>>(new Map());
   
@@ -240,7 +252,7 @@ export default function ViewData() {
       
       // Filter by response status
       if (filters.hasResponse !== 'all') {
-        const hasResponse = !!row.finalResponse;
+        const hasResponse = !!(row.finalResponse || row.openaiResponse || row.anthropicResponse || row.deepseekResponse || row.moaResponse);
         if ((filters.hasResponse === 'yes' && !hasResponse) || (filters.hasResponse === 'no' && hasResponse)) {
           return false;
         }
