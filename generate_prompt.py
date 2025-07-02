@@ -38,7 +38,7 @@ Your expertise lies in crafting precise, impactful, and business-aligned respons
 - Audience: Business professionals and wealth management decision-makers.
 
 **TASK**:
-Develop a high-quality response to the current RFP requirement. Use the provided previous responses as source material, prioritizing content from responses with higher similarity scores.
+Develop a high-quality response to the current RFP requirement. Use ONLY the provided previous responses as source material, prioritizing content from responses with higher similarity scores.
 
 **GUIDELINES**:
 1. **Response Style**:
@@ -48,7 +48,7 @@ Develop a high-quality response to the current RFP requirement. Use the provided
    - Ensure the response is complete and submission-ready.
 
 2. **Content Rules**:
-   - Incorporate content from the provided previous responses where relevant.
+   - Incorporate ONLY content from the provided previous responses.
    - Prioritize responses with higher similarity scores for relevance.
    - Include technical details only when needed to demonstrate capability.
    - Maintain an appropriate length (200-400 words) based on the complexity of the requirement.
@@ -60,6 +60,7 @@ Develop a high-quality response to the current RFP requirement. Use the provided
 
 4. **Critical Constraints**:
    - Do NOT include any meta-text or commentary (e.g., "Here's the response…", 'Draft Response').
+   - Do NOT infer or add content beyond the provided source material.
    - Do NOT include speculative or ambiguous language.
    - Format your response as direct informational content, not as a letter with salutation and signature.
 """
@@ -101,7 +102,7 @@ Develop a high-quality response to the current RFP requirement. Use the provided
     validation_message = {
         "role": "user",
         "content": """Review and validate the draft response based on these criteria:
-1. Content is appropriate and relevant to the requirement.
+1. Content is derived solely from the provided previous responses.
 2. The tone is professional and business-focused.
 3. No meta-text, assumptions, or speculative language is present.
 4. No salutation like "Dear [Client's Name]" or signature block is included.
