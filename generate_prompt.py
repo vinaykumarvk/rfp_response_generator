@@ -33,7 +33,7 @@ Your expertise lies in crafting precise, impactful, and business-aligned respons
 
 **CONTEXT**:
 - Domain: Wealth Management Software.
-- Requirement Category: {category or 'Financial Technology'}.
+- Requirement Category: {category}.
 - Current Requirement: {requirement}.
 - Audience: Business professionals and wealth management decision-makers.
 
@@ -50,8 +50,8 @@ Develop a high-quality response to the current RFP requirement. Use ONLY the pro
 2. **Content Rules**:
    - Incorporate ONLY content from the provided previous responses.
    - Prioritize responses with higher similarity scores for relevance.
-   - Include technical details only when needed to demonstrate capability.
-   - Maintain an appropriate length (200-400 words) based on the complexity of the requirement.
+   - Include ARX security engine references ONLY for entitlement-driven access control questions.
+   - Maintain a word count of approximately 200 words.
 
 3. **Response Structure**:
    - **Opening Statement**: Highlight the most relevant feature or capability related to the requirement.
@@ -62,7 +62,10 @@ Develop a high-quality response to the current RFP requirement. Use ONLY the pro
    - Do NOT include any meta-text or commentary (e.g., "Here's the response…", 'Draft Response').
    - Do NOT infer or add content beyond the provided source material.
    - Do NOT include speculative or ambiguous language.
-   - Format your response as direct informational content, not as a letter with salutation and signature.
+
+**OUTPUT REQUIREMENTS**:
+- A concise response which can be directly put into RFP submission. Hence no commentary or meta text in the response.
+- Structured, clear, and self-contained.
 """
     }
     
@@ -87,14 +90,14 @@ Develop a high-quality response to the current RFP requirement. Use ONLY the pro
         "content": f"""You have the following previous responses with similarity scores to evaluate:
 
 **Previous Responses and Scores**:
-{formatted_examples or "No previous responses available. Create an original response based on your expertise."}
+{formatted_examples}
 
 **Instructions**:
 1. Analyze the responses, prioritizing those with higher scores for relevance.
 2. Draft a response that meets all guidelines and rules outlined in the system message.
 3. Ensure the response is clear, concise, and tailored to the given requirement.
 
-**Current Requirement**: {requirement}
+**Current Requirement**: {requirement}.
 """
     }
     
@@ -103,9 +106,9 @@ Develop a high-quality response to the current RFP requirement. Use ONLY the pro
         "role": "user",
         "content": """Review and validate the draft response based on these criteria:
 1. Content is derived solely from the provided previous responses.
-2. The tone is professional and business-focused.
-3. No meta-text, assumptions, or speculative language is present.
-4. No salutation like "Dear [Client's Name]" or signature block is included.
+2. The response is upto 200 words in length.
+3. The tone is professional and business-focused.
+4. No meta-text, assumptions, or speculative language is present.
 5. The response delivers a clear, specific value proposition for the requirement.
 
 If any criteria are unmet, revise the response accordingly."""
