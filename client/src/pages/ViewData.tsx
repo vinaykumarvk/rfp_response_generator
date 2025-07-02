@@ -2249,11 +2249,11 @@ export default function ViewData() {
                   <TabsTrigger 
                     value="response" 
                     className="flex items-center gap-2"
-                    disabled={!selectedResponse?.finalResponse}
+                    disabled={!hasAnyResponse(selectedResponse)}
                   >
                     <MessageSquare className="h-4 w-4" />
                     Response
-                    {!selectedResponse?.finalResponse && <span className="ml-1 text-xs opacity-60">(Not available)</span>}
+                    {!hasAnyResponse(selectedResponse) && <span className="ml-1 text-xs opacity-60">(Not available)</span>}
                   </TabsTrigger>
                   <TabsTrigger 
                     value="references" 
@@ -2276,7 +2276,7 @@ export default function ViewData() {
                       <>
                         <div className="flex justify-between items-center mb-3">
                           <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-200">Response:</h4>
-                          {selectedResponse.finalResponse && (
+                          {hasAnyResponse(selectedResponse) && (
                             <Button 
                               size="sm" 
                               variant="outline" 
@@ -2289,10 +2289,10 @@ export default function ViewData() {
                           )}
                         </div>
                         <div className="prose prose-slate dark:prose-invert max-w-none text-slate-900 dark:text-slate-50 font-medium">
-                          {selectedResponse.finalResponse && (
+                          {hasAnyResponse(selectedResponse) && (
                             <div className="bg-white dark:bg-slate-800 p-3 rounded-md border border-slate-200 dark:border-slate-700">
                               <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                                {selectedResponse.finalResponse
+                                {(getBestResponse(selectedResponse) || '')
                                   .replace(/\\n/g, '\n')
                                   .replace(/\\"/g, '"')
                                   .replace(/\\\\/g, '\\')}

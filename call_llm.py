@@ -720,7 +720,7 @@ def get_llm_responses(requirement_id, model='moa', display_results=True, skip_si
                         openai_response = CASE WHEN :normalized_model = 'openai' THEN :response ELSE openai_response END,
                         deepseek_response = CASE WHEN :normalized_model = 'deepseek' THEN :response ELSE deepseek_response END,
                         anthropic_response = CASE WHEN :normalized_model = 'anthropic' THEN :response ELSE anthropic_response END,
-                        final_response = :response,  -- Always set final_response to the current response
+                        final_response = :response,  -- For individual models, copy response to final_response
                         similar_questions = :similar_questions,
                         model_provider = :normalized_model,
                         timestamp = NOW()
