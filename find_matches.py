@@ -95,6 +95,8 @@ def find_similar_matches(requirement_id):
                     e.requirement as matched_requirement,
                     e.response as matched_response,
                     e.category,
+                    e.reference,
+                    e.payload,
                     1 - (e.embedding <=> (SELECT embedding FROM req_embedding)) as similarity_score
                 FROM embeddings e
                 WHERE e.embedding IS NOT NULL
@@ -125,13 +127,29 @@ def find_similar_matches(requirement_id):
             similar_questions_for_db = []
             
             for result in similar_results:
+                # Extract customer/client information from payload
+                customer_info = ""
+                try:
+                    if result[5]:  # payload field
+                        payload = json.loads(result[5])
+                        # Try to extract customer/client info from category or other fields
+                        if payload.get('category'):
+                            customer_info = payload['category']
+                except Exception as e:
+                    logger.debug(f"Could not parse payload for customer info: {e}")
+                
+                # Use reference field if available, otherwise use category
+                reference_source = result[4] if result[4] else customer_info  # reference field
+                
                 # Format for API response
                 formatted_results.append({
                     "id": result[0],
                     "requirement": result[1],
                     "response": result[2],
                     "category": result[3],
-                    "similarity_score": float(result[4])
+                    "reference": reference_source,
+                    "customer": customer_info,
+                    "similarity_score": float(result[6])  # Updated index for similarity_score
                 })
                 
                 # Format for database storage
@@ -139,7 +157,8 @@ def find_similar_matches(requirement_id):
                     "question": result[1],
                     "response": result[2],
                     "reference": f"Match #{result[0]}",
-                    "similarity_score": f"{float(result[4]):.4f}"
+                    "customer": customer_info,
+                    "similarity_score": f"{float(result[6]):.4f}"  # Updated index
                 })
             
             # Store the similar questions in the database

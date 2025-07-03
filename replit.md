@@ -100,15 +100,18 @@ The RFP Response Generator is an advanced AI-powered application that leverages 
 
 ## Recent Changes
 
-### July 02, 2025 - Anti-Hallucination Enhancement with Similarity Percentages
+### July 02, 2025 - Anti-Hallucination Enhancement with Customer Attribution
 - **Enhanced Prompt Structure**: Added mandatory source attribution requirements to prevent LLM hallucination
 - **Descriptive Source Citations**: Replaced generic "Example 1" with descriptive titles like "Source 1: Audit Trail Implementation"
-- **Similarity Percentage Integration**: All citations now include similarity percentages (e.g., "from Source 1: Audit Trail Implementation - 92% similarity")
-- **Transparent Source Tracking**: Users can see exactly what previous responses are being referenced with their relevance scores
+- **Customer Information Integration**: All citations now include customer/client names from embeddings (e.g., "from Source 1: Audit Trail Implementation for CT Sigma - 92% similarity")
+- **Similarity Percentage Integration**: All citations include similarity percentages showing relevance scores
+- **Transparent Source Tracking**: Users can see exactly what previous responses are being referenced, for which customers, with relevance scores
+- **Enhanced Database Integration**: Modified find_matches.py to extract customer information from embeddings payload and reference fields
+- **Complete Traceability**: Every claim can be traced to specific customer implementations with similarity scores
 - **Strict Sourcing Constraints**: Added multiple validation layers requiring content to be traceable to provided examples
 - **Hallucination Prevention**: Implemented comprehensive checks including SOURCE VALIDATION and HALLUCINATION CHECK in prompt validation
-- **Content Rules**: Enhanced with MANDATORY reference requirements and STRICT SOURCING constraints
-- **Output Requirements**: Added SOURCE ATTRIBUTION mandate with descriptive context and similarity percentages
+- **Content Rules**: Enhanced with MANDATORY reference requirements including customer names and STRICT SOURCING constraints
+- **Output Requirements**: Added SOURCE ATTRIBUTION mandate with descriptive context, customer names, and similarity percentages
 
 ### Key Anti-Hallucination Features Added:
 1. **Content Rules**: MANDATORY citation of specific example numbers for all claims
