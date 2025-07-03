@@ -52,7 +52,7 @@ Develop a high-quality response to the current RFP requirement. Use ONLY the pro
    - Prioritize responses with higher similarity scores for relevance.
    - Include ARX security engine references ONLY for entitlement-driven access control questions.
    - Maintain a word count of approximately 200 words.
-   - **MANDATORY**: For every claim or feature mentioned, reference the specific example number (e.g., "as outlined in Example 1" or "based on Example 2").
+   - **MANDATORY**: For every claim or feature mentioned, reference the specific source with descriptive context (e.g., "as demonstrated in our reporting capabilities response" or "based on our previous authentication implementation").
 
 3. **Response Structure**:
    - **Opening Statement**: Highlight the most relevant feature or capability related to the requirement.
@@ -68,7 +68,7 @@ Develop a high-quality response to the current RFP requirement. Use ONLY the pro
 **OUTPUT REQUIREMENTS**:
 - A concise response which can be directly put into RFP submission. Hence no commentary or meta text in the response.
 - Structured, clear, and self-contained.
-- **SOURCE ATTRIBUTION**: Include specific example references for all factual claims (e.g., "Our system provides advanced reporting capabilities (Example 1) with real-time dashboard features (Example 2).").
+- **SOURCE ATTRIBUTION**: Include specific descriptive references for all factual claims (e.g., "Our system provides advanced reporting capabilities (from our financial reporting response) with real-time dashboard features (from our analytics implementation).").
 """
     }
     
@@ -83,9 +83,16 @@ Develop a high-quality response to the current RFP requirement. Use ONLY the pro
                 except:
                     score = 0
                     
-            formatted_examples += f"**Example {i} (Similarity: {score:.2f})**:\n"
-            formatted_examples += f"Requirement: {resp.get('requirement', '')}\n"
-            formatted_examples += f"Response: {resp.get('response', '')}\n\n"
+            requirement_text = resp.get('requirement', '')
+            response_text = resp.get('response', '')
+            
+            # Create a short descriptive title from the requirement
+            title_words = requirement_text.split()[:5]  # First 5 words
+            short_title = ' '.join(title_words) + ('...' if len(title_words) >= 5 else '')
+            
+            formatted_examples += f"**Source {i}: {short_title} (Similarity: {score:.2f})**:\n"
+            formatted_examples += f"Original Requirement: {requirement_text}\n"
+            formatted_examples += f"Previous Response: {response_text}\n\n"
     
     # Create user message with requirement and examples
     user_message = {
@@ -98,9 +105,9 @@ Develop a high-quality response to the current RFP requirement. Use ONLY the pro
 **Instructions**:
 1. Analyze the responses, prioritizing those with higher scores for relevance.
 2. Draft a response that meets all guidelines and rules outlined in the system message.
-3. **CRITICAL**: For every feature, capability, or claim you mention, cite the specific example number in parentheses.
+3. **CRITICAL**: For every feature, capability, or claim you mention, cite the specific source with its descriptive title in parentheses (e.g., "from Source 1: Audit Trail Implementation").
 4. Ensure the response is clear, concise, and tailored to the given requirement.
-5. If you cannot find supporting content in the examples for a claim, do NOT include that claim.
+5. If you cannot find supporting content in the sources for a claim, do NOT include that claim.
 
 **Current Requirement**: {requirement}.
 """
@@ -115,8 +122,8 @@ Develop a high-quality response to the current RFP requirement. Use ONLY the pro
 3. The tone is professional and business-focused.
 4. No meta-text, assumptions, or speculative language is present.
 5. The response delivers a clear, specific value proposition for the requirement.
-6. **SOURCE VALIDATION**: Every factual claim includes a reference to the specific example (e.g., "Example 1", "Example 2").
-7. **HALLUCINATION CHECK**: No content exists that cannot be traced back to the provided examples.
+6. **SOURCE VALIDATION**: Every factual claim includes a reference to the specific source with descriptive title (e.g., "from Source 1: Audit Trail Implementation").
+7. **HALLUCINATION CHECK**: No content exists that cannot be traced back to the provided sources.
 
 If any criteria are unmet, revise the response accordingly. Pay special attention to criteria 6 and 7 to prevent hallucination."""
     }
