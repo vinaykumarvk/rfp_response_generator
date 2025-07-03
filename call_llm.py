@@ -528,44 +528,36 @@ def get_llm_responses(requirement_id, model='moa', display_results=True, skip_si
             
             # If not skipping or if retrieving existing failed, perform similarity search
             if not skip_similarity_search:
-                # Find similar matches and generate prompts
-                similar_query = text("""
-                    WITH requirement_embedding AS (
-                        SELECT embedding 
-                        FROM embeddings 
-                        WHERE requirement = (
-                            SELECT requirement 
-                            FROM excel_requirement_responses 
-                            WHERE id = :req_id
-                        )
-                        LIMIT 1
-                    )
-                    SELECT 
-                        e.id,
-                        e.requirement as matched_requirement,
-                        e.response as matched_response,
-                        e.category,
-                        CASE 
-                            WHEN re.embedding IS NOT NULL AND e.embedding IS NOT NULL 
-                            THEN 1 - (e.embedding <=> re.embedding)
-                            ELSE 0.0
-                        END as similarity_score
-                    FROM embeddings e
-                    CROSS JOIN requirement_embedding re
-                    WHERE e.embedding IS NOT NULL
-                    ORDER BY similarity_score DESC
-                    LIMIT 5;
-                """)
-
+                print("2. Running similarity search...")
+                
+                # Use the corrected find_similar_matches function
+                from find_matches import find_similar_matches
+                
                 try:
-                    similar_results = connection.execute(similar_query, {"req_id": requirement_id}).fetchall()
-                    print("2. Retrieved similar questions from database")
-
-                    if not similar_results:
-                        print("Warning: No similar questions found")
+                    similarity_result = find_similar_matches(requirement_id)
+                    
+                    if similarity_result and similarity_result.get('success'):
+                        similar_matches = similarity_result.get('similar_matches', [])
+                        print(f"Found {len(similar_matches)} matches with 90%+ similarity")
+                        
+                        # Convert to the format expected by the rest of the code
                         similar_results = []
+                        for match in similar_matches:
+                            similar_results.append([
+                                match['id'],
+                                match['requirement'],
+                                match['response'], 
+                                match['category'],
+                                match['similarity_score']
+                            ])
+                        
+                        print("2. Retrieved similar questions using corrected vector search")
+                    else:
+                        print(f"Warning: Similarity search failed: {similarity_result.get('error', 'Unknown error')}")
+                        similar_results = []
+                        
                 except Exception as e:
-                    print(f"Warning: Error fetching similar questions: {str(e)}")
+                    print(f"Warning: Error in similarity search: {str(e)}")
                     similar_results = []
 
             # Format previous responses and similar questions
