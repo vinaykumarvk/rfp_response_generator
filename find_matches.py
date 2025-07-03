@@ -52,23 +52,13 @@ def find_similar_matches(requirement_id):
             # Log the requirement we're looking for
             logger.info(f"Found requirement: {requirement}")
             
-            # First check if an embedding exists for this requirement
-            embedding_check_query = text("""
-                SELECT COUNT(*) 
-                FROM embeddings 
-                WHERE requirement = (
-                    SELECT requirement 
-                    FROM excel_requirement_responses 
-                    WHERE id = :req_id
-                )
-            """)
+            # Check total embeddings available for search
+            total_embeddings_query = text("SELECT COUNT(*) FROM embeddings")
+            total_embeddings = connection.execute(total_embeddings_query).scalar()
+            logger.info(f"Total embeddings available for search: {total_embeddings}")
             
-            embedding_count = connection.execute(embedding_check_query, {"req_id": requirement_id}).scalar()
-            logger.info(f"Found {embedding_count} embeddings for requirement ID {requirement_id}")
-            
-            if embedding_count == 0:
-                logger.warning(f"No embeddings found for requirement ID {requirement_id}")
-                # Return early with fallback similar questions
+            if total_embeddings == 0:
+                logger.warning("No embeddings found in database")
                 return {
                     "success": True,
                     "requirement": {
@@ -77,7 +67,7 @@ def find_similar_matches(requirement_id):
                         "category": requirement[2]
                     },
                     "similar_matches": [],
-                    "warning": "No embeddings found for this requirement"
+                    "warning": "No embeddings found in database"
                 }
             
             # Create an embedding for the current requirement to search against
@@ -132,13 +122,21 @@ def find_similar_matches(requirement_id):
             
             # Calculate cosine similarity for each embedding
             similar_matches = []
+            processed_count = 0
+            
+            # Pre-calculate norm for current embedding for efficiency
+            norm_current = np.linalg.norm(current_embedding)
+            
             for row in all_embeddings:
+                processed_count += 1
+                if processed_count % 1000 == 0:
+                    logger.info(f"Processed {processed_count} embeddings...")
+                
                 try:
                     stored_embedding = np.array(row.embedding)
                     
-                    # Calculate cosine similarity
+                    # Calculate cosine similarity efficiently
                     dot_product = np.dot(current_embedding, stored_embedding)
-                    norm_current = np.linalg.norm(current_embedding)
                     norm_stored = np.linalg.norm(stored_embedding)
                     similarity = dot_product / (norm_current * norm_stored)
                     
