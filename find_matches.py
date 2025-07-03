@@ -100,6 +100,7 @@ def find_similar_matches(requirement_id):
                     1 - (e.embedding <=> (SELECT embedding FROM req_embedding)) as similarity_score
                 FROM embeddings e
                 WHERE e.embedding IS NOT NULL
+                HAVING similarity_score >= 0.9
                 ORDER BY similarity_score DESC
                 LIMIT 5;
             """)

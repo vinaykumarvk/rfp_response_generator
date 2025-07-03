@@ -308,6 +308,36 @@ def prompt_gpt(prompt, model_name='openAI'):
         logger.error(f"Error generating response from {model_name}: {str(e)}")
         raise
 
+def clean_response_text(response_text):
+    """
+    Remove all source references and citations from response text for clean customer use.
+    
+    Args:
+        response_text: The original response with citations
+        
+    Returns:
+        str: Clean response text without any references
+    """
+    import re
+    
+    if not response_text:
+        return response_text
+    
+    # Remove citations in parentheses like "(from Source 1: ... - 92% similarity)"
+    cleaned = re.sub(r'\s*\([^)]*from\s+Source\s+\d+[^)]*\)', '', response_text)
+    
+    # Remove any remaining source references
+    cleaned = re.sub(r'\s*\(Source\s+\d+[^)]*\)', '', cleaned)
+    
+    # Remove any remaining similarity references
+    cleaned = re.sub(r'\s*\([^)]*\d+%\s*similarity[^)]*\)', '', cleaned)
+    
+    # Clean up extra spaces and formatting
+    cleaned = re.sub(r'\s+', ' ', cleaned)
+    cleaned = cleaned.strip()
+    
+    return cleaned
+
 def create_synthesized_response_prompt(requirement, responses):
     """
     Generate a prompt to synthesize multiple RFP responses into a cohesive, impactful response.
@@ -633,13 +663,18 @@ def get_llm_responses(requirement_id, model='moa', display_results=True, skip_si
 
                 # Save responses to database
                 print("4. Saving responses to database")
+                
+                # Clean the final response for customer use
+                clean_final_response = clean_response_text(final_response)
+                
                 save_query = text("""
                     UPDATE excel_requirement_responses
                     SET 
                         openai_response = :openai_response,
                         deepseek_response = :deepseek_response,
                         anthropic_response = :anthropic_response,
-                        final_response = :final_response,
+                        moa_response = :moa_response,
+                        final_response = :clean_final_response,
                         similar_questions = :similar_questions,
                         model_provider = :model_provider,
                         timestamp = NOW()
@@ -651,7 +686,8 @@ def get_llm_responses(requirement_id, model='moa', display_results=True, skip_si
                     "openai_response": openai_response,
                     "deepseek_response": deepseek_response,
                     "anthropic_response": claude_response,
-                    "final_response": final_response,
+                    "moa_response": final_response,  # Store MOA response with references
+                    "clean_final_response": clean_final_response,  # Store clean response
                     "similar_questions": str(similar_questions_list),
                     "model_provider": model
                 })
@@ -714,13 +750,16 @@ def get_llm_responses(requirement_id, model='moa', display_results=True, skip_si
                 
                 print(f"Original model: '{model}', Normalized model: '{normalized_model}'")
                 
+                # Clean the response for final_response column (remove all references)
+                clean_response = clean_response_text(response)
+                
                 save_query = text("""
                     UPDATE excel_requirement_responses
                     SET 
                         openai_response = CASE WHEN :normalized_model = 'openai' THEN :response ELSE openai_response END,
                         deepseek_response = CASE WHEN :normalized_model = 'deepseek' THEN :response ELSE deepseek_response END,
                         anthropic_response = CASE WHEN :normalized_model = 'anthropic' THEN :response ELSE anthropic_response END,
-                        final_response = :response,  -- For individual models, copy response to final_response
+                        final_response = :clean_response,  -- Store clean response without references
                         similar_questions = :similar_questions,
                         model_provider = :normalized_model,
                         timestamp = NOW()
@@ -731,6 +770,7 @@ def get_llm_responses(requirement_id, model='moa', display_results=True, skip_si
                 connection.execute(save_query, {
                     "req_id": requirement_id,
                     "response": response,
+                    "clean_response": clean_response,
                     "normalized_model": normalized_model,
                     "similar_questions": str(similar_questions_list)
                 })
@@ -749,7 +789,10 @@ def get_llm_responses(requirement_id, model='moa', display_results=True, skip_si
                 for q in similar_questions_list:
                     print(f"- {q['question']} (Similarity: {q['similarity_score']})")
                 print("\nFinal Response:")
-                print(final_response if model == 'moa' else response)
+                if model == 'moa':
+                    print(final_response if 'final_response' in locals() else "No response generated")
+                else:
+                    print(response if 'response' in locals() else "No response generated")
 
     except Exception as e:
         print(f"\nError in get_llm_responses: {str(e)}")

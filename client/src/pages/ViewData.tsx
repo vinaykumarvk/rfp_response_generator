@@ -87,7 +87,7 @@ export default function ViewData() {
   const [showResponseDialog, setShowResponseDialog] = useState(false);
   const [selectedResponse, setSelectedResponse] = useState<ExcelRequirementResponse | null>(null);
   const [selectedResponseId, setSelectedResponseId] = useState<number | null>(null);
-  const [activeTab, setActiveTab] = useState('response');
+  const [activeTab, setActiveTab] = useState('final-response');
   const [referenceCount, setReferenceCount] = useState(0);
   const [selectedItems, setSelectedItems] = useState<number[]>([]);
   const [selectAll, setSelectAll] = useState(false);
@@ -2245,15 +2245,42 @@ export default function ViewData() {
               </div>
               
               <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                <TabsList className="grid w-full grid-cols-2 mb-6">
+                <TabsList className="grid w-full grid-cols-5 mb-6">
                   <TabsTrigger 
-                    value="response" 
+                    value="openai" 
+                    className="flex items-center gap-2"
+                    disabled={!selectedResponse?.openaiResponse}
+                  >
+                    <Atom className="h-4 w-4" />
+                    OpenAI
+                    {!selectedResponse?.openaiResponse && <span className="ml-1 text-xs opacity-60">(N/A)</span>}
+                  </TabsTrigger>
+                  <TabsTrigger 
+                    value="anthropic" 
+                    className="flex items-center gap-2"
+                    disabled={!selectedResponse?.anthropicResponse}
+                  >
+                    <Bot className="h-4 w-4" />
+                    Anthropic
+                    {!selectedResponse?.anthropicResponse && <span className="ml-1 text-xs opacity-60">(N/A)</span>}
+                  </TabsTrigger>
+                  <TabsTrigger 
+                    value="deepseek" 
+                    className="flex items-center gap-2"
+                    disabled={!selectedResponse?.deepseekResponse}
+                  >
+                    <Brain className="h-4 w-4" />
+                    Deepseek
+                    {!selectedResponse?.deepseekResponse && <span className="ml-1 text-xs opacity-60">(N/A)</span>}
+                  </TabsTrigger>
+                  <TabsTrigger 
+                    value="final-response" 
                     className="flex items-center gap-2"
                     disabled={!selectedResponse?.finalResponse}
                   >
                     <MessageSquare className="h-4 w-4" />
-                    Response
-                    {!selectedResponse?.finalResponse && <span className="ml-1 text-xs opacity-60">(Not available)</span>}
+                    Final Response
+                    {!selectedResponse?.finalResponse && <span className="ml-1 text-xs opacity-60">(N/A)</span>}
                   </TabsTrigger>
                   <TabsTrigger 
                     value="references" 
@@ -2270,12 +2297,88 @@ export default function ViewData() {
                   </TabsTrigger>
                 </TabsList>
                 
-                <TabsContent value="response">
+                {/* OpenAI Response Tab */}
+                <TabsContent value="openai">
+                  <div className="p-4 bg-slate-50 dark:bg-slate-900 rounded-md mb-4">
+                    <div className="flex justify-between items-center mb-3">
+                      <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-200">OpenAI Response (with references):</h4>
+                    </div>
+                    <div className="prose prose-slate dark:prose-invert max-w-none text-slate-900 dark:text-slate-50 font-medium">
+                      {selectedResponse?.openaiResponse ? (
+                        <div className="bg-white dark:bg-slate-800 p-3 rounded-md border border-slate-200 dark:border-slate-700">
+                          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                            {selectedResponse.openaiResponse
+                              .replace(/\\n/g, '\n')
+                              .replace(/\\"/g, '"')
+                              .replace(/\\\\/g, '\\')}
+                          </ReactMarkdown>
+                        </div>
+                      ) : (
+                        <div className="bg-white dark:bg-slate-800 p-3 rounded-md border border-slate-200 dark:border-slate-700 text-center text-slate-500">
+                          No OpenAI response available. Generate one using the "Generate Answer" button above.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </TabsContent>
+
+                {/* Anthropic Response Tab */}
+                <TabsContent value="anthropic">
+                  <div className="p-4 bg-slate-50 dark:bg-slate-900 rounded-md mb-4">
+                    <div className="flex justify-between items-center mb-3">
+                      <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-200">Anthropic Response (with references):</h4>
+                    </div>
+                    <div className="prose prose-slate dark:prose-invert max-w-none text-slate-900 dark:text-slate-50 font-medium">
+                      {selectedResponse?.anthropicResponse ? (
+                        <div className="bg-white dark:bg-slate-800 p-3 rounded-md border border-slate-200 dark:border-slate-700">
+                          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                            {selectedResponse.anthropicResponse
+                              .replace(/\\n/g, '\n')
+                              .replace(/\\"/g, '"')
+                              .replace(/\\\\/g, '\\')}
+                          </ReactMarkdown>
+                        </div>
+                      ) : (
+                        <div className="bg-white dark:bg-slate-800 p-3 rounded-md border border-slate-200 dark:border-slate-700 text-center text-slate-500">
+                          No Anthropic response available. Generate one using the "Generate Answer" button above.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </TabsContent>
+
+                {/* Deepseek Response Tab */}
+                <TabsContent value="deepseek">
+                  <div className="p-4 bg-slate-50 dark:bg-slate-900 rounded-md mb-4">
+                    <div className="flex justify-between items-center mb-3">
+                      <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-200">Deepseek Response (with references):</h4>
+                    </div>
+                    <div className="prose prose-slate dark:prose-invert max-w-none text-slate-900 dark:text-slate-50 font-medium">
+                      {selectedResponse?.deepseekResponse ? (
+                        <div className="bg-white dark:bg-slate-800 p-3 rounded-md border border-slate-200 dark:border-slate-700">
+                          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                            {selectedResponse.deepseekResponse
+                              .replace(/\\n/g, '\n')
+                              .replace(/\\"/g, '"')
+                              .replace(/\\\\/g, '\\')}
+                          </ReactMarkdown>
+                        </div>
+                      ) : (
+                        <div className="bg-white dark:bg-slate-800 p-3 rounded-md border border-slate-200 dark:border-slate-700 text-center text-slate-500">
+                          No Deepseek response available. Generate one using the "Generate Answer" button above.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </TabsContent>
+
+                {/* Final Response Tab */}
+                <TabsContent value="final-response">
                   <div className="p-4 bg-slate-50 dark:bg-slate-900 rounded-md mb-4">
                     {!isEditingResponse ? (
                       <>
                         <div className="flex justify-between items-center mb-3">
-                          <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-200">Response:</h4>
+                          <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-200">Final Response (clean for customer use):</h4>
                           {selectedResponse?.finalResponse && (
                             <Button 
                               size="sm" 
@@ -2289,7 +2392,7 @@ export default function ViewData() {
                           )}
                         </div>
                         <div className="prose prose-slate dark:prose-invert max-w-none text-slate-900 dark:text-slate-50 font-medium">
-                          {selectedResponse?.finalResponse && (
+                          {selectedResponse?.finalResponse ? (
                             <div className="bg-white dark:bg-slate-800 p-3 rounded-md border border-slate-200 dark:border-slate-700">
                               <ReactMarkdown remarkPlugins={[remarkGfm]}>
                                 {selectedResponse.finalResponse
@@ -2298,13 +2401,17 @@ export default function ViewData() {
                                   .replace(/\\\\/g, '\\')}
                               </ReactMarkdown>
                             </div>
+                          ) : (
+                            <div className="bg-white dark:bg-slate-800 p-3 rounded-md border border-slate-200 dark:border-slate-700 text-center text-slate-500">
+                              No final response available. Generate one using the "Generate Answer" button above.
+                            </div>
                           )}
                         </div>
                       </>
                     ) : (
                       <>
                         <div className="flex justify-between items-center mb-3">
-                          <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-200">Edit Response:</h4>
+                          <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-200">Edit Final Response:</h4>
                           <div className="flex items-center gap-2">
                             <Button 
                               size="sm" 
