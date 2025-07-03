@@ -2,24 +2,23 @@ import json
 import logging
 import sys
 import time
-import os
-import numpy as np
 from database import engine
 from sqlalchemy import text
-from openai import OpenAI
 
-# Configure logging
+# Configure more detailed logging
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.DEBUG,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[logging.StreamHandler(stream=sys.stdout)]
+    handlers=[
+        logging.StreamHandler(stream=sys.stdout)
+    ]
 )
 logger = logging.getLogger(__name__)
 
 def find_similar_matches(requirement_id):
     """
     Find similar matches for a requirement using vector similarity search.
-    This is the corrected version that properly does vector similarity search.
+    Also stores the similar matches in the similar_questions column of excel_requirement_responses.
     
     Args:
         requirement_id: The ID of the requirement to find matches for
@@ -28,147 +27,146 @@ def find_similar_matches(requirement_id):
         Dict with requirement details and similar matches
     """
     logger.info(f"Finding similar matches for requirement ID: {requirement_id}")
-    
     try:
         with engine.connect() as connection:
-            # Get the requirement details
-            requirement_query = text("""
-                SELECT id, requirement, category 
-                FROM excel_requirement_responses 
-                WHERE id = :req_id
+            # First, get the requirement details
+            req_query = text("""
+                SELECT r.id, r.requirement, r.category
+                FROM excel_requirement_responses r
+                WHERE r.id = :req_id
             """)
-            
-            requirement = connection.execute(requirement_query, {"req_id": requirement_id}).fetchone()
-            
+
+            # Get the requirement details
+            requirement = connection.execute(req_query, {"req_id": requirement_id}).fetchone()
+
             if not requirement:
+                print(f"\nNo requirement found with ID: {requirement_id}")
                 return {
                     "success": False,
-                    "error": f"Requirement with ID {requirement_id} not found"
+                    "error": f"No requirement found with ID: {requirement_id}"
                 }
 
+            # Log the requirement we're looking for
             logger.info(f"Found requirement: {requirement}")
             
-            current_requirement = requirement[1]
-            current_category = requirement[2]
-            
-            # Generate embedding for current requirement using OpenAI
-            client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
-            
-            try:
-                embedding_response = client.embeddings.create(
-                    input=current_requirement,
-                    model="text-embedding-ada-002"
+            # First check if an embedding exists for this requirement
+            embedding_check_query = text("""
+                SELECT COUNT(*) 
+                FROM embeddings 
+                WHERE requirement = (
+                    SELECT requirement 
+                    FROM excel_requirement_responses 
+                    WHERE id = :req_id
                 )
-                current_embedding = np.array(embedding_response.data[0].embedding)
-                logger.info(f"Generated embedding for requirement: {current_requirement}")
-            except Exception as e:
-                logger.error(f"Failed to generate embedding: {str(e)}")
-                return {"success": False, "error": f"Failed to generate embedding: {str(e)}"}
+            """)
             
-            # Get ALL embeddings from database for similarity comparison
-            # This is the proper way - compare against all embeddings, not just exact matches
-            embeddings_query = text("""
+            embedding_count = connection.execute(embedding_check_query, {"req_id": requirement_id}).scalar()
+            logger.info(f"Found {embedding_count} embeddings for requirement ID {requirement_id}")
+            
+            if embedding_count == 0:
+                logger.warning(f"No embeddings found for requirement ID {requirement_id}")
+                # Return early with fallback similar questions
+                return {
+                    "success": True,
+                    "requirement": {
+                        "id": requirement[0],
+                        "text": requirement[1],
+                        "category": requirement[2]
+                    },
+                    "similar_matches": [],
+                    "warning": "No embeddings found for this requirement"
+                }
+            
+            # Find top 5 similar vectors using cosine similarity with a more efficient query
+            # Using Common Table Expression (CTE) to avoid nested subqueries
+            similar_query = text("""
+                WITH req_embedding AS (
+                    SELECT embedding
+                    FROM embeddings
+                    WHERE requirement = (
+                        SELECT requirement
+                        FROM excel_requirement_responses
+                        WHERE id = :req_id
+                    )
+                    LIMIT 1
+                )
                 SELECT 
                     e.id,
-                    e.requirement,
-                    e.response,
+                    e.requirement as matched_requirement,
+                    e.response as matched_response,
                     e.category,
                     e.reference,
                     e.payload,
-                    e.embedding
+                    1 - (e.embedding <=> (SELECT embedding FROM req_embedding)) as similarity_score
                 FROM embeddings e
                 WHERE e.embedding IS NOT NULL
-                ORDER BY e.id
+                ORDER BY similarity_score DESC
+                LIMIT 5;
             """)
+
+            # Log that we're starting the similarity search
+            logger.info(f"Starting similarity search query for requirement ID: {requirement_id}")
+            start_time = time.time()
             
-            all_embeddings = connection.execute(embeddings_query).fetchall()
-            logger.info(f"Retrieved {len(all_embeddings)} embeddings for similarity calculation")
-            
-            # Calculate cosine similarity for each embedding
-            similar_matches = []
-            processed_count = 0
-            matches_found = 0
-            
-            # Pre-calculate norm for current embedding for efficiency
-            norm_current = np.linalg.norm(current_embedding)
-            
-            for row in all_embeddings:
-                processed_count += 1
-                if processed_count % 1000 == 0:
-                    logger.info(f"Processed {processed_count} embeddings, found {matches_found} matches so far...")
+            # Execute the similarity search with a timeout
+            # Using try/except to catch potential timeout issues
+            try:
+                similar_results = connection.execution_options(timeout=20).execute(
+                    similar_query, {"req_id": requirement_id}
+                ).fetchall()
                 
-                try:
-                    stored_embedding = np.array(row.embedding)
-                    
-                    # Calculate cosine similarity
-                    dot_product = np.dot(current_embedding, stored_embedding)
-                    norm_stored = np.linalg.norm(stored_embedding)
-                    similarity = dot_product / (norm_current * norm_stored)
-                    
-                    # Only include if similarity >= 90%
-                    if similarity >= 0.9:
-                        matches_found += 1
-                        
-                        # Extract customer name from payload if available
-                        customer_name = ""
-                        try:
-                            if row.payload:
-                                payload_data = json.loads(row.payload)
-                                customer_name = payload_data.get('customer', '')
-                        except:
-                            pass
-                        
-                        similar_matches.append({
-                            'id': row.id,
-                            'requirement': row.requirement,
-                            'response': row.response,
-                            'category': row.category,
-                            'reference': row.reference or f"Source {row.id}",
-                            'customer': customer_name,
-                            'similarity_score': similarity
-                        })
-                        
-                except Exception as e:
-                    logger.warning(f"Error processing embedding {row.id}: {str(e)}")
-                    continue
-            
-            logger.info(f"Final results: Found {matches_found} matches with 90%+ similarity from {processed_count} embeddings")
-            
-            # Sort by similarity score (highest first)
-            similar_matches.sort(key=lambda x: x['similarity_score'], reverse=True)
-            
-            # Limit to top 10 matches
-            similar_matches = similar_matches[:10]
+                elapsed_time = time.time() - start_time
+                logger.info(f"Similarity search completed in {elapsed_time:.2f} seconds")
+            except Exception as query_error:
+                elapsed_time = time.time() - start_time
+                logger.error(f"Similarity search failed after {elapsed_time:.2f} seconds: {str(query_error)}")
+                raise
             
             # Format results for return and database storage
             formatted_results = []
             similar_questions_for_db = []
             
-            for result in similar_matches:
+            for result in similar_results:
+                # Extract customer/client information from payload
+                customer_info = ""
+                try:
+                    if result[5]:  # payload field
+                        payload = json.loads(result[5])
+                        # Try to extract customer/client info from category or other fields
+                        if payload.get('category'):
+                            customer_info = payload['category']
+                except Exception as e:
+                    logger.debug(f"Could not parse payload for customer info: {e}")
+                
+                # Use reference field if available, otherwise use category
+                reference_source = result[4] if result[4] else customer_info  # reference field
+                
                 # Format for API response
                 formatted_results.append({
-                    "id": result['id'],
-                    "requirement": result['requirement'],
-                    "response": result['response'],
-                    "category": result['category'],
-                    "reference": result['reference'],
-                    "customer": result['customer'],
-                    "similarity_score": float(result['similarity_score'])
+                    "id": result[0],
+                    "requirement": result[1],
+                    "response": result[2],
+                    "category": result[3],
+                    "reference": reference_source,
+                    "customer": customer_info,
+                    "similarity_score": float(result[6])  # Updated index for similarity_score
                 })
                 
                 # Format for database storage
                 similar_questions_for_db.append({
-                    "question": result['requirement'],
-                    "response": result['response'],
-                    "reference": result['reference'],
-                    "customer": result['customer'],
-                    "similarity_score": f"{float(result['similarity_score']):.4f}"
+                    "question": result[1],
+                    "response": result[2],
+                    "reference": f"Match #{result[0]}",
+                    "customer": customer_info,
+                    "similarity_score": f"{float(result[6]):.4f}"  # Updated index
                 })
             
             # Store the similar questions in the database
             if similar_questions_for_db:
+                # Convert to JSON string for storage
                 similar_questions_json = json.dumps(similar_questions_for_db)
                 
+                # Update the similar_questions column in the database
                 update_query = text("""
                     UPDATE excel_requirement_responses
                     SET similar_questions = :similar_questions
@@ -180,23 +178,48 @@ def find_similar_matches(requirement_id):
                     "similar_questions": similar_questions_json
                 })
                 
+                # Commit the transaction
                 connection.commit()
                 logger.info(f"Updated similar_questions in database for requirement ID: {requirement_id}")
+            
+            # For debug/console output in logs only
+            logger.info(f"Original Requirement: ID={requirement[0]}, Category={requirement[2]}")
+            logger.info(f"Requirement text: {requirement[1]}")
+            logger.info(f"Found {len(similar_results)} similar matches")
+            
+            # Log the results for debugging but don't print to stdout
+            for idx, result in enumerate(similar_results, 1):
+                logger.info(f"Match #{idx}")
+                logger.info(f"ID: {result[0]}")
+                logger.info(f"Category: {result[3]}")
+                logger.info(f"Similarity Score: {result[4]:.4f}")
+                logger.info(f"Requirement: {result[1]}")
+                logger.info(f"Response: {result[2][:100]}...") # Log only the first 100 chars
+                logger.info("-" * 40)
             
             # Return structured data
             return {
                 "success": True,
                 "requirement": {
-                    "id": requirement_id,
-                    "text": current_requirement,
-                    "category": current_category
+                    "id": requirement[0],
+                    "text": requirement[1],
+                    "category": requirement[2]
                 },
                 "similar_matches": formatted_results
             }
-            
     except Exception as e:
         logger.error(f"Error finding similar matches: {str(e)}")
         return {
             "success": False,
             "error": str(e)
         }
+
+if __name__ == "__main__":
+    import sys
+    
+    # Get requirement ID from command line if provided, otherwise use 1 as default
+    requirement_id = int(sys.argv[1]) if len(sys.argv) > 1 else 1
+    
+    # Run the function with the provided ID
+    results = find_similar_matches(requirement_id)
+    print(json.dumps(results, indent=2))

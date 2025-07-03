@@ -308,36 +308,6 @@ def prompt_gpt(prompt, model_name='openAI'):
         logger.error(f"Error generating response from {model_name}: {str(e)}")
         raise
 
-def clean_response_text(response_text):
-    """
-    Remove all source references and citations from response text for clean customer use.
-    
-    Args:
-        response_text: The original response with citations
-        
-    Returns:
-        str: Clean response text without any references
-    """
-    import re
-    
-    if not response_text:
-        return response_text
-    
-    # Remove citations in parentheses like "(from Source 1: ... - 92% similarity)"
-    cleaned = re.sub(r'\s*\([^)]*from\s+Source\s+\d+[^)]*\)', '', response_text)
-    
-    # Remove any remaining source references
-    cleaned = re.sub(r'\s*\(Source\s+\d+[^)]*\)', '', cleaned)
-    
-    # Remove any remaining similarity references
-    cleaned = re.sub(r'\s*\([^)]*\d+%\s*similarity[^)]*\)', '', cleaned)
-    
-    # Clean up extra spaces and formatting
-    cleaned = re.sub(r'\s+', ' ', cleaned)
-    cleaned = cleaned.strip()
-    
-    return cleaned
-
 def create_synthesized_response_prompt(requirement, responses):
     """
     Generate a prompt to synthesize multiple RFP responses into a cohesive, impactful response.
@@ -528,36 +498,44 @@ def get_llm_responses(requirement_id, model='moa', display_results=True, skip_si
             
             # If not skipping or if retrieving existing failed, perform similarity search
             if not skip_similarity_search:
-                print("2. Running similarity search...")
-                
-                # Use the corrected find_similar_matches function
-                from find_matches import find_similar_matches
-                
+                # Find similar matches and generate prompts
+                similar_query = text("""
+                    WITH requirement_embedding AS (
+                        SELECT embedding 
+                        FROM embeddings 
+                        WHERE requirement = (
+                            SELECT requirement 
+                            FROM excel_requirement_responses 
+                            WHERE id = :req_id
+                        )
+                        LIMIT 1
+                    )
+                    SELECT 
+                        e.id,
+                        e.requirement as matched_requirement,
+                        e.response as matched_response,
+                        e.category,
+                        CASE 
+                            WHEN re.embedding IS NOT NULL AND e.embedding IS NOT NULL 
+                            THEN 1 - (e.embedding <=> re.embedding)
+                            ELSE 0.0
+                        END as similarity_score
+                    FROM embeddings e
+                    CROSS JOIN requirement_embedding re
+                    WHERE e.embedding IS NOT NULL
+                    ORDER BY similarity_score DESC
+                    LIMIT 5;
+                """)
+
                 try:
-                    similarity_result = find_similar_matches(requirement_id)
-                    
-                    if similarity_result and similarity_result.get('success'):
-                        similar_matches = similarity_result.get('similar_matches', [])
-                        print(f"Found {len(similar_matches)} matches with 90%+ similarity")
-                        
-                        # Convert to the format expected by the rest of the code
+                    similar_results = connection.execute(similar_query, {"req_id": requirement_id}).fetchall()
+                    print("2. Retrieved similar questions from database")
+
+                    if not similar_results:
+                        print("Warning: No similar questions found")
                         similar_results = []
-                        for match in similar_matches:
-                            similar_results.append([
-                                match['id'],
-                                match['requirement'],
-                                match['response'], 
-                                match['category'],
-                                match['similarity_score']
-                            ])
-                        
-                        print("2. Retrieved similar questions using corrected vector search")
-                    else:
-                        print(f"Warning: Similarity search failed: {similarity_result.get('error', 'Unknown error')}")
-                        similar_results = []
-                        
                 except Exception as e:
-                    print(f"Warning: Error in similarity search: {str(e)}")
+                    print(f"Warning: Error fetching similar questions: {str(e)}")
                     similar_results = []
 
             # Format previous responses and similar questions
@@ -655,18 +633,13 @@ def get_llm_responses(requirement_id, model='moa', display_results=True, skip_si
 
                 # Save responses to database
                 print("4. Saving responses to database")
-                
-                # Clean the final response for customer use
-                clean_final_response = clean_response_text(final_response)
-                
                 save_query = text("""
                     UPDATE excel_requirement_responses
                     SET 
                         openai_response = :openai_response,
                         deepseek_response = :deepseek_response,
                         anthropic_response = :anthropic_response,
-                        moa_response = :moa_response,
-                        final_response = :clean_final_response,
+                        final_response = :final_response,
                         similar_questions = :similar_questions,
                         model_provider = :model_provider,
                         timestamp = NOW()
@@ -678,8 +651,7 @@ def get_llm_responses(requirement_id, model='moa', display_results=True, skip_si
                     "openai_response": openai_response,
                     "deepseek_response": deepseek_response,
                     "anthropic_response": claude_response,
-                    "moa_response": final_response,  # Store MOA response with references
-                    "clean_final_response": clean_final_response,  # Store clean response
+                    "final_response": final_response,
                     "similar_questions": str(similar_questions_list),
                     "model_provider": model
                 })
@@ -742,16 +714,13 @@ def get_llm_responses(requirement_id, model='moa', display_results=True, skip_si
                 
                 print(f"Original model: '{model}', Normalized model: '{normalized_model}'")
                 
-                # Clean the response for final_response column (remove all references)
-                clean_response = clean_response_text(response)
-                
                 save_query = text("""
                     UPDATE excel_requirement_responses
                     SET 
                         openai_response = CASE WHEN :normalized_model = 'openai' THEN :response ELSE openai_response END,
                         deepseek_response = CASE WHEN :normalized_model = 'deepseek' THEN :response ELSE deepseek_response END,
                         anthropic_response = CASE WHEN :normalized_model = 'anthropic' THEN :response ELSE anthropic_response END,
-                        final_response = :clean_response,  -- Store clean response without references
+                        final_response = :response,  -- For individual models, copy response to final_response
                         similar_questions = :similar_questions,
                         model_provider = :normalized_model,
                         timestamp = NOW()
@@ -762,7 +731,6 @@ def get_llm_responses(requirement_id, model='moa', display_results=True, skip_si
                 connection.execute(save_query, {
                     "req_id": requirement_id,
                     "response": response,
-                    "clean_response": clean_response,
                     "normalized_model": normalized_model,
                     "similar_questions": str(similar_questions_list)
                 })
@@ -781,10 +749,7 @@ def get_llm_responses(requirement_id, model='moa', display_results=True, skip_si
                 for q in similar_questions_list:
                     print(f"- {q['question']} (Similarity: {q['similarity_score']})")
                 print("\nFinal Response:")
-                if model == 'moa':
-                    print(final_response if 'final_response' in locals() else "No response generated")
-                else:
-                    print(response if 'response' in locals() else "No response generated")
+                print(final_response if model == 'moa' else response)
 
     except Exception as e:
         print(f"\nError in get_llm_responses: {str(e)}")
