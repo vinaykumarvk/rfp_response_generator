@@ -52,7 +52,7 @@ Develop a high-quality response to the current RFP requirement. Use ONLY the pro
    - Prioritize responses with higher similarity scores for relevance.
    - Include ARX security engine references ONLY for entitlement-driven access control questions.
    - Maintain a word count of approximately 200 words.
-   - **MANDATORY**: For every claim or feature mentioned, reference the specific source with descriptive context, customer name, and similarity percentage (e.g., "as demonstrated in our reporting capabilities response for ABC Corp (92% similarity)" or "based on our previous authentication implementation for XYZ Client (85% similarity)").
+   - **MANDATORY**: For every claim or feature mentioned, reference the specific source with descriptive context and similarity percentage. Include customer names ONLY when available from the source data (e.g., "as demonstrated in our reporting capabilities response (92% similarity)" or "based on our previous authentication implementation for CustomerName (95% similarity)").
 
 3. **Response Structure**:
    - **Opening Statement**: Highlight the most relevant feature or capability related to the requirement.
@@ -68,20 +68,27 @@ Develop a high-quality response to the current RFP requirement. Use ONLY the pro
 **OUTPUT REQUIREMENTS**:
 - A concise response which can be directly put into RFP submission. Hence no commentary or meta text in the response.
 - Structured, clear, and self-contained.
-- **SOURCE ATTRIBUTION**: Include specific descriptive references with customer names and similarity percentages for all factual claims (e.g., "Our system provides advanced reporting capabilities (from our financial reporting response for ABC Corp - 92% similarity) with real-time dashboard features (from our analytics implementation for XYZ Client - 85% similarity).").
+- **SOURCE ATTRIBUTION**: Include specific descriptive references with similarity percentages for all factual claims. Include customer names ONLY when available from the source data (e.g., "Our system provides advanced reporting capabilities (from our financial reporting response - 92% similarity)" or "with real-time dashboard features (from our analytics implementation for CustomerName - 95% similarity)" when customer name is available).
 """
     }
     
     # Format the previous responses for the prompt
     formatted_examples = ""
     if previous_responses and len(previous_responses) > 0:
-        for i, resp in enumerate(previous_responses[:3], 1):  # Use up to 3 similar responses
+        # Filter for 90%+ similarity only
+        high_similarity_responses = [resp for resp in previous_responses if resp.get('similarity_score', 0) >= 0.9]
+        
+        for i, resp in enumerate(high_similarity_responses[:3], 1):  # Use up to 3 similar responses with 90%+ similarity
             score = resp.get('similarity_score', 0)
             if isinstance(score, str):
                 try:
                     score = float(score)
                 except:
                     score = 0
+                    
+            # Skip if similarity is below 90%
+            if score < 0.9:
+                continue
                     
             requirement_text = resp.get('requirement', '')
             response_text = resp.get('response', '')
@@ -110,11 +117,12 @@ Develop a high-quality response to the current RFP requirement. Use ONLY the pro
 {formatted_examples}
 
 **Instructions**:
-1. Analyze the responses, prioritizing those with higher scores for relevance.
-2. Draft a response that meets all guidelines and rules outlined in the system message.
-3. **CRITICAL**: For every feature, capability, or claim you mention, cite the specific source with its descriptive title, customer name, and similarity percentage in parentheses (e.g., "from Source 1: Audit Trail Implementation for ABC Corp - 92% similarity").
-4. Ensure the response is clear, concise, and tailored to the given requirement.
-5. If you cannot find supporting content in the sources for a claim, do NOT include that claim.
+1. **CRITICAL**: Use ONLY responses with 90% or higher similarity scores.
+2. Analyze the responses, prioritizing those with higher scores for relevance.
+3. Draft a response that meets all guidelines and rules outlined in the system message.
+4. **CRITICAL**: For every feature, capability, or claim you mention, cite the specific source with its descriptive title and similarity percentage. Include customer names ONLY when available from the source data (e.g., "from Source 1: Audit Trail Implementation - 92% similarity" or "from Source 2: Role Access System for CustomerName - 95% similarity").
+5. Ensure the response is clear, concise, and tailored to the given requirement.
+6. If you cannot find supporting content in the sources for a claim, do NOT include that claim.
 
 **Current Requirement**: {requirement}.
 """
@@ -129,7 +137,7 @@ Develop a high-quality response to the current RFP requirement. Use ONLY the pro
 3. The tone is professional and business-focused.
 4. No meta-text, assumptions, or speculative language is present.
 5. The response delivers a clear, specific value proposition for the requirement.
-6. **SOURCE VALIDATION**: Every factual claim includes a reference to the specific source with descriptive title, customer name, and similarity percentage (e.g., "from Source 1: Audit Trail Implementation for ABC Corp - 92% similarity").
+6. **SOURCE VALIDATION**: Every factual claim includes a reference to the specific source with descriptive title and similarity percentage (90% or higher). Include customer names ONLY when available from the source data (e.g., "from Source 1: Audit Trail Implementation - 92% similarity").
 7. **HALLUCINATION CHECK**: No content exists that cannot be traced back to the provided sources.
 
 If any criteria are unmet, revise the response accordingly. Pay special attention to criteria 6 and 7 to prevent hallucination."""

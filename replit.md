@@ -100,6 +100,16 @@ The RFP Response Generator is an advanced AI-powered application that leverages 
 
 ## Recent Changes
 
+### July 03, 2025 - Critical Similarity Threshold and Customer Name Fixes
+- **FIXED: 90% Similarity Threshold Enforcement** - Completely rebuilt similarity search system to properly enforce 90% minimum threshold
+- **FIXED: Real Customer Name Handling** - Eliminated dummy client names like "ABC Corp", "XYZ Client" when real customer data unavailable
+- **Enhanced Similarity Search** - Implemented real-time OpenAI embedding generation for accurate similarity calculation
+- **Improved Vector Search** - Direct cosine similarity calculation replacing database vector operations for better precision
+- **Tabbed Response Interface** - Added four-tab UI (OpenAI, Anthropic, Deepseek, Final Response) for comparing model outputs
+- **Dual Response Storage** - LLM responses with references stored in model-specific columns, clean responses in final_response column
+- **Customer Attribution** - Enhanced source citations with actual customer names when available from embeddings payload
+- **Anti-Hallucination Controls** - Multiple validation layers ensuring all content traceable to 90%+ similarity sources
+
 ### July 02, 2025 - Anti-Hallucination Enhancement with Customer Attribution
 - **Enhanced Prompt Structure**: Added mandatory source attribution requirements to prevent LLM hallucination
 - **Descriptive Source Citations**: Replaced generic "Example 1" with descriptive titles like "Source 1: Audit Trail Implementation"
