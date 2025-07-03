@@ -98,7 +98,33 @@ The RFP Response Generator is an advanced AI-powered application that leverages 
 - **Vector Search**: Efficient similarity matching with configurable parameters
 - **Batch Processing**: Support for bulk operations to handle large RFP sets
 
+## Regression Prevention Protocol
+
+### Mandatory Testing Before Any Changes
+To prevent the critical regression issues that occurred, the following protocol is now enforced:
+
+1. **Pre-Change Testing**: Run `python3 test_suite.py` before making any changes
+2. **Post-Change Testing**: Run the same test suite after changes to ensure no regressions
+3. **Test Failure Protocol**: If tests fail, STOP development and revert to working state
+4. **Documentation**: All changes must be tested and documented
+
+### Core Test Requirements
+- Database connectivity and embeddings availability
+- Similarity search functionality with 90% threshold enforcement
+- Response generation quality without dummy customer names
+- 4-tab interface data structure compatibility
+- Anti-hallucination controls and source attribution
+
+**Critical Rule**: NO changes to core functionality without passing all tests.
+
 ## Recent Changes
+
+### July 03, 2025 - Critical Regression Fix and Testing Protocol Implementation
+- **FIXED: Critical regression in similarity search** - Restored proper vector similarity search after identifying exact text matching bug introduced earlier
+- **IMPLEMENTED: Comprehensive test suite** - Created automated testing to prevent future regressions
+- **ESTABLISHED: Mandatory testing protocol** - All changes now require pre/post testing validation
+- **RESTORED: 90% similarity threshold enforcement** - System now properly compares against all 9,665 embeddings
+- **MAINTAINED: Anti-hallucination controls** - No dummy customer names, strict source attribution requirements
 
 ### July 03, 2025 - Critical Similarity Threshold and Customer Name Fixes
 - **FIXED: 90% Similarity Threshold Enforcement** - Completely rebuilt similarity search system to properly enforce 90% minimum threshold
