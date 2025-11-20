@@ -149,11 +149,11 @@ def find_similar_matches(requirement_id):
                     "similarity_score": float(result[6])  # Updated index for similarity_score
                 })
                 
-                # Format for database storage
+                # Format for database storage (includes document name)
                 similar_questions_for_db.append({
                     "question": result[1],
                     "response": result[2],
-                    "reference": f"Match #{result[0]}",
+                    "reference": document_name,  # Use document name instead of "Match #X"
                     "customer": customer_info,
                     "similarity_score": f"{float(result[6]):.4f}"  # Updated index
                 })

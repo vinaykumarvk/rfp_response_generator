@@ -98,6 +98,8 @@ export default function ReferencePanel({ responseId, showTitle = true, onReferen
     setLoading(true);
     setError(null);
     
+    console.log("ReferencePanel: Fetching references for responseId:", responseId);
+    
     // Create abort controller for cleanup
     let controller: AbortController;
     try {
@@ -126,6 +128,14 @@ export default function ReferencePanel({ responseId, showTitle = true, onReferen
     fetchReferences(responseId, controller.signal)
       .then(data => {
         if (isMounted) {
+          console.log("ReferencePanel: Received references:", data);
+          if (data && data.length > 0) {
+            console.log("ReferencePanel: First reference sample:", {
+              id: data[0].id,
+              reference: data[0].reference,
+              category: data[0].category
+            });
+          }
           setReferences(data || []);
           clearTimeout(timeoutId);
         }
