@@ -201,7 +201,7 @@ def get_model_config(model_name):
             },
             'client_kwargs': {},
             'completion_args': {
-                'model': "claude-3-7-sonnet-20250219",
+                'model': "claude-sonnet-4-5",
                 'max_tokens': 4000,
                 'temperature': 0.2
             },
