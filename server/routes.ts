@@ -226,24 +226,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log('Python embedding generation output:', stdout);
       
-      // Parse the response - extract only the JSON part
+      // Parse the response - extract the JSON part
       try {
-        // Find the last line that looks like JSON (starts with { or [)
-        const lines = stdout.trim().split('\n');
-        let jsonLine = '';
-        for (let i = lines.length - 1; i >= 0; i--) {
-          const line = lines[i].trim();
-          if (line.startsWith('{') || line.startsWith('[')) {
-            jsonLine = line;
-            break;
+        // Try to parse the entire stdout as JSON first
+        let data;
+        try {
+          data = JSON.parse(stdout.trim());
+        } catch (e) {
+          // If that fails, extract the JSON block (everything from first { to last })
+          const firstBrace = stdout.indexOf('{');
+          const lastBrace = stdout.lastIndexOf('}');
+          
+          if (firstBrace === -1 || lastBrace === -1) {
+            throw new Error('No JSON output found in response');
           }
+          
+          const jsonStr = stdout.substring(firstBrace, lastBrace + 1);
+          data = JSON.parse(jsonStr);
         }
-        
-        if (!jsonLine) {
-          throw new Error('No JSON output found in response');
-        }
-        
-        const data = JSON.parse(jsonLine);
         
         if (data.success) {
           return res.status(200).json({

@@ -132,18 +132,18 @@ class EmbeddingGenerator:
                         embedding_vectors = self.generate_embedding_batch(batch_texts)
                         
                         # Bulk insert all embeddings
-                        insert_query = text("""
+                        # Note: Use raw SQL with proper casting for pgvector
+                        insert_query = """
                             INSERT INTO embeddings (
                                 category, requirement, response, reference, 
                                 payload, embedding
                             ) VALUES (
-                                :category, :requirement, :response, :reference,
-                                :payload, :embedding::vector
+                                %(category)s, %(requirement)s, %(response)s, %(reference)s,
+                                %(payload)s, %(embedding)s::vector
                             )
-                        """)
+                        """
                         
-                        # Prepare bulk insert data
-                        insert_data = []
+                        # Insert each embedding individually within the transaction
                         for i, (data, embedding) in enumerate(zip(batch_data, embedding_vectors)):
                             vector_str = '[' + ','.join(map(str, embedding)) + ']'
                             metadata = {
@@ -151,17 +151,17 @@ class EmbeddingGenerator:
                                 'source': 'uploaded_requirement'
                             }
                             
-                            insert_data.append({
+                            insert_params = {
                                 "category": data['category'],
                                 "requirement": data['requirement'],
                                 "response": data['response'],
                                 "reference": f"REQ-{data['id']}",
                                 "payload": json.dumps(metadata),
                                 "embedding": vector_str
-                            })
-                        
-                        # Execute bulk insert
-                        connection.execute(insert_query, insert_data)
+                            }
+                            
+                            # Execute raw SQL with psycopg2 (not SQLAlchemy text())
+                            connection.connection.cursor().execute(insert_query, insert_params)
                         
                         # Transaction is auto-committed when exiting begin() context
                         
