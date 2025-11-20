@@ -885,11 +885,11 @@ except Exception as e:
         const references = similarQuestionsList.map((item: any, index: number) => ({
           id: index + 1,
           responseId: id,
-          category: item.category || 'Unknown',
+          category: item.customer || item.category || 'Unknown',  // Use customer field first
           requirement: item.question || item.requirement || '',
           response: item.response || '',
           reference: item.reference || (item.id ? `#${item.id}` : undefined),
-          score: item.similarity_score || 0
+          score: parseFloat(item.similarity_score) || 0  // Parse string score to number
         }));
         
         return res.json(references);
@@ -925,7 +925,7 @@ except Exception as e:
           const references = data.similar_matches.map((item: any, index: number) => ({
             id: index + 1,
             responseId: id,
-            category: item.category || 'Unknown',
+            category: item.customer || item.category || 'Unknown',  // Use customer field first
             requirement: item.requirement || '',
             response: item.response || '',
             reference: item.id ? `#${item.id}` : undefined,
