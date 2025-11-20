@@ -104,6 +104,18 @@ The RFP Response Generator is an advanced AI-powered application that leverages 
 
 ## Recent Changes
 
+### November 20, 2025 - Document Name Display in References
+- **Enhanced UI**: References now display source document names alongside IDs (e.g., "Reference #10710 - BDO RFI.xlsx_Sheet1")
+- **Complete Backfill**: Populated all 9,650 reference embeddings with document names from original source Excel file
+- **Improved Traceability**: Users can now see exactly which document each reference came from
+- **Optimized Performance**: Used batch SQL updates for efficient backfill of reference column
+
+### November 20, 2025 - On-the-Fly Embedding Architecture
+- **Critical Fix**: Implemented on-the-fly embedding generation to protect pristine reference data
+- **Architecture Change**: New requirements generate temporary embeddings (not persisted to database)
+- **Data Integrity**: Embeddings table maintains exactly 9,650 pristine reference embeddings forever
+- **Performance**: Efficient vector search using direct SQL casting for temporary embeddings
+
 ### November 20, 2025 - Automatic Embedding Generation
 - **Root Cause Fixed**: Implemented missing embedding generation step that was preventing references from showing in responses
 - **Automatic Workflow**: Embeddings now generate automatically in the background when you upload Excel files (no manual steps needed)

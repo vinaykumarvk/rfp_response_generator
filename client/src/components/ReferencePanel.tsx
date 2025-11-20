@@ -206,7 +206,7 @@ export default function ReferencePanel({ responseId, showTitle = true, onReferen
               <div className="flex-1">
                 <div className="flex items-center gap-2">
                   <span className="font-medium text-slate-900 dark:text-slate-100">
-                    Reference {reference.reference || `#${reference.id}`}
+                    Reference #{reference.id}{reference.reference ? ` - ${reference.reference}` : ''}
                   </span>
                   <Badge variant="outline" className="h-5 text-xs bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-200 border-slate-200 dark:border-slate-700">
                     Score: {(reference.score * 100).toFixed(1)}%
@@ -233,7 +233,7 @@ export default function ReferencePanel({ responseId, showTitle = true, onReferen
               {reference.reference && (
                 <div className="flex items-center gap-2 text-sm text-blue-600 dark:text-blue-400">
                   <ExternalLink className="h-4 w-4" />
-                  <span>Reference ID: {reference.reference}</span>
+                  <span>Source Document: {reference.reference}</span>
                 </div>
               )}
             </div>

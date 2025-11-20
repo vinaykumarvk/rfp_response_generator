@@ -118,22 +118,18 @@ def find_similar_matches(requirement_id):
             similar_questions_for_db = []
             
             for result in similar_results:
-                # Extract customer/client information
-                # Check if reference field looks like a customer name or just a requirement ID
-                reference_field = result[4] if result[4] else ""
-                category_field = result[3] if result[3] else ""
+                # Extract fields from the database result
+                reference_field = result[4] if result[4] else ""  # Document name (e.g., "BDO RFI.xlsx_Sheet1")
+                category_field = result[3] if result[3] else ""   # Category/customer info
                 
-                customer_info = ""
+                # Document name is in the reference column - this is what we want to display
+                document_name = reference_field if reference_field else ""
                 
-                # If reference starts with "REQ-" it's just an ID, not a customer name
-                # In that case, use category field instead
-                if reference_field and not reference_field.startswith('REQ-') and not reference_field.startswith('Match #'):
-                    customer_info = reference_field
-                # Otherwise use category field (which often has customer names in old data)
-                elif category_field:
-                    customer_info = category_field
-                # Last resort: try payload
-                else:
+                # Customer/category info from category field
+                customer_info = category_field if category_field else ""
+                
+                # Last resort: try payload for customer info
+                if not customer_info:
                     try:
                         if result[5]:  # payload field
                             payload = json.loads(result[5])
@@ -142,16 +138,14 @@ def find_similar_matches(requirement_id):
                     except Exception as e:
                         logger.debug(f"Could not parse payload for customer info: {e}")
                 
-                reference_source = customer_info  # Use customer_info as reference source
-                
                 # Format for API response
                 formatted_results.append({
                     "id": result[0],
                     "requirement": result[1],
                     "response": result[2],
-                    "category": result[3],
-                    "reference": reference_source,
-                    "customer": customer_info,
+                    "category": customer_info,  # Category field for display
+                    "reference": document_name,  # Document name from reference column
+                    "customer": customer_info,   # Customer info for backwards compatibility
                     "similarity_score": float(result[6])  # Updated index for similarity_score
                 })
                 
