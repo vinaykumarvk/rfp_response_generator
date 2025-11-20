@@ -192,7 +192,7 @@ def find_similar_matches(requirement_id):
                 logger.info(f"Match #{idx}")
                 logger.info(f"ID: {result[0]}")
                 logger.info(f"Category: {result[3]}")
-                logger.info(f"Similarity Score: {result[4]:.4f}")
+                logger.info(f"Similarity Score: {float(result[6]):.4f}")
                 logger.info(f"Requirement: {result[1]}")
                 logger.info(f"Response: {result[2][:100]}...") # Log only the first 100 chars
                 logger.info("-" * 40)

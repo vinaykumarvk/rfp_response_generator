@@ -52,7 +52,8 @@ Develop a high-quality response to the current RFP requirement. Use ONLY the pro
    - Prioritize responses with higher similarity scores for relevance.
    - Include ARX security engine references ONLY for entitlement-driven access control questions.
    - Maintain a word count of approximately 200 words.
-   - **MANDATORY**: For every claim or feature mentioned, reference the specific source with descriptive context, customer name, and similarity percentage (e.g., "as demonstrated in our reporting capabilities response for ABC Corp (92% similarity)" or "based on our previous authentication implementation for XYZ Client (85% similarity)").
+   - **MANDATORY SOURCING**: For every claim or feature mentioned, reference the source number and the EXACT customer name shown in the source (e.g., "from Source 1 for CT Sigma - 92% similarity"). 
+   - **CRITICAL**: DO NOT invent, modify, or create customer names. Use ONLY the customer names exactly as listed in each source's "Customer/Client" field. If a source shows "Customer/Client: CT Sigma", you must write "for CT Sigma" - never invent different names like "Global Wealth Advisors" or "Sterling Trust".
 
 3. **Response Structure**:
    - **Opening Statement**: Highlight the most relevant feature or capability related to the requirement.
@@ -64,11 +65,13 @@ Develop a high-quality response to the current RFP requirement. Use ONLY the pro
    - Do NOT infer or add content beyond the provided source material.
    - Do NOT include speculative or ambiguous language.
    - **STRICT SOURCING**: Every factual claim must be traceable to a specific example. If no examples support a claim, do NOT include it.
+   - **NO INVENTED CUSTOMER NAMES**: You must use ONLY the exact customer names from the provided sources. Never create fictional customer names like "Global Wealth Advisors", "Sterling Trust", or any other names not explicitly listed in the sources.
 
 **OUTPUT REQUIREMENTS**:
 - A concise response which can be directly put into RFP submission. Hence no commentary or meta text in the response.
 - Structured, clear, and self-contained.
-- **SOURCE ATTRIBUTION**: Include specific descriptive references with customer names and similarity percentages for all factual claims (e.g., "Our system provides advanced reporting capabilities (from our financial reporting response for ABC Corp - 92% similarity) with real-time dashboard features (from our analytics implementation for XYZ Client - 85% similarity).").
+- **SOURCE ATTRIBUTION**: Include specific references using the source number and EXACT customer name from the source data (e.g., "from Source 1 for CT Sigma - 92% similarity"). 
+- **VERIFICATION**: Before citing a customer name, verify it appears in the source's "Customer/Client" field. Only use names that are explicitly provided.
 """
     }
     
@@ -112,9 +115,10 @@ Develop a high-quality response to the current RFP requirement. Use ONLY the pro
 **Instructions**:
 1. Analyze the responses, prioritizing those with higher scores for relevance.
 2. Draft a response that meets all guidelines and rules outlined in the system message.
-3. **CRITICAL**: For every feature, capability, or claim you mention, cite the specific source with its descriptive title, customer name, and similarity percentage in parentheses (e.g., "from Source 1: Audit Trail Implementation for ABC Corp - 92% similarity").
-4. Ensure the response is clear, concise, and tailored to the given requirement.
-5. If you cannot find supporting content in the sources for a claim, do NOT include that claim.
+3. **CRITICAL**: For every feature, capability, or claim you mention, cite using "from Source X for [EXACT CUSTOMER NAME] - XX% similarity" format.
+4. **VERIFICATION REQUIRED**: Before writing any customer name, verify it appears in that source's "Customer/Client:" field. Copy the name exactly as shown - do not modify, abbreviate, or invent.
+5. Ensure the response is clear, concise, and tailored to the given requirement.
+6. If you cannot find supporting content in the sources for a claim, do NOT include that claim.
 
 **Current Requirement**: {requirement}.
 """
@@ -129,10 +133,11 @@ Develop a high-quality response to the current RFP requirement. Use ONLY the pro
 3. The tone is professional and business-focused.
 4. No meta-text, assumptions, or speculative language is present.
 5. The response delivers a clear, specific value proposition for the requirement.
-6. **SOURCE VALIDATION**: Every factual claim includes a reference to the specific source with descriptive title, customer name, and similarity percentage (e.g., "from Source 1: Audit Trail Implementation for ABC Corp - 92% similarity").
-7. **HALLUCINATION CHECK**: No content exists that cannot be traced back to the provided sources.
+6. **SOURCE VALIDATION**: Every factual claim includes a reference using "from Source X for [CUSTOMER] - XX% similarity" format.
+7. **CUSTOMER NAME VALIDATION**: Verify each customer name appears EXACTLY as shown in the source's "Customer/Client:" field. Remove any citations using invented names like "Global Wealth Advisors", "Sterling Trust", or any name not explicitly listed in the sources.
+8. **HALLUCINATION CHECK**: No content exists that cannot be traced back to the provided sources.
 
-If any criteria are unmet, revise the response accordingly. Pay special attention to criteria 6 and 7 to prevent hallucination."""
+If any criteria are unmet, revise the response accordingly. Pay special attention to criteria 6, 7, and 8 to prevent hallucination and fake customer names."""
     }
     
     # Create the full message array
