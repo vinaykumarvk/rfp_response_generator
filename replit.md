@@ -53,10 +53,11 @@ The RFP Response Generator is an advanced AI-powered application that leverages 
 
 1. **Requirement Input**: Users upload Excel files containing RFP requirements
 2. **Data Processing**: Requirements are parsed and stored in PostgreSQL database
-3. **Vector Generation**: Embeddings are created for similarity search capabilities using OpenAI's text-embedding-3-small model
+3. **Vector Generation**: Embeddings are **automatically generated** in the background using OpenAI's text-embedding-3-small model
+   - Triggers automatically after Excel upload (no manual steps needed)
    - Uses batch processing (up to 100 requirements per API call) for efficiency
    - Stores embeddings in PostgreSQL with pgvector for fast similarity search
-   - Can be triggered via `/api/generate-embeddings` endpoint
+   - Manual endpoint `/api/generate-embeddings` available if needed for re-generation
 4. **AI Processing**: When generating responses, the system:
    - Finds similar previous responses using vector search
    - Creates optimized prompts with domain-specific context
@@ -103,13 +104,14 @@ The RFP Response Generator is an advanced AI-powered application that leverages 
 
 ## Recent Changes
 
-### November 20, 2025 - Embedding Generation Workflow Implementation
+### November 20, 2025 - Automatic Embedding Generation
 - **Root Cause Fixed**: Implemented missing embedding generation step that was preventing references from showing in responses
+- **Automatic Workflow**: Embeddings now generate automatically in the background when you upload Excel files (no manual steps needed)
 - **Batch Processing**: Created `generate_embeddings.py` with efficient batch processing using OpenAI API (up to 100 requirements per API call)
 - **Security Hardening**: Used spawn instead of exec to prevent command injection, added input validation and sanitization
-- **API Endpoint**: Added `/api/generate-embeddings` endpoint with proper error handling and timeout management
 - **Database Optimization**: Implemented bulk insert operations with transaction management for better performance
-- **Workflow**: Complete flow now works: Upload Requirements → Generate Embeddings → Find Similar Matches → Generate Response with Source Citations
+- **Complete Flow**: Upload Requirements → Auto-Generate Embeddings → Find Similar Matches → Generate Response with Source Citations
+- **Manual Override**: `/api/generate-embeddings` endpoint available if needed for re-generating embeddings on old data
 
 ### July 02, 2025 - Anti-Hallucination Enhancement with Customer Attribution
 - **Enhanced Prompt Structure**: Added mandatory source attribution requirements to prevent LLM hallucination
