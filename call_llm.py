@@ -167,15 +167,11 @@ def get_model_config(model_name):
             'client_kwargs': {},
             'completion_args': {
                 'model': 'gpt-5',
-                'temperature': 0.2,
-                'user': "private-user",
-                'extra_headers': {
-                    "HTTP-Referer": "null",
-                    "X-Data-Use-Consent": "false"
-                }
+                'temperature': 0.2
             },
             'requires_system_message_handling': False,
-            'response_handler': lambda response: response.choices[0].message.content.strip()
+            'use_responses_api': True,  # Use new Responses API for GPT-5
+            'response_handler': lambda response: response.output_text.strip() if hasattr(response, 'output_text') else str(response)
         },
         'deepseek': {
             'display_name': 'DeepSeek',
@@ -271,11 +267,24 @@ def prompt_gpt(prompt, model_name='openAI'):
             
             response = client.messages.create(**completion_args)
         else:
-            # Standard completion for models that don't need special system message handling
-            completion_args = config['completion_args'].copy()
-            completion_args['messages'] = prompt
-            
-            response = client.chat.completions.create(**completion_args)
+            # Check if this model uses the new Responses API (e.g., GPT-5)
+            if config.get('use_responses_api', False):
+                # Use the new Responses API
+                completion_args = config['completion_args'].copy()
+                # Convert messages format to input format for Responses API
+                completion_args['input'] = prompt
+                
+                print(f"======= {display_name.upper()} PROMPT (Responses API) =======")
+                print(f"Input: {str(prompt)[:200]}...")
+                print("===============================")
+                
+                response = client.responses.create(**completion_args)
+            else:
+                # Standard completion for models that use chat.completions API
+                completion_args = config['completion_args'].copy()
+                completion_args['messages'] = prompt
+                
+                response = client.chat.completions.create(**completion_args)
         
         # Handle the response using the model-specific handler
         content = config['response_handler'](response)
