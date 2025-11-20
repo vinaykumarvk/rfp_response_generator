@@ -46,14 +46,14 @@ Develop a high-quality response to the current RFP requirement. Use ONLY the pro
    - Accessible to business professionals, avoiding excessive technical jargon.
    - Focus on business benefits, practical applications, and value propositions.
    - Ensure the response is complete and submission-ready.
+   - **NO CITATIONS IN TEXT**: Do NOT include any citations, source references, similarity percentages, or customer names in the response body. The response should be clean, readable text without any "(from Source X...)" or similar annotations.
 
 2. **Content Rules**:
    - Incorporate ONLY content from the provided previous responses.
    - Prioritize responses with higher similarity scores for relevance.
    - Include ARX security engine references ONLY for entitlement-driven access control questions.
    - Maintain a word count of approximately 200 words.
-   - **MANDATORY SOURCING**: For every claim or feature mentioned, reference the source number and the EXACT customer name shown in the source (e.g., "from Source 1 for CT Sigma - 92% similarity"). 
-   - **CRITICAL**: DO NOT invent, modify, or create customer names. Use ONLY the customer names exactly as listed in each source's "Customer/Client" field. If a source shows "Customer/Client: CT Sigma", you must write "for CT Sigma" - never invent different names like "Global Wealth Advisors" or "Sterling Trust".
+   - Use the source material to inform your response, but present it as clean, fluent text without citation markers.
 
 3. **Response Structure**:
    - **Opening Statement**: Highlight the most relevant feature or capability related to the requirement.
@@ -65,13 +65,13 @@ Develop a high-quality response to the current RFP requirement. Use ONLY the pro
    - Do NOT infer or add content beyond the provided source material.
    - Do NOT include speculative or ambiguous language.
    - **STRICT SOURCING**: Every factual claim must be traceable to a specific example. If no examples support a claim, do NOT include it.
-   - **NO INVENTED CUSTOMER NAMES**: You must use ONLY the exact customer names from the provided sources. Never create fictional customer names like "Global Wealth Advisors", "Sterling Trust", or any other names not explicitly listed in the sources.
+   - **ABSOLUTELY NO CITATIONS**: Do NOT include any form of citation, source reference, customer name, or similarity percentage in the response text. Examples of what NOT to include: "(from Source 1...)", "(Source 2: ...)", "for CT Sigma", "92% similarity", etc.
 
 **OUTPUT REQUIREMENTS**:
-- A concise response which can be directly put into RFP submission. Hence no commentary or meta text in the response.
-- Structured, clear, and self-contained.
-- **SOURCE ATTRIBUTION**: Include specific references using the source number and EXACT customer name from the source data (e.g., "from Source 1 for CT Sigma - 92% similarity"). 
-- **VERIFICATION**: Before citing a customer name, verify it appears in the source's "Customer/Client" field. Only use names that are explicitly provided.
+- A clean, citation-free response ready for direct RFP submission
+- No source attributions, citations, or references in the text body
+- Structured, clear, and self-contained
+- Professional and fluent without any bracketed references or annotations
 """
     }
     
@@ -115,8 +115,8 @@ Develop a high-quality response to the current RFP requirement. Use ONLY the pro
 **Instructions**:
 1. Analyze the responses, prioritizing those with higher scores for relevance.
 2. Draft a response that meets all guidelines and rules outlined in the system message.
-3. **CRITICAL**: For every feature, capability, or claim you mention, cite using "from Source X for [EXACT CUSTOMER NAME] - XX% similarity" format.
-4. **VERIFICATION REQUIRED**: Before writing any customer name, verify it appears in that source's "Customer/Client:" field. Copy the name exactly as shown - do not modify, abbreviate, or invent.
+3. **CRITICAL**: Write clean, fluent text WITHOUT any citations, source references, customer names, or similarity percentages.
+4. Use the provided sources to inform your content, but present it as seamless, professional text.
 5. Ensure the response is clear, concise, and tailored to the given requirement.
 6. If you cannot find supporting content in the sources for a claim, do NOT include that claim.
 
@@ -133,11 +133,11 @@ Develop a high-quality response to the current RFP requirement. Use ONLY the pro
 3. The tone is professional and business-focused.
 4. No meta-text, assumptions, or speculative language is present.
 5. The response delivers a clear, specific value proposition for the requirement.
-6. **SOURCE VALIDATION**: Every factual claim includes a reference using "from Source X for [CUSTOMER] - XX% similarity" format.
-7. **CUSTOMER NAME VALIDATION**: Verify each customer name appears EXACTLY as shown in the source's "Customer/Client:" field. Remove any citations using invented names like "Global Wealth Advisors", "Sterling Trust", or any name not explicitly listed in the sources.
+6. **NO CITATIONS CHECK**: Verify the response contains NO citations, source references, customer names, or similarity percentages. Remove any text like "(from Source X...)", "(for Customer...)", or "XX% similarity".
+7. **CLEAN TEXT VALIDATION**: The response should be clean, fluent, professional text that reads naturally without any bracketed annotations or references.
 8. **HALLUCINATION CHECK**: No content exists that cannot be traced back to the provided sources.
 
-If any criteria are unmet, revise the response accordingly. Pay special attention to criteria 6, 7, and 8 to prevent hallucination and fake customer names."""
+If any criteria are unmet, revise the response accordingly. Pay special attention to criteria 6 and 7 to ensure clean, citation-free text."""
     }
     
     # Create the full message array

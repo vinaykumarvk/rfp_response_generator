@@ -127,19 +127,27 @@ def find_similar_matches(requirement_id):
             similar_questions_for_db = []
             
             for result in similar_results:
-                # Extract customer/client information from payload
+                # Extract customer/client information
+                # Priority: reference field > category field > payload category
                 customer_info = ""
-                try:
-                    if result[5]:  # payload field
-                        payload = json.loads(result[5])
-                        # Try to extract customer/client info from category or other fields
-                        if payload.get('category'):
-                            customer_info = payload['category']
-                except Exception as e:
-                    logger.debug(f"Could not parse payload for customer info: {e}")
                 
-                # Use reference field if available, otherwise use category
-                reference_source = result[4] if result[4] else customer_info  # reference field
+                # First try reference field (as per user specification)
+                if result[4]:  # reference field
+                    customer_info = result[4]
+                # If reference is empty, use category field
+                elif result[3]:  # category field
+                    customer_info = result[3]
+                # Last resort: try payload
+                else:
+                    try:
+                        if result[5]:  # payload field
+                            payload = json.loads(result[5])
+                            if payload.get('category'):
+                                customer_info = payload['category']
+                    except Exception as e:
+                        logger.debug(f"Could not parse payload for customer info: {e}")
+                
+                reference_source = customer_info  # Use customer_info as reference source
                 
                 # Format for API response
                 formatted_results.append({
