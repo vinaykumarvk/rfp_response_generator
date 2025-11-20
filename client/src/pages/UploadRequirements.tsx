@@ -173,20 +173,6 @@ export default function UploadRequirements() {
                 return;
               }
               
-              // Check if file has extra columns not in our schema
-              const allowedColumns = [
-                'Category', 'category', 
-                'Requirement', 'requirement', 'text', 'Text', 'content', 'Content',
-                'Response', 'response', 'finalResponse',
-                'Rating', 'rating'
-              ];
-              
-              const extraColumns = availableColumns.filter(col => !allowedColumns.includes(col));
-              if (extraColumns.length > 0) {
-                reject(new Error(`File contains extra columns: ${extraColumns.join(', ')}. Only 'Category' and 'Requirement' columns are supported.`));
-                return;
-              }
-              
               // Map to our expected format
               const parsedData: ExcelRow[] = jsonData.map(row => ({
                 category: row.Category || row.category || "Uncategorized",
