@@ -5,7 +5,7 @@ import os
 import sys
 import json
 import logging
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from openai import OpenAI
 from database import engine
 from sqlalchemy import text
