@@ -134,6 +134,126 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Generate embeddings for requirements
+  app.post("/api/generate-embeddings", async (req: Request, res: Response) => {
+    try {
+      const { requirementIds } = req.body;
+      
+      // Validate and sanitize input
+      let validatedIds: string | null = null;
+      if (requirementIds) {
+        if (!Array.isArray(requirementIds)) {
+          return res.status(400).json({ message: 'requirementIds must be an array' });
+        }
+        
+        // Validate that all IDs are numbers
+        const numericIds = requirementIds.filter(id => {
+          const num = parseInt(id);
+          return !isNaN(num) && num > 0;
+        });
+        
+        if (numericIds.length === 0) {
+          return res.status(400).json({ message: 'No valid requirement IDs provided' });
+        }
+        
+        validatedIds = numericIds.join(',');
+      }
+      
+      console.log(`Generating embeddings${validatedIds ? ` for specific requirements: ${validatedIds}` : ' for all requirements without embeddings'}`);
+      
+      // Use spawn instead of exec for security - prevents command injection
+      const { spawn } = await import('child_process');
+      const args = validatedIds ? [validatedIds] : [];
+      
+      const pythonProcess = spawn('python3', ['generate_embeddings.py', ...args]);
+      
+      let stdout = '';
+      let stderr = '';
+      
+      pythonProcess.stdout?.on('data', (data: Buffer) => {
+        stdout += data.toString();
+      });
+      
+      pythonProcess.stderr?.on('data', (data: Buffer) => {
+        stderr += data.toString();
+        console.error('Python stderr:', data.toString());
+      });
+      
+      // Wait for the process to complete
+      await new Promise<void>((resolve, reject) => {
+        // Set timeout
+        const timeout = setTimeout(() => {
+          pythonProcess.kill();
+          reject(new Error('Embedding generation timed out after 5 minutes'));
+        }, 300000); // 5 minute timeout
+        
+        pythonProcess.on('close', (code: number | null) => {
+          clearTimeout(timeout);
+          if (code === 0) {
+            resolve();
+          } else {
+            reject(new Error(`Python process exited with code ${code}`));
+          }
+        });
+        
+        pythonProcess.on('error', (error: Error) => {
+          clearTimeout(timeout);
+          reject(error);
+        });
+      });
+      
+      console.log('Python embedding generation output:', stdout);
+      
+      // Parse the response - extract only the JSON part
+      try {
+        // Find the last line that looks like JSON (starts with { or [)
+        const lines = stdout.trim().split('\n');
+        let jsonLine = '';
+        for (let i = lines.length - 1; i >= 0; i--) {
+          const line = lines[i].trim();
+          if (line.startsWith('{') || line.startsWith('[')) {
+            jsonLine = line;
+            break;
+          }
+        }
+        
+        if (!jsonLine) {
+          throw new Error('No JSON output found in response');
+        }
+        
+        const data = JSON.parse(jsonLine);
+        
+        if (data.success) {
+          return res.status(200).json({
+            success: true,
+            message: 'Embeddings generated successfully',
+            statistics: data.statistics
+          });
+        } else {
+          return res.status(500).json({
+            success: false,
+            message: 'Embedding generation failed',
+            errors: data.statistics?.errors || []
+          });
+        }
+      } catch (parseError) {
+        console.error('Failed to parse embedding generation output:', parseError);
+        return res.status(500).json({
+          success: false,
+          message: 'Failed to parse embedding generation output',
+          rawOutput: stdout,
+          stderr: stderr
+        });
+      }
+    } catch (error) {
+      console.error('Error generating embeddings:', error);
+      return res.status(500).json({ 
+        message: 'Failed to generate embeddings',
+        error: String(error)
+      });
+    }
+  });
+
   // Health check endpoint
   app.get('/api/health', (_req: Request, res: Response) => {
     return res.json({ status: 'ok', timestamp: new Date().toISOString() });
