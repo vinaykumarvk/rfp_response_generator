@@ -156,7 +156,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Generate embeddings for requirements
+  // DEPRECATED: Generate embeddings for requirements
+  // WARNING: This endpoint should ONLY be used for adding REFERENCE DATA to the embeddings table
+  // DO NOT use this for uploaded user requirements - those use on-the-fly embedding generation
+  // The embeddings table should contain only the 9,650 pristine reference embeddings
   app.post("/api/generate-embeddings", async (req: Request, res: Response) => {
     try {
       const { requirementIds } = req.body;

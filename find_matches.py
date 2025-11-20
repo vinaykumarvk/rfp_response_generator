@@ -49,47 +49,38 @@ def find_similar_matches(requirement_id):
             # Log the requirement we're looking for
             logger.info(f"Found requirement: {requirement}")
             
-            # First check if an embedding exists for this requirement
-            embedding_check_query = text("""
-                SELECT COUNT(*) 
-                FROM embeddings 
-                WHERE requirement = (
-                    SELECT requirement 
-                    FROM excel_requirement_responses 
-                    WHERE id = :req_id
+            # Generate embedding on-the-fly for this requirement (don't persist it)
+            # This keeps the embeddings table pristine with only 9,650 reference embeddings
+            requirement_text = requirement[1]
+            logger.info(f"Generating temporary embedding for requirement: {requirement_text[:100]}...")
+            
+            try:
+                from openai import OpenAI
+                import os
+                
+                client = OpenAI(api_key=os.environ.get('OPENAI_API_KEY'))
+                embedding_response = client.embeddings.create(
+                    model="text-embedding-3-small",
+                    input=requirement_text
                 )
-            """)
-            
-            embedding_count = connection.execute(embedding_check_query, {"req_id": requirement_id}).scalar()
-            logger.info(f"Found {embedding_count} embeddings for requirement ID {requirement_id}")
-            
-            if embedding_count == 0:
-                logger.warning(f"No embeddings found for requirement ID {requirement_id}")
-                # Return early with fallback similar questions
+                requirement_embedding = embedding_response.data[0].embedding
+                logger.info(f"Generated temporary embedding (dimension: {len(requirement_embedding)})")
+                
+            except Exception as e:
+                logger.error(f"Error generating temporary embedding: {str(e)}")
                 return {
-                    "success": True,
-                    "requirement": {
-                        "id": requirement[0],
-                        "text": requirement[1],
-                        "category": requirement[2]
-                    },
-                    "similar_matches": [],
-                    "warning": "No embeddings found for this requirement"
+                    "success": False,
+                    "error": f"Failed to generate embedding: {str(e)}"
                 }
             
-            # Find top 5 similar vectors using cosine similarity with a more efficient query
-            # Using Common Table Expression (CTE) to avoid nested subqueries
-            similar_query = text("""
-                WITH req_embedding AS (
-                    SELECT embedding
-                    FROM embeddings
-                    WHERE requirement = (
-                        SELECT requirement
-                        FROM excel_requirement_responses
-                        WHERE id = :req_id
-                    )
-                    LIMIT 1
-                )
+            # Now find similar matches using the temporary embedding
+            # Search against the 9,650 reference embeddings ONLY
+            # Convert the embedding list to the format PostgreSQL expects
+            embedding_str = '[' + ','.join(map(str, requirement_embedding)) + ']'
+            
+            # We need to use a subquery with the embedding directly in the SQL
+            # since SQLAlchemy has issues with vector type parameter binding
+            similar_query = text(f"""
                 SELECT 
                     e.id,
                     e.requirement as matched_requirement,
@@ -97,7 +88,7 @@ def find_similar_matches(requirement_id):
                     e.category,
                     e.reference,
                     e.payload,
-                    1 - (e.embedding <=> (SELECT embedding FROM req_embedding)) as similarity_score
+                    1 - (e.embedding <=> '{embedding_str}'::vector) as similarity_score
                 FROM embeddings e
                 WHERE e.embedding IS NOT NULL
                 ORDER BY similarity_score DESC
@@ -108,11 +99,11 @@ def find_similar_matches(requirement_id):
             logger.info(f"Starting similarity search query for requirement ID: {requirement_id}")
             start_time = time.time()
             
-            # Execute the similarity search with a timeout
+            # Execute the similarity search with the temporary embedding
             # Using try/except to catch potential timeout issues
             try:
                 similar_results = connection.execution_options(timeout=20).execute(
-                    similar_query, {"req_id": requirement_id}
+                    similar_query
                 ).fetchall()
                 
                 elapsed_time = time.time() - start_time
