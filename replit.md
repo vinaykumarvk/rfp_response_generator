@@ -53,7 +53,10 @@ The RFP Response Generator is an advanced AI-powered application that leverages 
 
 1. **Requirement Input**: Users upload Excel files containing RFP requirements
 2. **Data Processing**: Requirements are parsed and stored in PostgreSQL database
-3. **Vector Generation**: Embeddings are created for similarity search capabilities
+3. **Vector Generation**: Embeddings are created for similarity search capabilities using OpenAI's text-embedding-3-small model
+   - Uses batch processing (up to 100 requirements per API call) for efficiency
+   - Stores embeddings in PostgreSQL with pgvector for fast similarity search
+   - Can be triggered via `/api/generate-embeddings` endpoint
 4. **AI Processing**: When generating responses, the system:
    - Finds similar previous responses using vector search
    - Creates optimized prompts with domain-specific context
@@ -100,6 +103,14 @@ The RFP Response Generator is an advanced AI-powered application that leverages 
 
 ## Recent Changes
 
+### November 20, 2025 - Embedding Generation Workflow Implementation
+- **Root Cause Fixed**: Implemented missing embedding generation step that was preventing references from showing in responses
+- **Batch Processing**: Created `generate_embeddings.py` with efficient batch processing using OpenAI API (up to 100 requirements per API call)
+- **Security Hardening**: Used spawn instead of exec to prevent command injection, added input validation and sanitization
+- **API Endpoint**: Added `/api/generate-embeddings` endpoint with proper error handling and timeout management
+- **Database Optimization**: Implemented bulk insert operations with transaction management for better performance
+- **Workflow**: Complete flow now works: Upload Requirements → Generate Embeddings → Find Similar Matches → Generate Response with Source Citations
+
 ### July 02, 2025 - Anti-Hallucination Enhancement with Customer Attribution
 - **Enhanced Prompt Structure**: Added mandatory source attribution requirements to prevent LLM hallucination
 - **Descriptive Source Citations**: Replaced generic "Example 1" with descriptive titles like "Source 1: Audit Trail Implementation"
@@ -124,6 +135,9 @@ The RFP Response Generator is an advanced AI-powered application that leverages 
 
 ```
 Changelog:
+- November 20, 2025. Implemented embedding generation workflow to fix missing references issue
+- November 20, 2025. Added batch processing for efficient embedding creation
+- November 20, 2025. Fixed security vulnerabilities in embedding generation endpoint
 - July 02, 2025. Enhanced prompts with source attribution to prevent hallucination
 - July 02, 2025. Initial setup
 ```
