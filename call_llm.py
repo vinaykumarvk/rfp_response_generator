@@ -166,11 +166,11 @@ def get_model_config(model_name):
             },
             'client_kwargs': {},
             'completion_args': {
-                'model': 'gpt-5',
+                'model': 'gpt-5.1',
                 'temperature': 0.2
             },
             'requires_system_message_handling': False,
-            'use_responses_api': True,  # Use new Responses API for GPT-5
+            'use_responses_api': True,  # Use new Responses API for GPT-5.1
             'response_handler': lambda response: response.output_text.strip() if hasattr(response, 'output_text') else str(response)
         },
         'deepseek': {
