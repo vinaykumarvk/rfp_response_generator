@@ -166,7 +166,7 @@ def get_model_config(model_name):
             },
             'client_kwargs': {},
             'completion_args': {
-                'model': 'gpt-4',
+                'model': 'gpt-5',
                 'temperature': 0.2,
                 'user': "private-user",
                 'extra_headers': {
