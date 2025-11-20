@@ -124,6 +124,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       responses = await storage.createExcelRequirementResponses(formattedData);
       console.log(`Created ${responses.length} Excel requirement responses`);
       
+      // Automatically generate embeddings for the new requirements in the background
+      const requirementIds = responses.map(r => r.id);
+      if (requirementIds.length > 0) {
+        console.log(`Triggering automatic embedding generation for ${requirementIds.length} requirements...`);
+        
+        // Run embedding generation in background (don't wait for it)
+        const { spawn } = await import('child_process');
+        const embeddingProcess = spawn('python3', ['generate_embeddings.py', requirementIds.join(',')]);
+        
+        embeddingProcess.on('close', (code) => {
+          if (code === 0) {
+            console.log(`✓ Successfully generated embeddings for ${requirementIds.length} requirements`);
+          } else {
+            console.error(`✗ Embedding generation failed with code ${code}`);
+          }
+        });
+        
+        embeddingProcess.on('error', (error) => {
+          console.error('Error in background embedding generation:', error);
+        });
+      }
+      
       return res.status(201).json({ 
         message: `Successfully processed ${responses.length} entries from Excel file`, 
         data: responses 
