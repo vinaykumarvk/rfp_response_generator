@@ -507,63 +507,67 @@ def get_llm_responses(requirement_id, model='moa', display_results=True, skip_si
             
             # If not skipping or if retrieving existing failed, perform similarity search
             if not skip_similarity_search:
-                # Find similar matches and generate prompts
-                similar_query = text("""
-                    WITH requirement_embedding AS (
-                        SELECT embedding 
-                        FROM embeddings 
-                        WHERE requirement = (
-                            SELECT requirement 
-                            FROM excel_requirement_responses 
-                            WHERE id = :req_id
-                        )
-                        LIMIT 1
-                    )
-                    SELECT 
-                        e.id,
-                        e.requirement as matched_requirement,
-                        e.response as matched_response,
-                        e.category,
-                        CASE 
-                            WHEN re.embedding IS NOT NULL AND e.embedding IS NOT NULL 
-                            THEN 1 - (e.embedding <=> re.embedding)
-                            ELSE 0.0
-                        END as similarity_score
-                    FROM embeddings e
-                    CROSS JOIN requirement_embedding re
-                    WHERE e.embedding IS NOT NULL
-                    ORDER BY similarity_score DESC
-                    LIMIT 5;
-                """)
-
+                # Use the proper find_similar_matches function that extracts customer names
                 try:
-                    similar_results = connection.execute(similar_query, {"req_id": requirement_id}).fetchall()
-                    print("2. Retrieved similar questions from database")
-
-                    if not similar_results:
+                    from find_matches import find_similar_matches
+                    
+                    print("2. Calling find_similar_matches to get proper customer names...")
+                    matches_result = find_similar_matches(requirement_id)
+                    
+                    if matches_result.get('success') and matches_result.get('similar_matches'):
+                        # Convert the matches to the format expected by the rest of the code
+                        similar_results = []
+                        for match in matches_result['similar_matches']:
+                            similar_results.append([
+                                match['id'],
+                                match['requirement'],
+                                match['response'],
+                                match.get('category', ''),
+                                match.get('customer', ''),  # Customer name extracted by find_matches
+                                match['similarity_score']
+                            ])
+                        print(f"Retrieved {len(similar_results)} similar questions with customer data")
+                    else:
                         print("Warning: No similar questions found")
                         similar_results = []
                 except Exception as e:
                     print(f"Warning: Error fetching similar questions: {str(e)}")
+                    print(f"Exception traceback: {traceback.format_exc()}")
                     similar_results = []
 
             # Format previous responses and similar questions
             previous_responses = []
             similar_questions_list = []
             for idx, result in enumerate(similar_results, 1):
+                # Handle both old format (tuple with 5 items) and new format (tuple with 6 items including customer)
+                if len(result) >= 6:
+                    # New format from find_similar_matches with customer data
+                    requirement_text = result[1]
+                    response_text = result[2]
+                    customer_name = result[4]  # Customer name
+                    similarity = result[5]     # Similarity score
+                else:
+                    # Old format (backward compatibility)
+                    requirement_text = result[1]
+                    response_text = result[2]
+                    customer_name = ""
+                    similarity = result[4] if len(result) > 4 else 0.0
+                
                 # Format the similar questions for the prompt in the expected dictionary format
                 previous_responses.append({
-                    "requirement": result[1],  # matched_requirement
-                    "response": result[2],     # matched_response
-                    "similarity_score": result[4]  # similarity_score as float
+                    "requirement": requirement_text,
+                    "response": response_text,
+                    "customer": customer_name,
+                    "similarity_score": similarity
                 })
                 
                 # Format similar questions for API response and database storage
                 similar_questions_list.append({
-                    "question": result[1],
-                    "response": result[2],
+                    "question": requirement_text,
+                    "response": response_text,
                     "reference": f"Response #{idx}",
-                    "similarity_score": f"{result[4]:.4f}"
+                    "customer": customer_name,  # Include customer name in stored data
+                    "similarity_score": f"{similarity:.4f}"
                 })
                 
             print(f"Found {len(previous_responses)} similar questions")

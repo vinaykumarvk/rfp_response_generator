@@ -128,15 +128,19 @@ def find_similar_matches(requirement_id):
             
             for result in similar_results:
                 # Extract customer/client information
-                # Priority: reference field > category field > payload category
+                # Check if reference field looks like a customer name or just a requirement ID
+                reference_field = result[4] if result[4] else ""
+                category_field = result[3] if result[3] else ""
+                
                 customer_info = ""
                 
-                # First try reference field (as per user specification)
-                if result[4]:  # reference field
-                    customer_info = result[4]
-                # If reference is empty, use category field
-                elif result[3]:  # category field
-                    customer_info = result[3]
+                # If reference starts with "REQ-" it's just an ID, not a customer name
+                # In that case, use category field instead
+                if reference_field and not reference_field.startswith('REQ-') and not reference_field.startswith('Match #'):
+                    customer_info = reference_field
+                # Otherwise use category field (which often has customer names in old data)
+                elif category_field:
+                    customer_info = category_field
                 # Last resort: try payload
                 else:
                     try:
