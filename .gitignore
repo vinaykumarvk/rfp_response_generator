@@ -50,6 +50,12 @@ virtualenv/
 *.sqlite3
 *.db
 
+# Large data files
+*.pkl
+*.pickle
+*.h5
+*.hdf5
+
 # Replit specific
 .replit/
 .cache/
