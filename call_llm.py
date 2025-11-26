@@ -6,7 +6,7 @@ from database import engine
 from generate_prompt import create_rfp_prompt, convert_prompt_to_claude, find_similar_matches_and_generate_prompt
 import logging
 import traceback
-import os
+import httpx
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
