@@ -4,7 +4,7 @@ psycopg2-binary==2.9.9
 
 # AI/ML Models
 openai==1.12.0
-anthropic==0.12.1
+anthropic>=0.37.0
 
 # Note: pgvector is a PostgreSQL extension, not a Python package
 # Install it in your database with: CREATE EXTENSION IF NOT EXISTS vector;
