@@ -2362,8 +2362,21 @@ export default function ViewData() {
               </div>
               
               <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-md mb-4">
-                <h4 className="text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">Requirement:</h4>
+                <h4 className="text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">Original Requirement:</h4>
                 <p className="text-slate-900 dark:text-slate-100">{selectedResponse.requirement}</p>
+              </div>
+              
+              {/* Show the question that was actually sent to LLM */}
+              <div className="p-4 bg-blue-50 dark:bg-blue-900/30 rounded-md mb-4 border border-blue-200 dark:border-blue-800">
+                <h4 className="text-sm font-medium text-blue-700 dark:text-blue-300 mb-1">
+                  Question Sent to LLM:
+                  {selectedResponse.elaboratedRequirement && selectedResponse.elaboratedRequirement !== selectedResponse.requirement && (
+                    <span className="ml-2 text-xs font-normal text-blue-600 dark:text-blue-400">(Elaborated)</span>
+                  )}
+                </h4>
+                <p className="text-slate-900 dark:text-slate-100">
+                  {selectedResponse.elaboratedRequirement || selectedResponse.requirement}
+                </p>
               </div>
               
               <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-md mb-4">
