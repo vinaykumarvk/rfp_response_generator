@@ -147,6 +147,7 @@ export default function Sidebar() {
             size="sm" 
             onClick={() => setCollapsed(!collapsed)}
             className="h-8 w-8 p-0"
+            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
             title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           >
             {collapsed ? (

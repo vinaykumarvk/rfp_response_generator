@@ -10,9 +10,9 @@ import * as path from "path";
 import * as fs from "fs";
 import { fileURLToPath } from "url";
 import { dirname } from "path";
-import { promisify } from "util";
-import { exec as cpExec } from "child_process";
+import { spawn } from "child_process";
 import { mapPythonResponseToDbFields } from "./field_mapping_fix";
+import { validateRequirementId, validateModelName, validateBoolean } from "./pythonRunner";
 
 // Helper function for getting the directory path in ES modules
 const getDirPath = () => {
@@ -20,7 +20,7 @@ const getDirPath = () => {
   return dirname(currentFilePath);
 };
 
-const exec = promisify(cpExec);
+// Removed unused exec import - all Python calls now use secure spawn() with argument arrays
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // API routes - prefix with /api
@@ -93,12 +93,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Analyze Excel data (Upload Requirements)
   app.post("/api/analyze-excel", async (req: Request, res: Response) => {
     try {
-      // Extract data from the uploaded Excel file
+      // RELIABILITY: Add input validation and size limits
       const excelData = req.body.data;
       const replaceExisting = req.body.replaceExisting === true;
       
+      // Validate input structure
       if (!excelData || !Array.isArray(excelData)) {
         return res.status(400).json({ message: "Invalid Excel data format. Expected an array." });
+      }
+      
+      // SECURITY: Add size limits to prevent memory exhaustion
+      const MAX_REQUIREMENTS = 10000; // Reasonable limit
+      if (excelData.length > MAX_REQUIREMENTS) {
+        return res.status(400).json({ 
+          message: `Too many requirements. Maximum allowed: ${MAX_REQUIREMENTS}, received: ${excelData.length}` 
+        });
+      }
+      
+      // Validate each requirement has required fields
+      for (let i = 0; i < excelData.length; i++) {
+        const row = excelData[i];
+        if (!row || typeof row !== 'object') {
+          return res.status(400).json({ message: `Invalid requirement at index ${i}: must be an object` });
+        }
+        if (!row.requirement || typeof row.requirement !== 'string' || row.requirement.trim().length === 0) {
+          return res.status(400).json({ message: `Invalid requirement at index ${i}: requirement field is required` });
+        }
+        if (row.requirement.length > 10000) {
+          return res.status(400).json({ message: `Requirement at index ${i} exceeds maximum length of 10000 characters` });
+        }
       }
       
       // Convert Excel data to our database format
@@ -330,67 +353,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // The path is a proxy to the Python FastAPI server
         console.log(`Calling Python API to generate response for requirement ${requirementId}`);
         
+        // SECURITY: Validate and sanitize inputs to prevent shell injection
+        const validatedRequirementId = validateRequirementId(requirementId);
+        const validatedModel = validateModelName(modelProvider);
+        const validatedSkipSimilarity = validateBoolean(skipSimilaritySearch);
+        
         // Format the model name correctly for the Python API
-        let pythonModel = modelProvider.toLowerCase();
+        let pythonModel = validatedModel;
         if (pythonModel === 'openai') pythonModel = 'openAI';
-        if (pythonModel === 'claude') pythonModel = 'anthropic';
         
-        const pythonApiResponse = await exec(`python3 -c "
-import sys
-import os
-import json
-import traceback
+        // SECURITY: Use spawn() with argument array instead of exec() with shell string
+        const pythonApiResponse = await new Promise<{ stdout: string; stderr: string; code: number | null }>((resolve, reject) => {
+          const pythonProcess = spawn('python3', [
+            'call_llm_wrapper.py',
+            validatedRequirementId.toString(),
+            pythonModel,
+            validatedSkipSimilarity.toString()
+          ], {
+            stdio: ['pipe', 'pipe', 'pipe'],
+            env: process.env,
+            cwd: process.cwd()
+          });
 
-try:
-    # Import and call the get_llm_responses function directly
-    from call_llm import get_llm_responses
-    
-    # This will generate the response and store it in database
-    get_llm_responses(${requirementId}, '${pythonModel}', False, ${skipSimilaritySearch ? 'True' : 'False'})
-    
-    # Now fetch the response from database to return
-    from sqlalchemy import text
-    from database import engine
-    
-    with engine.connect() as connection:
-        query = text('''
-            SELECT 
-                id, 
-                final_response, 
-                openai_response, 
-                anthropic_response, 
-                deepseek_response,
-                model_provider
-            FROM excel_requirement_responses 
-            WHERE id = :req_id
-        ''')
-        
-        result = connection.execute(query, {'req_id': ${requirementId}}).fetchone()
-        
-        if result:
-            response_data = {
-                'id': result[0],
-                'finalResponse': result[1],
-                'openaiResponse': result[2], 
-                'anthropicResponse': result[3],
-                'deepseekResponse': result[4],
-                'modelProvider': result[5] or '${pythonModel}',
-                'success': True,
-                'message': 'Response generated successfully'
-            }
-            print(json.dumps(response_data))
-        else:
-            print(json.dumps({
-                'success': False,
-                'error': 'No response found after generation'
-            }))
-except Exception as e:
-    error_details = {
-        'error': str(e),
-        'traceback': traceback.format_exc()
-    }
-    print(json.dumps(error_details))
-"`);
+          let stdout = '';
+          let stderr = '';
+          const timeout = setTimeout(() => {
+            pythonProcess.kill('SIGTERM');
+            reject(new Error('Python script timeout after 60 seconds'));
+          }, 60000);
+
+          pythonProcess.stdout.on('data', (data) => {
+            stdout += data.toString();
+          });
+
+          pythonProcess.stderr.on('data', (data) => {
+            stderr += data.toString();
+          });
+
+          pythonProcess.on('close', (code) => {
+            clearTimeout(timeout);
+            resolve({ stdout, stderr, code });
+          });
+
+          pythonProcess.on('error', (error) => {
+            clearTimeout(timeout);
+            reject(error);
+          });
+        });
         
         console.log('Python script response:', pythonApiResponse.stdout);
         
@@ -455,13 +464,26 @@ except Exception as e:
           console.error('Failed to parse Python script response as JSON:', parseError);
           console.log('Raw output (first 200 chars):', pythonApiResponse.stdout.substring(0, 200));
           
-          // Instead of fallback responses, query the database directly to get the actual response
+          // Check if the error is due to API key failure - if so, don't use old database data
+          const isApiKeyError = pythonApiResponse.stdout.includes('401') || 
+                                pythonApiResponse.stdout.includes('Incorrect API key') ||
+                                pythonApiResponse.stdout.includes('AuthenticationError');
+          
+          if (isApiKeyError) {
+            console.log('API key error detected - will not use old database data');
+            // Throw error to be caught by outer catch block which will use simulated responses
+            throw new Error(`API key error: ${pythonApiResponse.stdout.substring(0, 200)}`);
+          }
+          
+          // If it's not an API key error, try to get response from database (might be a parsing issue but response was saved)
           try {
-            console.log('Falling back to database query for requirement response');
+            console.log('Attempting to retrieve response from database (non-API-key error)');
             const dbResponse = await storage.getExcelRequirementResponseById(Number(requirementId));
             
-            if (dbResponse) {
-              console.log('Successfully retrieved response from database');
+            // Only use database response if it matches the requested model provider
+            if (dbResponse && dbResponse.modelProvider && 
+                dbResponse.modelProvider.toLowerCase() === modelProvider.toLowerCase()) {
+              console.log('Successfully retrieved matching response from database');
               responseData = {
                 id: dbResponse.id,
                 finalResponse: dbResponse.finalResponse,
@@ -469,85 +491,25 @@ except Exception as e:
                 anthropicResponse: dbResponse.anthropicResponse,
                 deepseekResponse: dbResponse.deepseekResponse,
                 moaResponse: dbResponse.moaResponse,
-                modelProvider: dbResponse.modelProvider || modelProvider,
+                modelProvider: dbResponse.modelProvider,
                 success: true,
                 message: 'Response retrieved from database'
               };
             } else {
-              // If database query fails, then use fallback responses
-              console.error('Failed to retrieve response from database, using fallbacks');
-              
-              if (modelProvider.toLowerCase() === 'openai') {
-                responseData = {
-                  finalResponse: `OpenAI response for requirement ${requirementId}`,
-                  openaiResponse: `Detailed OpenAI response for: ${requirementText?.substring(0, 50) || 'unknown requirement'}...`,
-                  modelProvider: 'openai'
-                };
-              } else if (modelProvider.toLowerCase() === 'claude' || modelProvider.toLowerCase() === 'anthropic') {
-                responseData = {
-                  finalResponse: `Anthropic response for requirement ${requirementId}`,
-                  anthropicResponse: `Detailed Claude response for: ${requirementText?.substring(0, 50) || 'unknown requirement'}...`,
-                  modelProvider: 'anthropic'
-                };
-              } else if (modelProvider.toLowerCase() === 'deepseek') {
-                responseData = {
-                  finalResponse: `DeepSeek response for requirement ${requirementId}`,
-                  deepseekResponse: `Detailed DeepSeek response for: ${requirementText?.substring(0, 50) || 'unknown requirement'}...`,
-                  modelProvider: 'deepseek'
-                };
-              } else if (modelProvider.toLowerCase() === 'moa') {
-                responseData = {
-                  finalResponse: `MOA (Mixture of Agents) response for requirement ${requirementId}`,
-                  openaiResponse: `OpenAI component of MOA response`,
-                  anthropicResponse: `Anthropic component of MOA response`,
-                  deepseekResponse: `DeepSeek component of MOA response`,
-                  moaResponse: `Final synthesized MOA response for: ${requirementText?.substring(0, 50) || 'unknown requirement'}...`,
-                  modelProvider: 'moa'
-                };
-              } else {
-                responseData = {
-                  finalResponse: `Response using ${modelProvider} for requirement ${requirementId}`,
-                  modelProvider
-                };
-              }
+              // Database has old/different model response - return error instead of using old data
+              console.log('Database has different model response - returning error');
+              throw new Error('Database response does not match requested model');
             }
           } catch (dbError) {
-            console.error('Failed to retrieve response from database:', dbError);
-            // Fall back to the same placeholder responses as before
-            if (modelProvider.toLowerCase() === 'openai') {
-              responseData = {
-                finalResponse: `OpenAI response for requirement ${requirementId}`,
-                openaiResponse: `Detailed OpenAI response for: ${requirementText?.substring(0, 50) || 'unknown requirement'}...`,
-                modelProvider: 'openai'
-              };
-            } else if (modelProvider.toLowerCase() === 'claude' || modelProvider.toLowerCase() === 'anthropic') {
-              responseData = {
-                finalResponse: `Anthropic response for requirement ${requirementId}`,
-                anthropicResponse: `Detailed Claude response for: ${requirementText?.substring(0, 50) || 'unknown requirement'}...`,
-                modelProvider: 'anthropic'
-              };
-            } else if (modelProvider.toLowerCase() === 'deepseek') {
-              responseData = {
-                finalResponse: `DeepSeek response for requirement ${requirementId}`,
-                deepseekResponse: `Detailed DeepSeek response for: ${requirementText?.substring(0, 50) || 'unknown requirement'}...`,
-                modelProvider: 'deepseek'
-              };
-            } else if (modelProvider.toLowerCase() === 'moa') {
-              responseData = {
-                finalResponse: `MOA (Mixture of Agents) response for requirement ${requirementId}`,
-                openaiResponse: `OpenAI component of MOA response`,
-                anthropicResponse: `Anthropic component of MOA response`,
-                deepseekResponse: `DeepSeek component of MOA response`,
-                moaResponse: `Final synthesized MOA response for: ${requirementText?.substring(0, 50) || 'unknown requirement'}...`,
-                modelProvider: 'moa'
-              };
-            } else {
-              responseData = {
-                finalResponse: `Response using ${modelProvider} for requirement ${requirementId}`,
-                modelProvider
-              };
-            }
+            console.error('Failed to retrieve matching response from database:', dbError);
+            // Re-throw original parse error to return proper error response
+            throw parseError;
           }
+        }
+        
+        // If we get here, we have valid responseData from Python or database
+        if (!responseData) {
+          throw new Error('No response data available');
         }
         
         // Handle error responses from the Python script
@@ -617,145 +579,18 @@ except Exception as e:
           ...responseData
         });
       } catch (pythonError) {
-        console.error('Error executing Python LLM call:', pythonError);
+        // RELIABILITY: Return error instead of simulated responses
+        // Simulated responses corrupt data and hide outages
+        console.error(`LLM generation failed for requirement ${requirementId} with model ${modelProvider}`);
+        console.error(`Python error: ${pythonError instanceof Error ? pythonError.message : String(pythonError)}`);
         
-        // Fall back to simulated responses if the Python call fails
-        console.log('Falling back to simulated responses due to Python API error');
-        
-        let responseContent;
-        
-        if (modelProvider.toLowerCase() === 'openai') {
-          responseContent = {
-            finalResponse: `Simulated OpenAI response for requirement ${requirementId}`,
-            openaiResponse: `Detailed OpenAI response for: ${requirementText?.substring(0, 50) || 'unknown requirement'}...`,
-            modelProvider: 'openai'
-          };
-        } else if (modelProvider.toLowerCase() === 'claude' || modelProvider.toLowerCase() === 'anthropic') {
-          // Get the actual response from Python instead of simulated response
-          try {
-            // Try to get the response from Python (direct call)
-            const pythonDirectResponse = await exec(`python3 -c "
-from call_llm import get_llm_responses
-get_llm_responses(${requirementId}, 'anthropic', False)
-"`);
-            
-            console.log("Direct Python call for Anthropic model completed");
-            
-            // Now fetch the saved response from the database
-            const dbResponse = await exec(`python3 -c "
-import json
-from sqlalchemy import text
-from database import engine
-
-with engine.connect() as connection:
-    query = text('''
-        SELECT 
-            anthropic_response 
-        FROM excel_requirement_responses 
-        WHERE id = :req_id
-    ''')
-    
-    result = connection.execute(query, {'req_id': ${requirementId}}).fetchone()
-    
-    if result and result[0]:
-        print(json.dumps({'response': result[0]}))
-    else:
-        print(json.dumps({'response': None}))
-"`);
-            
-            // Parse the response
-            const dbData = JSON.parse(dbResponse.stdout);
-            const actualResponse = dbData.response;
-            
-            // Use the field mapping utility for consistent field handling
-            const mappedFields = mapPythonResponseToDbFields(
-              { anthropic_response: actualResponse }, 
-              'anthropic'
-            );
-            
-            console.log('Direct DB call - mapped fields:', mappedFields);
-            
-            responseContent = {
-              finalResponse: mappedFields.finalResponse || actualResponse,
-              anthropicResponse: mappedFields.anthropicResponse || actualResponse,
-              modelProvider: 'anthropic'
-            };
-          } catch (directCallError) {
-            console.error("Error in direct Python call:", directCallError);
-            // Fall back to simulated response only if direct call fails
-            responseContent = {
-              finalResponse: `Simulated Anthropic response for requirement ${requirementId}`,
-              anthropicResponse: `Detailed Claude response for: ${requirementText?.substring(0, 50) || 'unknown requirement'}...`,
-              modelProvider: 'anthropic'
-            };
-          }
-        } else if (modelProvider.toLowerCase() === 'deepseek') {
-          responseContent = {
-            finalResponse: `Simulated DeepSeek response for requirement ${requirementId}`,
-            deepseekResponse: `Detailed DeepSeek response for: ${requirementText?.substring(0, 50) || 'unknown requirement'}...`,
-            modelProvider: 'deepseek'
-          };
-        } else if (modelProvider.toLowerCase() === 'moa') {
-          responseContent = {
-            finalResponse: `Simulated MOA (Mixture of Agents) response for requirement ${requirementId}`,
-            openaiResponse: `OpenAI component of MOA response`,
-            anthropicResponse: `Anthropic component of MOA response`,
-            deepseekResponse: `DeepSeek component of MOA response`,
-            moaResponse: `Final synthesized MOA response for: ${requirementText?.substring(0, 50) || 'unknown requirement'}...`,
-            modelProvider: 'moa'
-          };
-        } else {
-          responseContent = {
-            finalResponse: `Simulated response using ${modelProvider} for requirement ${requirementId}`,
-            modelProvider
-          };
-        }
-        
-        // Save the simulated response to the database
-        try {
-          // Normalize model name
-          const normalizedModelProvider = modelProvider.toLowerCase() === 'claude' 
-            ? 'anthropic' 
-            : modelProvider.toLowerCase();
-            
-          console.log(`Fallback - Model provider: ${modelProvider}, normalized: ${normalizedModelProvider}`);
-          
-          // Prepare the update object
-          const updateData: any = {
-            finalResponse: responseContent.finalResponse || 
-              (normalizedModelProvider === 'anthropic'
-                ? responseContent.anthropicResponse 
-                : normalizedModelProvider === 'openai'
-                  ? responseContent.openaiResponse
-                  : normalizedModelProvider === 'deepseek'
-                    ? responseContent.deepseekResponse
-                    : normalizedModelProvider === 'moa'
-                      ? responseContent.moaResponse
-                      : null),
-            modelProvider: responseContent.modelProvider || normalizedModelProvider
-          };
-          
-          // Set model-specific responses
-          if (responseContent.openaiResponse) updateData.openaiResponse = responseContent.openaiResponse;
-          if (responseContent.anthropicResponse) updateData.anthropicResponse = responseContent.anthropicResponse;
-          if (responseContent.deepseekResponse) updateData.deepseekResponse = responseContent.deepseekResponse;
-          if (responseContent.moaResponse) updateData.moaResponse = responseContent.moaResponse;
-          
-          // Update the record in the database
-          await storage.updateExcelRequirementResponse(Number(requirementId), updateData);
-          
-          console.log(`Updated requirement ${requirementId} in database with simulated response`);
-        } catch (dbError) {
-          console.error(`Failed to update database for requirement ${requirementId}:`, dbError);
-          // Continue processing - we'll return the response even if DB update fails
-        }
-        
-        return res.status(200).json({ 
-          success: true,
-          message: `Simulated response generated for requirement ${requirementId} with model ${modelProvider}`,
+        // Return explicit error - don't corrupt database with placeholder data
+        return res.status(500).json({ 
+          success: false,
+          error: `Failed to generate LLM response: ${pythonError instanceof Error ? pythonError.message : String(pythonError)}`,
           requirementId,
           model: modelProvider,
-          ...responseContent
+          message: 'LLM generation failed. Please check API keys and try again.'
         });
       }
     } catch (error) {
@@ -776,25 +611,44 @@ with engine.connect() as connection:
       
       console.log(`Finding similar matches for requirement ID: ${requirementId}`);
       
-      // Call the Python script to find similar matches
-      const pythonResponse = await exec(`python3 -c "
-import sys
-import os
-import json
-from find_matches import find_similar_matches
+      // SECURITY: Validate requirement ID and use spawn() instead of exec()
+      const validatedRequirementId = validateRequirementId(requirementId);
+      
+      const pythonResponse = await new Promise<{ stdout: string; stderr: string; code: number | null }>((resolve, reject) => {
+        const pythonProcess = spawn('python3', [
+          'find_matches_wrapper.py',
+          validatedRequirementId.toString()
+        ], {
+          stdio: ['pipe', 'pipe', 'pipe'],
+          env: process.env,
+          cwd: process.cwd()
+        });
 
-try:
-    # Call the find_similar_matches function and get the results as a dictionary
-    results = find_similar_matches(${requirementId})
-    
-    # Convert the results to JSON and print
-    print(json.dumps(results))
-except Exception as e:
-    print(json.dumps({
-        'success': False,
-        'error': str(e)
-    }))
-"`);
+        let stdout = '';
+        let stderr = '';
+        const timeout = setTimeout(() => {
+          pythonProcess.kill('SIGTERM');
+          reject(new Error('Python script timeout after 120 seconds'));
+        }, 120000); // 120-second timeout (2 minutes) for similarity search processing
+
+        pythonProcess.stdout.on('data', (data) => {
+          stdout += data.toString();
+        });
+
+        pythonProcess.stderr.on('data', (data) => {
+          stderr += data.toString();
+        });
+
+        pythonProcess.on('close', (code) => {
+          clearTimeout(timeout);
+          resolve({ stdout, stderr, code });
+        });
+
+        pythonProcess.on('error', (error) => {
+          clearTimeout(timeout);
+          reject(error);
+        });
+      });
       
       console.log('Python script response:', pythonResponse.stdout);
       
@@ -901,37 +755,57 @@ except Exception as e:
       // If we don't have stored similar questions, try to fetch them using find_matches
       console.log(`No similar questions found in database for requirement ${id}, fetching from find_matches...`);
       try {
-        // Call the find_similar_matches function
-        const pythonResponse = await exec(`python3 -c "
-import sys
-import os
-import json
-from find_matches import find_similar_matches
+        // SECURITY: Validate ID and use spawn() instead of exec()
+        const validatedId = validateRequirementId(id);
+        
+        const pythonResponse = await new Promise<{ stdout: string; stderr: string; code: number | null }>((resolve, reject) => {
+          const pythonProcess = spawn('python3', [
+            'find_matches_wrapper.py',
+            validatedId.toString()
+          ], {
+            stdio: ['pipe', 'pipe', 'pipe'],
+            env: process.env,
+            cwd: process.cwd()
+          });
 
-try:
-    # Call the find_similar_matches function and get the results as a dictionary
-    results = find_similar_matches(${id})
-    
-    # Convert the results to JSON and print
-    print(json.dumps(results))
-except Exception as e:
-    print(json.dumps({
-        'success': False,
-        'error': str(e)
-    }))
-"`);
+          let stdout = '';
+          let stderr = '';
+          const timeout = setTimeout(() => {
+            pythonProcess.kill('SIGTERM');
+            reject(new Error('Python script timeout after 60 seconds'));
+          }, 60000);
+
+          pythonProcess.stdout.on('data', (data) => {
+            stdout += data.toString();
+          });
+
+          pythonProcess.stderr.on('data', (data) => {
+            stderr += data.toString();
+          });
+
+          pythonProcess.on('close', (code) => {
+            clearTimeout(timeout);
+            resolve({ stdout, stderr, code });
+          });
+
+          pythonProcess.on('error', (error) => {
+            clearTimeout(timeout);
+            reject(error);
+          });
+        });
         
         const data = JSON.parse(pythonResponse.stdout);
         
         if (data.success && data.similar_matches && Array.isArray(data.similar_matches)) {
           // Format the data for the References panel
+          // IMPORTANT: Use the reference field from embeddings table (document name like "Maybank RFP.xlsx_5_Functional_(AP)")
           const references = data.similar_matches.map((item: any, index: number) => ({
             id: index + 1,
             responseId: id,
             category: item.customer || item.category || 'Unknown',  // Use customer field first
             requirement: item.requirement || '',
             response: item.response || '',
-            reference: item.id ? `#${item.id}` : undefined,
+            reference: item.reference || (item.id ? `#${item.id}` : undefined),  // Use reference from embeddings table (document name)
             score: item.similarity_score || 0
           }));
           
@@ -1017,59 +891,48 @@ except Exception as e:
       
       console.log(`Generating LLM response for requirement ID ${requirementId} using model ${model}`);
       
-      // Call Python script to generate LLM response
-      const pythonResponse = await exec(`python3 -c "
-import sys
-import os
-import json
-from call_llm import get_llm_responses
+      // SECURITY: Validate inputs and use spawn() instead of exec()
+      const validatedRequirementId = validateRequirementId(requirementId);
+      const validatedModel = validateModelName(model);
+      
+      // Call Python script securely using wrapper
+      const pythonResponse = await new Promise<{ stdout: string; stderr: string; code: number | null }>((resolve, reject) => {
+        const pythonProcess = spawn('python3', [
+          'call_llm_wrapper.py',
+          validatedRequirementId.toString(),
+          validatedModel,
+          'false'
+        ], {
+          stdio: ['pipe', 'pipe', 'pipe'],
+          env: process.env,
+          cwd: process.cwd()
+        });
 
-try:
-    # Call get_llm_responses to generate and save responses
-    get_llm_responses(${requirementId}, '${model}', False)
-    
-    # Get the saved responses from database
-    from sqlalchemy import text
-    from database import engine
-    
-    with engine.connect() as connection:
-        query = text('''
-            SELECT 
-                id, 
-                final_response, 
-                openai_response, 
-                anthropic_response, 
-                deepseek_response,
-                model_provider
-            FROM excel_requirement_responses 
-            WHERE id = :req_id
-        ''')
-        
-        result = connection.execute(query, {'req_id': ${requirementId}}).fetchone()
-        
-        if result:
-            response_data = {
-                'id': result[0],
-                'finalResponse': result[1],
-                'openaiResponse': result[2], 
-                'anthropicResponse': result[3],
-                'deepseekResponse': result[4],
-                'modelProvider': result[5] or '${model}',
-                'success': True,
-                'message': 'Response generated successfully'
-            }
-            print(json.dumps(response_data))
-        else:
-            print(json.dumps({
-                'success': False,
-                'error': 'No response found after generation'
-            }))
-except Exception as e:
-    print(json.dumps({
-        'success': False,
-        'error': str(e)
-    }))
-"`);
+        let stdout = '';
+        let stderr = '';
+        const timeout = setTimeout(() => {
+          pythonProcess.kill('SIGTERM');
+          reject(new Error('Python script timeout after 120 seconds'));
+        }, 120000); // 120-second timeout (2 minutes) for similarity search processing
+
+        pythonProcess.stdout.on('data', (data) => {
+          stdout += data.toString();
+        });
+
+        pythonProcess.stderr.on('data', (data) => {
+          stderr += data.toString();
+        });
+
+        pythonProcess.on('close', (code) => {
+          clearTimeout(timeout);
+          resolve({ stdout, stderr, code });
+        });
+
+        pythonProcess.on('error', (error) => {
+          clearTimeout(timeout);
+          reject(error);
+        });
+      });
       
       console.log('Python script response:', pythonResponse.stdout);
       

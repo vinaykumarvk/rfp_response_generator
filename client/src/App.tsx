@@ -17,13 +17,25 @@ function AppLayout({ children }: { children: React.ReactNode }) {
   
   return (
     <div className="flex flex-col min-h-screen bg-slate-50 dark:bg-slate-900">
+      {/* ACCESSIBILITY: Skip to main content link */}
+      <a 
+        href="#main-content" 
+        className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-blue-600 focus:text-white focus:rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+      >
+        Skip to main content
+      </a>
+      
       <Header />
       <div className="flex flex-1 overflow-hidden relative">
         {/* Only show fixed sidebar on desktop */}
         {!isMobile && <Sidebar />}
         
-        {/* Main content area with improved padding for different screen sizes */}
-        <main className="flex-1 overflow-auto pb-20 sm:pb-16 md:pb-0 transition-all">
+        {/* ACCESSIBILITY: Main content area with landmark and skip target */}
+        <main 
+          id="main-content"
+          role="main"
+          className="flex-1 overflow-auto pb-20 sm:pb-16 md:pb-0 transition-all"
+        >
           <div className="px-4 py-4 sm:px-6 md:px-8 lg:px-10 max-w-7xl mx-auto">
             {children}
           </div>

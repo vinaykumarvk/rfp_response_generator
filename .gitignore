@@ -30,6 +30,15 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 *.log
+server_output.log
+server.log
+
+# Archive files and snapshots (should not be in repo)
+*.tar.gz
+*.zip
+*_snapshot_*.tar.gz
+*_github_ready.tar.gz
+*_github_ready.zip
 
 # Editor directories and files
 .vscode/
@@ -45,6 +54,8 @@ Thumbs.db
 venv/
 virtualenv/
 .pythonlibs/
+.venv/
+.local/
 
 # Database files
 *.sqlite3

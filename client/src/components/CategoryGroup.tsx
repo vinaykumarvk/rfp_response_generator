@@ -75,40 +75,53 @@ const CategoryGroup: React.FC<CategoryGroupProps> = ({
     }
   };
   
+  // ACCESSIBILITY: Handle keyboard events for expander
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      setIsExpanded(!isExpanded);
+    }
+  };
+
   return (
     <div className="border rounded-lg bg-white dark:bg-slate-800 overflow-hidden shadow-sm">
-      {/* Category header with toggle */}
-      <div 
-        className="p-3 flex items-center justify-between cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700 border-b"
+      {/* ACCESSIBILITY: Category header with toggle - converted to button for keyboard operability */}
+      <button
+        type="button"
+        className="w-full p-3 flex items-center justify-between cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700 border-b focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-800"
         onClick={() => setIsExpanded(!isExpanded)}
+        onKeyDown={handleKeyDown}
+        aria-expanded={isExpanded}
+        aria-controls={`category-content-${category}`}
+        aria-label={`${isExpanded ? 'Collapse' : 'Expand'} ${category} category`}
       >
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <Checkbox 
             id={`select-category-${category}`}
             checked={allSelected && items.length > 0}
             onCheckedChange={handleSelectAll}
             onClick={(e) => e.stopPropagation()} 
           />
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <h3 className="text-base font-semibold">{category}</h3>
-            <Badge variant="outline" className="text-xs">
+            <Badge variant="outline" className="text-xs whitespace-nowrap">
               {items.length} {items.length === 1 ? 'item' : 'items'}
             </Badge>
           </div>
         </div>
-        <ChevronDown className={`h-4 w-4 transform transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} />
-      </div>
+        <ChevronDown className={`h-4 w-4 transform transition-transform duration-200 flex-shrink-0 ${isExpanded ? 'rotate-180' : ''}`} aria-hidden="true" />
+      </button>
       
       {/* Collapsible content */}
       {isExpanded && (
-        <div className="p-3 space-y-2">
+        <div id={`category-content-${category}`} className="p-3 space-y-2">
           {items.map((row, index) => {
             const isSelected = row.id ? selectedItems.includes(row.id) : false;
             
             return (
               <Card 
                 key={row.id || index} 
-                className={`overflow-hidden border relative transition-all duration-200 ${
+                className={`overflow-hidden border relative transition-all duration-200 focus-within:ring-2 focus-within:ring-blue-500 focus-within:ring-offset-2 dark:focus-within:ring-offset-slate-800 ${
                   isSelected ? 'border-blue-400 dark:border-blue-600 shadow-md' : 'border-slate-200 dark:border-slate-700'
                 }`}
               >
@@ -135,8 +148,8 @@ const CategoryGroup: React.FC<CategoryGroupProps> = ({
                     )}
                     
                     <div className="flex-1 min-w-0">
-                      {/* Compact single-line attributes */}
-                      <div className="flex flex-wrap items-center gap-1 mb-1.5">
+                      {/* ACCESSIBILITY & MOBILE: Compact attributes with flex-wrap to prevent overflow */}
+                      <div className="flex flex-wrap items-center gap-1 sm:gap-1.5 mb-1.5">
                         {/* ID Badge */}
                         <Badge variant="secondary" className="text-[10px] sm:text-xs px-1.5 py-0">
                           ID: {row.id}
@@ -181,9 +194,9 @@ const CategoryGroup: React.FC<CategoryGroupProps> = ({
                         {row.requirement}
                       </div>
                       
-                      {/* Action buttons and timestamp in one row */}
-                      <div className="flex items-center justify-between mt-1">
-                        <div className="flex items-center gap-2">
+                      {/* MOBILE: Action buttons stack on small screens, timestamp moves below */}
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mt-1">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <Button
                             size="sm"
                             variant={row.finalResponse ? "default" : "outline"}
@@ -196,9 +209,9 @@ const CategoryGroup: React.FC<CategoryGroupProps> = ({
                               }
                             }}
                             disabled={!row.finalResponse}
-                            title={row.finalResponse ? "View response" : "No response available yet"}
+                            aria-label={row.finalResponse ? "View response" : "No response available yet"}
                           >
-                            <MessageSquare className="h-3.5 w-3.5" />
+                            <MessageSquare className="h-3.5 w-3.5" aria-hidden="true" />
                             <span>Response</span>
                           </Button>
                           
@@ -214,16 +227,16 @@ const CategoryGroup: React.FC<CategoryGroupProps> = ({
                               }
                             }}
                             disabled={!row.similarQuestions}
-                            title={row.similarQuestions ? "View references" : "No references available yet"}
+                            aria-label={row.similarQuestions ? "View references" : "No references available yet"}
                           >
-                            <BookOpen className="h-3.5 w-3.5" />
+                            <BookOpen className="h-3.5 w-3.5" aria-hidden="true" />
                             <span>References</span>
                           </Button>
                         </div>
                         
-                        {/* Timestamp */}
+                        {/* ACCESSIBILITY: Improved contrast for timestamp */}
                         {row.timestamp && (
-                          <div className="text-[9px] sm:text-[10px] text-slate-500 dark:text-slate-400 ml-auto pl-2">
+                          <div className="text-[9px] sm:text-[10px] text-slate-600 dark:text-slate-300 sm:ml-auto sm:pl-2">
                             {(() => {
                               try {
                                 return formatDistanceToNow(new Date(row.timestamp), { addSuffix: true });

@@ -1,0 +1,45 @@
+# Google App Engine Standard Environment configuration
+# Note: App Engine Standard has limitations with Python subprocess calls
+# Consider using Cloud Run (Dockerfile) instead for better Python support
+
+runtime: nodejs20
+
+instance_class: F2
+
+automatic_scaling:
+  min_instances: 1
+  max_instances: 10
+  target_cpu_utilization: 0.6
+  target_throughput_utilization: 0.6
+
+env_variables:
+  NODE_ENV: production
+  # Note: Add your environment variables here or use Secret Manager
+  # DATABASE_URL: "your-database-url"
+  # OPENAI_API_KEY: "your-openai-key"
+  # ANTHROPIC_API_KEY: "your-anthropic-key"
+  # DEEPSEEK_API_KEY: "your-deepseek-key"
+  # SENDGRID_API_KEY: "your-sendgrid-key"
+
+# Skip files that shouldn't be deployed
+skip_files:
+  - ^(.*/)?#.*#$
+  - ^(.*/)?.*~$
+  - ^(.*/)?.*\.py[co]$
+  - ^(.*/)?.*/RCS/.*$
+  - ^(.*/)?\..*$
+  - ^(.*/)?node_modules/.*$
+  - ^(.*/)?\.git/.*$
+  - ^(.*/)?\.env$
+  - ^(.*/)?\.env\.local$
+  - ^(.*/)?\.env\.*\.local$
+  - ^(.*/)?test/.*$
+  - ^(.*/)?tests/.*$
+  - ^(.*/)?__pycache__/.*$
+  - ^(.*/)?\.pytest_cache/.*$
+  - ^(.*/)?dist/.*$
+  - ^(.*/)?build/.*$
+
+# Note: App Engine Standard may have limitations with Python subprocess execution
+# For full Python support, use Cloud Run with the Dockerfile instead
+

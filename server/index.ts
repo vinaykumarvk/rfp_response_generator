@@ -1,13 +1,17 @@
+// Load environment variables from .env file
+import "dotenv/config";
+
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 
-// Enhanced API keys and environment configuration check
-console.log("=== COMPREHENSIVE ENVIRONMENT DIAGNOSTICS ===");
+// SECURITY: Removed API key prefix logging to prevent secrets exposure
+// Only log presence/absence, not actual key values
+console.log("=== ENVIRONMENT DIAGNOSTICS ===");
 console.log("API Keys:");
-console.log("- OpenAI API Key available:", process.env.OPENAI_API_KEY ? "Yes (starts with " + process.env.OPENAI_API_KEY.substring(0, 5) + "...)" : "No");
-console.log("- Anthropic API Key available:", process.env.ANTHROPIC_API_KEY ? "Yes (starts with " + process.env.ANTHROPIC_API_KEY.substring(0, 5) + "...)" : "No");
-console.log("- DeepSeek API Key available:", process.env.DEEPSEEK_API_KEY ? "Yes (starts with " + (process.env.DEEPSEEK_API_KEY ? process.env.DEEPSEEK_API_KEY.substring(0, 5) : "") + "...)" : "No");
+console.log("- OpenAI API Key available:", process.env.OPENAI_API_KEY ? "Yes" : "No");
+console.log("- Anthropic API Key available:", process.env.ANTHROPIC_API_KEY ? "Yes" : "No");
+console.log("- DeepSeek API Key available:", process.env.DEEPSEEK_API_KEY ? "Yes" : "No");
 console.log("- SendGrid API Key available:", process.env.SENDGRID_API_KEY ? "Yes" : "No");
 
 console.log("\nDatabase Configuration:");
@@ -66,47 +70,19 @@ app.use((req, res, next) => {
     return originalResJson.apply(res, [bodyJson, ...args]);
   };
 
-  // Add enhanced debugging for specific API endpoints
+  // SECURITY: Removed verbose logging of request/response bodies to prevent sensitive data exposure
+  // Only log minimal metadata for debugging
   if (path === '/api/generate-response') {
-    console.log('==== DETAILED REQUEST DEBUG - /api/generate-response ====');
-    console.log('Request body:', JSON.stringify(req.body, null, 2));
-    
-    // Capture and log the specific model response fields
-    const originalEnd = res.end;
-    res.end = function(chunk: any, ...args: any[]) {
-      // Only log on successful responses
-      if (res.statusCode >= 200 && res.statusCode < 300 && capturedJsonResponse) {
-        console.log('==== DETAILED RESPONSE DEBUG - /api/generate-response ====');
-        
-        // Check for model-specific response fields
-        const generatedResponse = capturedJsonResponse.generated_response || null;
-        const openaiResponse = capturedJsonResponse.openai_response || null;
-        const anthropicResponse = capturedJsonResponse.anthropic_response || null;
-        const deepseekResponse = capturedJsonResponse.deepseek_response || null;
-        
-        console.log('Response fields:');
-        console.log('- generated_response:', generatedResponse ? `Present (${generatedResponse.length} chars)` : 'Not present');
-        console.log('- openai_response:', openaiResponse ? `Present (${openaiResponse.length} chars)` : 'Not present');
-        console.log('- anthropic_response:', anthropicResponse ? `Present (${anthropicResponse.length} chars)` : 'Not present');
-        console.log('- deepseek_response:', deepseekResponse ? `Present (${deepseekResponse.length} chars)` : 'Not present');
-      }
-      
-      return originalEnd.apply(res, [chunk, ...args]);
-    };
+    // Log only metadata, not actual content
+    console.log(`[${req.method}] ${path} - requirementId: ${req.body?.requirementId || 'N/A'}, model: ${req.body?.model || 'N/A'}`);
   }
 
   res.on("finish", () => {
     const duration = Date.now() - start;
     if (path.startsWith("/api")) {
-      let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-      if (capturedJsonResponse) {
-        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
-      }
-
-      if (logLine.length > 80) {
-        logLine = logLine.slice(0, 79) + "…";
-      }
-
+      // SECURITY: Don't log full response bodies - they may contain sensitive data
+      // Only log status and metadata
+      const logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
       log(logLine);
     }
   });
@@ -148,10 +124,9 @@ app.use((req, res, next) => {
     serveStatic(app);
   }
 
-  // ALWAYS serve the app on port 5000
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
-  const port = 5000;
+  // Use PORT environment variable for GCP compatibility (Cloud Run, App Engine)
+  // Default to 5000 for local development
+  const port = parseInt(process.env.PORT || "5000", 10);
   server.listen({
     port,
     host: "0.0.0.0",

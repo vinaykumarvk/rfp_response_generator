@@ -25,6 +25,7 @@ import {
 import { Label } from "@/components/ui/label";
 import * as XLSX from 'xlsx';
 import { HelpTooltip } from "@/components/HelpTooltip";
+import { queryClient } from "@/lib/queryClient";
 
 // Define the structure of our parsed Excel data
 interface ExcelRow {
@@ -248,6 +249,25 @@ export default function UploadRequirements() {
           message: `File processed successfully. ${result.recordsAdded || parsedData.length} records ${replaceExisting ? 'replaced existing data' : 'added to the database'}.`,
         });
         
+        // CRITICAL: Always invalidate React Query cache after upload to refresh RFP names dropdown
+        // This ensures new RFP names appear in the filter dropdown immediately
+        await queryClient.invalidateQueries({ queryKey: ['/api/excel-requirements'] });
+        queryClient.removeQueries({ queryKey: ['/api/excel-requirements'] });
+        console.log('Invalidated and cleared requirements cache after upload');
+        
+        if (replaceExisting) {
+          console.log('Replace All used - old data should be cleared');
+          // If user is on ViewData page, trigger a page refresh to show new data
+          if (window.location.pathname === '/view-data' || window.location.pathname === '/') {
+            window.dispatchEvent(new CustomEvent('requirements-replaced'));
+          }
+        } else {
+          // For append mode, also trigger refresh to show new RFP names
+          if (window.location.pathname === '/view-data' || window.location.pathname === '/') {
+            window.dispatchEvent(new CustomEvent('requirements-updated'));
+          }
+        }
+        
         // Reset form on successful upload if desired
         // resetForm();
       } else {
@@ -270,9 +290,9 @@ export default function UploadRequirements() {
       <div className="p-4 sm:p-6">
         <h2 className="text-xl sm:text-2xl font-bold text-slate-800 dark:text-slate-100 mb-4 sm:mb-6 bg-gradient-to-r from-primary to-primary/70 text-transparent bg-clip-text">Upload Requirements</h2>
         
-        {/* Dialog for append/replace confirmation */}
+        {/* MOBILE: Dialog for append/replace confirmation - responsive width */}
         <Dialog open={showDialog} onOpenChange={setShowDialog}>
-          <DialogContent className="sm:max-w-md">
+          <DialogContent className="max-w-[90vw] sm:max-w-md">
             <DialogHeader>
               <div className="flex items-center gap-2">
                 <DialogTitle>Upload Options</DialogTitle>
@@ -362,9 +382,9 @@ export default function UploadRequirements() {
                     </div>
                   </div>
                 
-                  {/* File Upload Section with Drag & Drop - improved for mobile */}
+                  {/* ACCESSIBILITY & MOBILE: File Upload Section with Drag & Drop */}
                   <div 
-                    className={`border-2 border-dashed ${file ? 'border-primary/60 bg-primary/5' : 'border-slate-200 dark:border-slate-700'} rounded-lg p-4 sm:p-10 text-center transition-colors duration-200 relative`}
+                    className={`border-2 border-dashed ${file ? 'border-primary/60 bg-primary/5' : 'border-slate-200 dark:border-slate-700'} rounded-lg p-4 sm:p-6 md:p-10 text-center transition-colors duration-200 relative max-w-2xl mx-auto`}
                     onDragOver={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
@@ -376,6 +396,16 @@ export default function UploadRequirements() {
                       if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
                         // Get the first file
                         const droppedFile = e.dataTransfer.files[0];
+                        
+                        // USABILITY: Add file size validation (max 10MB)
+                        const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+                        if (droppedFile.size > MAX_FILE_SIZE) {
+                          setUploadStatus({
+                            type: "error",
+                            message: `File size exceeds 10MB limit. Please upload a smaller file.`,
+                          });
+                          return;
+                        }
                         
                         // Check if it's an Excel file
                         if (droppedFile.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' || 
@@ -412,33 +442,37 @@ export default function UploadRequirements() {
                         }
                       }
                     }}
+                    role="region"
+                    aria-label="File upload dropzone"
                   >
                     <div className="flex flex-col items-center justify-center space-y-3 sm:space-y-4">
                       <div className={`h-14 w-14 ${file ? 'bg-primary/20' : 'bg-slate-100 dark:bg-slate-800'} rounded-full flex items-center justify-center transition-colors duration-200`}>
-                        <Upload className={`h-6 w-6 ${file ? 'text-primary' : 'text-slate-500 dark:text-slate-400'}`} />
+                        <Upload className={`h-6 w-6 ${file ? 'text-primary' : 'text-slate-500 dark:text-slate-400'}`} aria-hidden="true" />
                       </div>
                       <div>
-                        <div className="flex items-center justify-center gap-2">
+                        <div className="flex items-center justify-center gap-2 flex-wrap">
                           <h4 className="text-md font-medium text-slate-700 dark:text-slate-300">Upload Excel File</h4>
                           <HelpTooltip text="Your Excel file must have two specific columns: 'Category' (the type of requirement) and 'Requirement' (the actual request text). The system will automatically extract and process these columns." />
                         </div>
-                        <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1 max-w-md mx-auto">
+                        <p id="file-upload-description" className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 mt-1 max-w-md mx-auto">
                           <span className="hidden sm:inline">Drag & drop your Excel file here or click to browse. File must contain 'Category' and 'Requirement' columns.</span>
                           <span className="sm:hidden">Select an Excel file with required columns.</span>
                         </p>
                       </div>
-                      <div className="mt-1 sm:mt-2 flex flex-col sm:flex-row gap-3 sm:gap-0">
+                      <div className="mt-1 sm:mt-2 flex flex-col sm:flex-row gap-3 sm:gap-0 w-full sm:w-auto">
                         <Input
                           id="file-upload"
                           type="file"
                           accept=".xlsx,.xls"
                           onChange={handleFileChange}
                           className="hidden"
+                          aria-describedby="file-upload-description"
+                          aria-label="Select Excel file to upload"
                         />
                         <label htmlFor="file-upload" className="w-full sm:w-auto">
-                          <Button type="button" variant="outline" className="cursor-pointer w-full sm:w-auto" asChild>
+                          <Button type="button" variant="outline" className="cursor-pointer w-full sm:w-auto focus-visible:ring-2 focus-visible:ring-blue-500" asChild>
                             <span>
-                              <FileText className="mr-2 h-4 w-4" />
+                              <FileText className="mr-2 h-4 w-4" aria-hidden="true" />
                               Select File
                             </span>
                           </Button>
@@ -464,8 +498,12 @@ export default function UploadRequirements() {
                       </div>
                       <div className="text-xs sm:text-sm">
                         {file && (
-                          <p className="text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 px-3 py-2 rounded-md">
-                            <span className="font-medium">Selected:</span> {file.name} ({(file.size / 1024).toFixed(1)} KB)
+                          <p className="text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-800 px-3 py-2 rounded-md">
+                            <span className="font-medium">Selected:</span>{' '}
+                            <span className="truncate block max-w-full" title={file.name}>
+                              {file.name}
+                            </span>
+                            <span className="text-xs"> ({(file.size / 1024).toFixed(1)} KB)</span>
                           </p>
                         )}
                         {(!rfpName || !uploadedBy) && file && (
@@ -542,9 +580,9 @@ export default function UploadRequirements() {
                 ))}
               </div>
               
-              {/* Desktop table view for larger screens */}
+              {/* MOBILE: Desktop table view with horizontal scroll on mobile */}
               <div className="hidden md:block">
-                <CardContent className="p-0 overflow-auto">
+                <CardContent className="p-0 overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>

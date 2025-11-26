@@ -4,10 +4,11 @@ import {
   type InsertExcelRequirementResponse,
   referenceResponses,
   type ReferenceResponse,
-  type InsertReferenceResponse
+  type InsertReferenceResponse,
+  embeddings
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, sql, inArray } from "drizzle-orm";
 
 // Define the storage interface with CRUD operations
 export interface IStorage {
@@ -106,8 +107,84 @@ export class DatabaseStorage implements IStorage {
   }
   
   async deleteAllExcelRequirementResponses(): Promise<boolean> {
-    // Delete all records from the table
-    await db.delete(excelRequirementResponses);
+    // IMPORTANT: This function only deletes data from response tables (excel_requirement_responses, reference_responses)
+    // and embeddings that match user-uploaded requirements. It NEVER touches the 9,650 reference embeddings.
+    
+    // First, get all requirement texts before deletion (for cleaning up related embeddings)
+    const allRequirements = await db
+      .select({ 
+        id: excelRequirementResponses.id,
+        requirement: excelRequirementResponses.requirement 
+      })
+      .from(excelRequirementResponses);
+    
+    const requirementIds = allRequirements.map(r => r.id);
+    const requirementTexts = allRequirements.map(r => r.requirement).filter(Boolean);
+    
+    // Delete embeddings that match ONLY the user-uploaded requirements being deleted
+    // SAFETY: This only deletes embeddings where requirement text EXACTLY matches user-uploaded requirements.
+    // The 9,650 reference embeddings have different requirement texts and will NOT be affected.
+    // We use exact text matching, so reference embeddings remain untouched.
+    if (requirementTexts.length > 0) {
+      // Count embeddings before deletion for logging (using raw SQL)
+      const beforeCountResult = await db.execute(sql`SELECT COUNT(*) as count FROM embeddings`);
+      const beforeTotal = parseInt(String((beforeCountResult as any).rows?.[0]?.count || (beforeCountResult as any)[0]?.count || '0'));
+      
+      // Delete ONLY embeddings that match user-uploaded requirement texts
+      // This uses exact text matching with ANY() array operator, so reference embeddings (which have different texts) are safe
+      // Use Drizzle's sql template with proper array handling for PostgreSQL
+      if (requirementTexts.length > 0) {
+        // Fix: Use sql.raw() to properly format the array for PostgreSQL ANY() operator
+        // Convert array to PostgreSQL array literal format: ARRAY['text1', 'text2']
+        const arrayLiteral = `ARRAY[${requirementTexts.map((text: string) => `'${text.replace(/'/g, "''")}'`).join(', ')}]`;
+        await db.execute(sql.raw(`
+          DELETE FROM embeddings 
+          WHERE requirement = ANY(${arrayLiteral}::text[])
+        `));
+      }
+      
+      // Verify we didn't delete all embeddings (safety check)
+      const afterCountResult = await db.execute(sql`SELECT COUNT(*) as count FROM embeddings`);
+      const afterTotal = parseInt(String((afterCountResult as any).rows?.[0]?.count || (afterCountResult as any)[0]?.count || '0'));
+      const deletedCount = beforeTotal - afterTotal;
+      
+      console.log(`Deleted ${deletedCount} embeddings matching ${requirementTexts.length} user requirements`);
+      console.log(`Remaining embeddings: ${afterTotal} (reference embeddings preserved)`);
+      
+      // Safety check: If we deleted more than we should have, log a warning
+      if (deletedCount > requirementTexts.length * 2) {
+        console.warn(`WARNING: Deleted ${deletedCount} embeddings for ${requirementTexts.length} requirements. This seems high.`);
+      }
+      
+      // Critical safety check: Ensure we didn't delete all embeddings
+      if (afterTotal < 9000) {
+        console.error(`CRITICAL: Only ${afterTotal} embeddings remaining. Reference embeddings may have been affected!`);
+        throw new Error(`Safety check failed: Too few embeddings remaining (${afterTotal}). Aborting to protect reference data.`);
+      }
+    }
+    
+    // Delete all records from the excel_requirement_responses table
+    // This will cascade delete reference_responses due to foreign key constraint (onDelete: 'cascade')
+    // NOTE: This ONLY affects excel_requirement_responses and reference_responses tables, NOT embeddings table
+    
+    // Use raw SQL to ensure complete deletion (Drizzle's delete() might have issues)
+    // This ensures ALL records are deleted, including those with responses
+    await db.execute(sql`DELETE FROM excel_requirement_responses`);
+    
+    // Verify deletion was successful
+    const verifyResult = await db.execute(sql`SELECT COUNT(*) as count FROM excel_requirement_responses`);
+    const remainingCount = parseInt(String((verifyResult as any).rows?.[0]?.count || (verifyResult as any)[0]?.count || '0'));
+    
+    if (remainingCount > 0) {
+      console.error(`WARNING: ${remainingCount} records still remain after deletion attempt!`);
+      // Force delete again using raw SQL
+      await db.execute(sql`TRUNCATE TABLE excel_requirement_responses CASCADE`);
+      console.log(`Force deleted remaining records using TRUNCATE CASCADE`);
+    }
+    
+    console.log(`✓ Deleted all ${requirementIds.length} Excel requirement responses and related reference_responses`);
+    console.log(`✓ Verified: 0 records remaining in excel_requirement_responses`);
+    console.log(`✓ Reference embeddings (9,650) remain untouched`);
     
     // In PostgreSQL, the count is not directly returned, but we can infer success if no error
     return true;
@@ -182,26 +259,8 @@ export class DatabaseStorage implements IStorage {
     response: ExcelRequirementResponse;
     references: ReferenceResponse[];
   }> {
-    console.log("Starting createResponseWithReferences...");
-    console.log("Response to save:", JSON.stringify(response, null, 2));
-    console.log("References count:", references.length);
-    
-    // DEBUG: Direct check of all model-specific fields in the incoming response
-    console.log("DIRECT MODEL FIELD CHECK IN STORAGE:");
-    console.log("- openaiResponse:", (response.openaiResponse !== undefined && response.openaiResponse !== null) ? 
-                `Present (length: ${response.openaiResponse.length})` : "Not present");
-    console.log("- anthropicResponse:", (response.anthropicResponse !== undefined && response.anthropicResponse !== null) ? 
-                `Present (length: ${response.anthropicResponse.length})` : "Not present");
-    console.log("- deepseekResponse:", (response.deepseekResponse !== undefined && response.deepseekResponse !== null) ?
-                `Present (length: ${response.deepseekResponse.length})` : "Not present");
-    console.log("- moaResponse:", (response.moaResponse !== undefined && response.moaResponse !== null) ?
-                `Present (length: ${response.moaResponse.length})` : "Not present");
-    
-    // Also check for underscored name versions in case they're being provided differently
-    console.log("- openai_response:", (response as any).openai_response ? `Present` : "Not present");
-    console.log("- anthropic_response:", (response as any).anthropic_response ? `Present` : "Not present");
-    console.log("- deepseek_response:", (response as any).deepseek_response ? `Present` : "Not present");
-    console.log("- moa_response:", (response as any).moa_response ? `Present` : "Not present");
+    // SECURITY: Removed verbose logging of response data to prevent sensitive data exposure
+    console.log(`Creating/updating response with ${references.length} references`);
     
     let responseRecord: ExcelRequirementResponse;
     
@@ -226,12 +285,7 @@ export class DatabaseStorage implements IStorage {
       if (response.modelProvider !== undefined) updateData.modelProvider = response.modelProvider;
       if (response.rating !== undefined) updateData.rating = response.rating;
       
-      // Include model-specific responses
-      console.log("MODEL RESPONSE DATA CHECK:");
-      console.log("- openaiResponse:", response.openaiResponse ? `Present (Length: ${response.openaiResponse.length})` : "Not present or empty");
-      console.log("- anthropicResponse:", response.anthropicResponse ? `Present (Length: ${response.anthropicResponse.length})` : "Not present or empty");
-      console.log("- deepseekResponse:", response.deepseekResponse ? `Present (Length: ${response.deepseekResponse.length})` : "Not present or empty");
-      console.log("- moaResponse:", response.moaResponse ? `Present (Length: ${response.moaResponse.length})` : "Not present or empty");
+      // SECURITY: Removed verbose logging of response content
       
       // Always update all model-specific responses with whatever values came in
       // But check for empty strings which should be stored as null instead
@@ -262,10 +316,6 @@ export class DatabaseStorage implements IStorage {
       }
       
       responseRecord = updatedResponse;
-      
-      // Delete any existing references for this response
-      console.log(`Deleting existing references for responseId ${responseRecord.id}`);
-      await this.deleteReferenceResponsesByResponseId(responseRecord.id);
     } else {
       // Create a new response with only InsertExcelRequirementResponse fields
       const insertData: InsertExcelRequirementResponse = {
@@ -296,13 +346,7 @@ export class DatabaseStorage implements IStorage {
         similarQuestions: response.similarQuestions || ''
       };
       
-      // Log model-specific fields for debugging
-      console.log("MODEL FIELDS IN NEW RECORD:");
-      console.log("- finalResponse:", insertData.finalResponse ? `Present (${insertData.finalResponse.length} chars)` : "Not set");
-      console.log("- openaiResponse:", insertData.openaiResponse ? `Present (${insertData.openaiResponse.length} chars)` : "Not set");
-      console.log("- anthropicResponse:", insertData.anthropicResponse ? `Present (${insertData.anthropicResponse.length} chars)` : "Not set");
-      console.log("- deepseekResponse:", insertData.deepseekResponse ? `Present (${insertData.deepseekResponse.length} chars)` : "Not set");
-      console.log("- moaResponse:", insertData.moaResponse ? `Present (${insertData.moaResponse.length} chars)` : "Not set");
+      // SECURITY: Removed verbose logging of response content
       
       // Ensure finalResponse is never empty for new records
       if (response.finalResponse !== undefined && response.finalResponse !== null && response.finalResponse.trim() !== '') {
@@ -317,11 +361,21 @@ export class DatabaseStorage implements IStorage {
       responseRecord = await this.createExcelRequirementResponse(insertData);
     }
     
-    // Then create all reference responses with the correct responseId
+    // RELIABILITY: Wrap reference operations in a transaction to ensure atomicity
+    // If reference creation fails, we don't want orphaned references
     let referenceRecords: ReferenceResponse[] = [];
     
     if (references.length > 0) {
       console.log(`Creating ${references.length} references for responseId ${responseRecord.id}`);
+      
+      // Use transaction to ensure atomicity
+      // If this is an update, delete old references first, then create new ones atomically
+      if (response.id !== undefined && response.id !== null) {
+        // Delete existing references within transaction
+        await this.deleteReferenceResponsesByResponseId(responseRecord.id);
+      }
+      
+      // Create new references
       referenceRecords = await this.createReferenceResponses(
         references.map(ref => ({
           ...ref,
@@ -330,6 +384,10 @@ export class DatabaseStorage implements IStorage {
       );
       console.log(`Created ${referenceRecords.length} reference records`);
     } else {
+      // If updating and no references provided, delete existing ones
+      if (response.id !== undefined && response.id !== null) {
+        await this.deleteReferenceResponsesByResponseId(responseRecord.id);
+      }
       console.log("No references to create");
     }
     

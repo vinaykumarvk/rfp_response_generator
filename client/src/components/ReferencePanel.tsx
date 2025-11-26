@@ -111,7 +111,7 @@ export default function ReferencePanel({ responseId, showTitle = true, onReferen
       } as AbortController;
     }
     
-    // Use a safer approach for the timeout
+    // Use a safer approach for the timeout - increased to allow for similarity search processing
     const timeoutId = setTimeout(() => {
       try {
         if (controller && typeof controller.abort === 'function') {
@@ -120,7 +120,7 @@ export default function ReferencePanel({ responseId, showTitle = true, onReferen
       } catch (err) {
         console.warn("Could not abort fetch operation:", err);
       }
-    }, 10000); // 10-second timeout
+    }, 120000); // 120-second timeout (2 minutes) to allow for similarity search and embedding processing
     
     // Make the request
     fetchReferences(responseId, controller.signal)

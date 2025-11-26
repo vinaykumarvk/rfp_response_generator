@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { format, formatDistanceToNow } from 'date-fns';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -137,6 +137,15 @@ export default function ViewData() {
     isLoading: false
   });
   
+  // USABILITY: Persistent status for completed bulk operations
+  const [lastBulkOperation, setLastBulkOperation] = useState<{
+    type: 'generate' | 'find';
+    model?: string;
+    completed: number;
+    total: number;
+    timestamp: Date;
+  } | null>(null);
+  
   // Filters
   const [filters, setFilters] = useState({
     rfpName: 'all',
@@ -153,10 +162,33 @@ export default function ViewData() {
   
   const isMobile = useIsMobile();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   
   const { data: excelData = [], isLoading: loading, refetch } = useQuery<ExcelRequirementResponse[]>({
     queryKey: ['/api/excel-requirements'],
   });
+  
+  // Listen for requirements-replaced and requirements-updated events to refresh data
+  React.useEffect(() => {
+    const handleRequirementsReplaced = () => {
+      console.log('Requirements replaced - refreshing data');
+      queryClient.invalidateQueries({ queryKey: ['/api/excel-requirements'] });
+      refetch();
+    };
+    
+    const handleRequirementsUpdated = () => {
+      console.log('Requirements updated - refreshing data and RFP names');
+      queryClient.invalidateQueries({ queryKey: ['/api/excel-requirements'] });
+      refetch();
+    };
+    
+    window.addEventListener('requirements-replaced', handleRequirementsReplaced);
+    window.addEventListener('requirements-updated', handleRequirementsUpdated);
+    return () => {
+      window.removeEventListener('requirements-replaced', handleRequirementsReplaced);
+      window.removeEventListener('requirements-updated', handleRequirementsUpdated);
+    };
+  }, [refetch]);
   
   // Set initial loading state
   React.useEffect(() => {
@@ -189,7 +221,7 @@ export default function ViewData() {
   // Extract unique RFP names and categories
   const uniqueRfpNames = useMemo(() => {
     const names = excelData
-      .map(item => item.rfpName || '')
+      .map(item => (item.rfpName || '').trim()) // Trim whitespace from RFP names
       .filter((value, index, self) => 
         value && self.indexOf(value) === index
       );
@@ -341,9 +373,17 @@ export default function ViewData() {
     // Reset editing state
     setIsEditingResponse(false);
     
-    // Note: We don't override activeTab here anymore
-    // The activeTab is now set by the button that was clicked in CategoryGroup.tsx
-    // and will be preserved when opening the dialog
+    // USABILITY: Default to "Response" tab when opening dialog if response exists
+    // This ensures users see the generated content immediately
+    if (hasAnyResponse(row)) {
+      setActiveTab('response');
+    } else if (row.similarQuestions) {
+      // If no response but has references, show references tab
+      setActiveTab('references');
+    } else {
+      // Otherwise default to response tab
+      setActiveTab('response');
+    }
     
     setShowResponseDialog(true);
   };
@@ -449,52 +489,68 @@ export default function ViewData() {
       setIsFindingSimilar(true);
       setSimilarMatches([]);
       
-      // Call the API to find similar matches
-      const response = await fetch(`/api/find-similar-matches/${requirementId}`);
+      // Call the API to find similar matches with increased timeout for similarity search
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 120000); // 120-second timeout (2 minutes)
       
-      if (!response.ok) {
-        throw new Error(`Failed to find similar matches: ${response.status} ${response.statusText}`);
-      }
-      
-      const data = await response.json();
-      
-      if (data.error) {
-        throw new Error(data.error);
-      }
-      
-      // Set the similar matches
-      if (data.similar_matches) {
-        setSimilarMatches(data.similar_matches);
-      } else if (data.rawOutput) {
-        // Handle raw output case
-        toast({
-          title: "Raw Output Returned",
-          description: "The similarity search returned raw output instead of structured data.",
-          variant: "destructive"
+      try {
+        const response = await fetch(`/api/find-similar-matches/${requirementId}`, {
+          signal: controller.signal
         });
-        console.log("Raw similarity search output:", data.rawOutput);
+        
+        clearTimeout(timeoutId);
+        
+        if (!response.ok) {
+          throw new Error(`Failed to find similar matches: ${response.status} ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        
+        if (data.error) {
+          throw new Error(data.error);
+        }
+        
+        // Set the similar matches
+        if (data.similar_matches) {
+          setSimilarMatches(data.similar_matches);
+        } else if (data.rawOutput) {
+          // Handle raw output case
+          toast({
+            title: "Raw Output Returned",
+            description: "The similarity search returned raw output instead of structured data.",
+            variant: "destructive"
+          });
+          console.log("Raw similarity search output:", data.rawOutput);
+        }
+        
+        // Show a success message
+        toast({
+          title: "Similar Matches Found",
+          description: `Found ${data.similar_matches?.length || 0} similar requirements.`,
+        });
+        
+        // If viewing a specific response, switch to the references tab
+        if (selectedResponseId === requirementId && selectedResponse) {
+          setActiveTab('references');
+        }
+        
+        // Refresh the data to reflect the updated similar questions
+        await refetch();
+        
+        return true;
+      } catch (fetchError) {
+        clearTimeout(timeoutId);
+        if (fetchError instanceof Error && fetchError.name === 'AbortError') {
+          throw new Error('Request timed out after 2 minutes. The similarity search may take longer for large datasets.');
+        }
+        throw fetchError;
       }
-      
-      // Show a success message
-      toast({
-        title: "Similar Matches Found",
-        description: `Found ${data.similar_matches?.length || 0} similar requirements.`,
-      });
-      
-      // If viewing a specific response, switch to the references tab
-      if (selectedResponseId === requirementId && selectedResponse) {
-        setActiveTab('references');
-      }
-      
-      // Refresh the data to reflect the updated similar questions
-      await refetch();
-      
-      return true;
     } catch (error) {
       console.error('Error finding similar matches:', error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
       toast({
         title: "Similarity Search Error",
-        description: `Failed to find similar matches: ${error instanceof Error ? error.message : String(error)}`,
+        description: `Failed to find similar matches: ${errorMessage}`,
         variant: "destructive",
       });
       return false;
@@ -545,9 +601,9 @@ export default function ViewData() {
               await new Promise(resolve => setTimeout(resolve, delayIndex * 20));
             }
             
-            // Call the API for this requirement with timeout
+            // Call the API for this requirement with increased timeout for similarity search
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+            const timeoutId = setTimeout(() => controller.abort(), 120000); // 120-second timeout (2 minutes) for similarity search
             
             const response = await fetch(`/api/find-similar-matches/${requirementId}`, {
               signal: controller.signal
@@ -604,6 +660,14 @@ export default function ViewData() {
       const failed = results.filter(r => !r.success).length;
       
       // Show final notification
+      // USABILITY: Store persistent status for bulk operation
+      setLastBulkOperation({
+        type: 'find',
+        completed: successful,
+        total: selectedItems.length,
+        timestamp: new Date()
+      });
+      
       toast({
         title: "Similarity Search Complete",
         description: `Successfully processed ${successful} requirements${failed > 0 ? `, failed: ${failed}` : ''}.`,
@@ -909,8 +973,31 @@ export default function ViewData() {
       
       console.log("Generated response for requirement " + requirementId + ":", data);
       
-      // Refresh the data
+      // Invalidate and refetch the requirements query to update the UI
+      // This ensures the Response button gets enabled with the new finalResponse
+      await queryClient.invalidateQueries({ queryKey: ['/api/excel-requirements'] });
       await refetch();
+      
+      // Also update the cache directly with the new response data if available
+      if (data.finalResponse || data.openaiResponse || data.anthropicResponse || data.deepseekResponse || data.moaResponse) {
+        queryClient.setQueryData<ExcelRequirementResponse[]>(['/api/excel-requirements'], (oldData) => {
+          if (!oldData) return oldData;
+          return oldData.map(item => {
+            if (item.id === requirementId) {
+              return {
+                ...item,
+                finalResponse: data.finalResponse || item.finalResponse,
+                openaiResponse: data.openaiResponse || item.openaiResponse,
+                anthropicResponse: data.anthropicResponse || item.anthropicResponse,
+                deepseekResponse: data.deepseekResponse || item.deepseekResponse,
+                moaResponse: data.moaResponse || item.moaResponse,
+                modelProvider: data.modelProvider || item.modelProvider
+              };
+            }
+            return item;
+          });
+        });
+      }
       
       // Fetch the updated response directly to ensure we have the latest data
       if (selectedResponse && selectedResponse.id === requirementId) {
@@ -1039,7 +1126,14 @@ export default function ViewData() {
             }));
             
             // Generate response for this requirement
-            return await generateResponseForRequirement(requirementId, modelProvider);
+            const result = await generateResponseForRequirement(requirementId, modelProvider);
+            
+            // Invalidate cache after each successful generation to update UI immediately
+            if (result) {
+              await queryClient.invalidateQueries({ queryKey: ['/api/excel-requirements'] });
+            }
+            
+            return result;
           } catch (error) {
             console.error(`Error in batch processing for req ${requirementId}:`, error);
             return false;
@@ -1064,8 +1158,18 @@ export default function ViewData() {
         }
       }
       
-      // Refresh data after all items are processed
+      // Invalidate and refresh data after all items are processed
+      await queryClient.invalidateQueries({ queryKey: ['/api/excel-requirements'] });
       await refetch();
+      
+      // USABILITY: Store persistent status for bulk operation
+      setLastBulkOperation({
+        type: 'generate',
+        model: modelProvider,
+        completed: successCount,
+        total: totalItems,
+        timestamp: new Date()
+      });
       
       toast({
         title: "Response Generation Complete",
@@ -1366,7 +1470,8 @@ export default function ViewData() {
         description: `Generated responses for ${selectedRequirements.length} requirements using ${model}`,
       });
 
-      // Refresh the data to show new responses
+      // Invalidate and refresh the data to show new responses
+      await queryClient.invalidateQueries({ queryKey: ['/api/excel-requirements'] });
       refetch();
     } catch (error) {
       console.error('Error generating response:', error);
@@ -1444,51 +1549,79 @@ export default function ViewData() {
   
   return (
     <div className="space-y-4">
-      {/* Progress bar for requirements loading */}
+      {/* ACCESSIBILITY: Progress bar for requirements loading with live region */}
       {requirementsLoadingProgress.isLoading && (
-        <div className="fixed top-0 left-0 right-0 z-50 bg-white dark:bg-slate-800 p-3 shadow-md">
+        <div className="fixed top-0 left-0 right-0 z-50 bg-white dark:bg-slate-800 p-3 shadow-md" role="status" aria-live="polite" aria-atomic="true">
           <div className="max-w-7xl mx-auto">
             <div className="flex items-center gap-3 mb-2">
-              <Loader2 className="animate-spin h-5 w-5 text-primary" />
+              <Loader2 className="animate-spin h-5 w-5 text-primary" aria-hidden="true" />
               <p className="font-medium text-sm">
                 Loading requirements data {requirementsLoadingProgress.loaded > 0 ? 
                   `(${requirementsLoadingProgress.loaded} items)` : '...'}
               </p>
             </div>
-            <Progress value={loading ? 30 : 100} className="h-2" />
+            <Progress value={loading ? 30 : 100} className="h-2" aria-label="Loading progress" />
           </div>
         </div>
       )}
       
-      {/* Progress bar for bulk find similar operations */}
+      {/* ACCESSIBILITY: Progress bar for bulk find similar operations with live region */}
       {bulkFindingProgress.isProcessing && (
-        <div className="fixed top-0 left-0 right-0 z-50 bg-white dark:bg-slate-800 p-3 shadow-md">
+        <div className="fixed top-0 left-0 right-0 z-50 bg-white dark:bg-slate-800 p-3 shadow-md" role="status" aria-live="polite" aria-atomic="true">
           <div className="max-w-7xl mx-auto">
             <div className="flex items-center gap-3 mb-2">
-              <Loader2 className="animate-spin h-5 w-5 text-primary" />
+              <Loader2 className="animate-spin h-5 w-5 text-primary" aria-hidden="true" />
               <p className="font-medium text-sm">
                 Fetching similar responses for {bulkFindingProgress.completed}/{bulkFindingProgress.total} requirements
               </p>
             </div>
             <Progress value={(bulkFindingProgress.completed / bulkFindingProgress.total) * 100} 
-              className="h-2" />
+              className="h-2" aria-label={`Progress: ${bulkFindingProgress.completed} of ${bulkFindingProgress.total} requirements processed`} />
           </div>
         </div>
       )}
       
-      {/* Progress bar for bulk generation operations */}
+      {/* ACCESSIBILITY: Progress bar for bulk generation operations with live region */}
       {bulkGenerationProgress.isProcessing && (
-        <div className="fixed top-0 left-0 right-0 z-50 bg-white dark:bg-slate-800 p-3 shadow-md">
+        <div className="fixed top-0 left-0 right-0 z-50 bg-white dark:bg-slate-800 p-3 shadow-md" role="status" aria-live="polite" aria-atomic="true">
           <div className="max-w-7xl mx-auto">
             <div className="flex items-center gap-3 mb-2">
-              <Loader2 className="animate-spin h-5 w-5 text-primary" />
+              <Loader2 className="animate-spin h-5 w-5 text-primary" aria-hidden="true" />
               <p className="font-medium text-sm">
                 Generating responses with {bulkGenerationProgress.model} for {bulkGenerationProgress.completed}/{bulkGenerationProgress.total} requirements
               </p>
             </div>
             <Progress value={(bulkGenerationProgress.completed / bulkGenerationProgress.total) * 100} 
-              className="h-2" />
+              className="h-2" aria-label={`Progress: ${bulkGenerationProgress.completed} of ${bulkGenerationProgress.total} responses generated`} />
           </div>
+        </div>
+      )}
+      
+      {/* USABILITY: Persistent status banner for completed bulk operations */}
+      {lastBulkOperation && !bulkGenerationProgress.isProcessing && !bulkFindingProgress.isProcessing && (
+        <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-3 mb-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Check className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+            <div>
+              <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                {lastBulkOperation.type === 'generate' 
+                  ? `Generated ${lastBulkOperation.completed} of ${lastBulkOperation.total} responses using ${lastBulkOperation.model?.toUpperCase() || 'AI'}`
+                  : `Found similar responses for ${lastBulkOperation.completed} of ${lastBulkOperation.total} requirements`}
+              </p>
+              <p className="text-xs text-blue-700 dark:text-blue-300 mt-0.5">
+                Completed {formatDistanceToNow(lastBulkOperation.timestamp, { addSuffix: true })}
+              </p>
+            </div>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setLastBulkOperation(null)}
+            className="h-7 w-7 p-0 text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-200"
+            aria-label="Dismiss status message"
+          >
+            <CloseIcon className="h-4 w-4" />
+          </Button>
         </div>
       )}
       
@@ -1498,7 +1631,7 @@ export default function ViewData() {
           <div className="flex items-center gap-3">
             <h1 className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-primary to-primary/70 text-transparent bg-clip-text">View Requirements</h1>
             
-            <p className="text-sm text-slate-500 dark:text-slate-400 whitespace-nowrap">
+            <p className="text-sm text-slate-600 dark:text-slate-300 whitespace-nowrap">
               {filteredData.length} {filteredData.length === 1 ? 'item' : 'items'}
               {filteredData.length !== excelData.length ? 
                 <Badge variant="outline" className="font-normal ml-1">
@@ -1719,8 +1852,8 @@ export default function ViewData() {
                           className="h-9 px-2 sm:px-3 flex gap-1.5 items-center" 
                           disabled={selectedItems.length === 0}
                         >
-                          <Sparkles className="h-4 w-4" />
-                          <span className="hidden xs:inline">Generate</span>
+                            <Sparkles className="h-4 w-4" />
+                          <span className="hidden xs:inline">Generate Response</span>
                           {selectedItems.length > 0 && (
                             <Badge className="ml-1 h-5 bg-white text-primary">{selectedItems.length}</Badge>
                           )}
@@ -1761,7 +1894,7 @@ export default function ViewData() {
                         <AccordionItem value="rfp-name" className="border-0 border-b">
                           <AccordionTrigger className="px-3 py-2 hover:no-underline hover:bg-slate-50 dark:hover:bg-slate-800">
                             <div className="flex items-center gap-2">
-                              <FileText className="h-4 w-4 text-slate-500" />
+                              <FileText className="h-4 w-4 text-slate-600 dark:text-slate-300" aria-hidden="true" />
                               <span className="text-sm font-medium">RFP Name</span>
                               {filters.rfpName !== 'all' && (
                                 <Badge variant="outline" className="ml-2 text-[10px]">
@@ -1797,7 +1930,7 @@ export default function ViewData() {
                         <AccordionItem value="category" className="border-0 border-b">
                           <AccordionTrigger className="px-3 py-2 hover:no-underline hover:bg-slate-50 dark:hover:bg-slate-800">
                             <div className="flex items-center gap-2">
-                              <Tag className="h-4 w-4 text-slate-500" />
+                              <Tag className="h-4 w-4 text-slate-600 dark:text-slate-300" aria-hidden="true" />
                               <span className="text-sm font-medium">Category</span>
                               {filters.category !== 'all' && (
                                 <Badge variant="outline" className="ml-2 text-[10px]">
@@ -1833,7 +1966,7 @@ export default function ViewData() {
                         <AccordionItem value="response-status" className="border-0 border-b">
                           <AccordionTrigger className="px-3 py-2 hover:no-underline hover:bg-slate-50 dark:hover:bg-slate-800">
                             <div className="flex items-center gap-2">
-                              <MessageSquare className="h-4 w-4 text-slate-500" />
+                              <MessageSquare className="h-4 w-4 text-slate-600 dark:text-slate-300" aria-hidden="true" />
                               <span className="text-sm font-medium">Response Status</span>
                               {filters.hasResponse !== 'all' && (
                                 <Badge variant="outline" className="ml-2 text-[10px]">
@@ -1868,7 +2001,7 @@ export default function ViewData() {
                         <AccordionItem value="model-provider" className="border-0">
                           <AccordionTrigger className="px-3 py-2 hover:no-underline hover:bg-slate-50 dark:hover:bg-slate-800">
                             <div className="flex items-center gap-2">
-                              <Sparkles className="h-4 w-4 text-slate-500" />
+                              <Sparkles className="h-4 w-4 text-slate-600 dark:text-slate-300" aria-hidden="true" />
                               <span className="text-sm font-medium">Model Provider</span>
                               {filters.generationMode !== 'all' && (
                                 <Badge variant="outline" className="ml-2 text-[10px]">
@@ -2106,7 +2239,7 @@ export default function ViewData() {
             ) : (
               <div className="p-12 text-center">
                 <p className="text-slate-700 dark:text-slate-300 font-medium">No data available. Please upload Excel files first.</p>
-                <p className="text-slate-600 dark:text-slate-400 text-sm mt-2">
+                <p className="text-slate-600 dark:text-slate-300 text-sm mt-2">
                   Go to the Upload Requirements page to add data.
                 </p>
               </div>
@@ -2115,9 +2248,9 @@ export default function ViewData() {
         </Card>
       </div>
       
-      {/* Detail Dialog */}
+      {/* MOBILE: Detail Dialog - responsive width */}
       <Dialog open={showResponseDialog} onOpenChange={setShowResponseDialog}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-[90vw] sm:max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <div className="flex items-center justify-between">
               <div>
@@ -2175,7 +2308,7 @@ export default function ViewData() {
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                       <DropdownMenuLabel className="flex items-center gap-2">
-                        Generate with LLM
+                        Generate Response
                         <HelpTooltip text="Select an AI model to generate a response for this requirement. Different models have unique strengths." />
                       </DropdownMenuLabel>
                       <DropdownMenuSeparator />
