@@ -54,18 +54,22 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y \
     python3.11 \
     python3.11-dev \
-    python3-pip \
+    python3.11-distutils \
     postgresql-client \
     gcc \
     g++ \
+    curl \
     && rm -rf /var/lib/apt/lists/*
+
+# Install pip for Python 3.11
+RUN curl -sS https://bootstrap.pypa.io/get-pip.py | python3.11
 
 # Create symlink for python3 -> python3.11
 RUN ln -sf /usr/bin/python3.11 /usr/bin/python3
 
-# Copy Python site-packages from python-runtime stage (contains all installed packages)
-COPY --from=python-runtime /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
-COPY --from=python-runtime /usr/local/bin /usr/local/bin
+# Copy Python requirements and install dependencies directly in final stage
+COPY python-requirements.txt ./
+RUN python3.11 -m pip install --no-cache-dir -r python-requirements.txt
 
 # Copy Node.js application from builder
 COPY --from=node-builder /app/dist ./dist
