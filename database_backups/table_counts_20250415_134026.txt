@@ -1,8 +1,0 @@
--- Table Row Counts as of Tue 15 Apr 2025 01:40:26 PM UTC
-         table_name          | row_count 
------------------------------+-----------
- embedding_categories        |        74
- embeddings                  |      9665
- excel_requirement_responses |        12
-(3 rows)
-

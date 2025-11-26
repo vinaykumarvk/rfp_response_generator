@@ -1,3 +1,0 @@
-RFP Response Generator v1.1
-Updated: Wed 16 Apr 2025 06:05:30 AM UTC
-GitHub Repository: https://github.com/vinaykumarvk/rfp_response_generator_clean

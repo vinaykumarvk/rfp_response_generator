@@ -1,3 +1,0 @@
--- Run this script to restore the excel_requirements table if needed
--- Created on Tue 15 Apr 2025 01:41:20 PM UTC
--- Example usage: psql $DATABASE_URL -f restore_excel_requirements.sql

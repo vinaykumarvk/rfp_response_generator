@@ -1,3 +1,0 @@
--- Run this script to restore the reference_responses table if needed
--- Created on Tue 15 Apr 2025 01:41:22 PM UTC
--- Example usage: psql $DATABASE_URL -f restore_reference_responses.sql

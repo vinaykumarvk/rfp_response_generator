@@ -1,3 +1,0 @@
--- Run this script to restore the rfp_responses table if needed
--- Created on Tue 15 Apr 2025 01:41:24 PM UTC
--- Example usage: psql $DATABASE_URL -f restore_rfp_responses.sql

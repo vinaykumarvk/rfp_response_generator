@@ -73,3 +73,29 @@ rfp_response_generator_v*/*.tar.gz
 # Replit specific
 .replit/
 .cache/
+
+# Backup and snapshot directories (should not be in repo)
+github_push/
+mini_repo/
+rfp_response_generator_v*/
+extract_temp/
+database_backups/
+progress_bar_fix/
+*.backup
+*_snapshot.sh
+create_v1_*.sh
+merge_with_*.sh
+prepare_for_*.sh
+push_to_*.sh
+preview_cleanup.sh
+extract_progress_bar_fix.sh
+check_push.sh
+cleanup_for_github.sh
+rfp_simplified_app.zip
+
+# Test files (keep only essential ones)
+test_*.py
+test
+run_*_tests.sh
+llm_test_report.md
+response.json
