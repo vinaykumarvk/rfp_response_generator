@@ -72,8 +72,9 @@ COPY --from=node-builder /app/dist ./dist
 COPY --from=node-builder /app/node_modules ./node_modules
 COPY --from=node-builder /app/package*.json ./
 
-# Copy Python scripts
+# Copy Python scripts and ensure they're executable
 COPY *.py ./
+RUN chmod +x call_llm_wrapper.py find_matches_wrapper.py get_db_response_wrapper.py generate_embeddings.py 2>/dev/null || true
 
 # Copy shared schema
 COPY shared ./shared

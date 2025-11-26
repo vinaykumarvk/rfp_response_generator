@@ -427,16 +427,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           pythonProcess.on('close', (code) => {
             clearTimeout(timeout);
+            if (code !== 0) {
+              console.error(`Python script exited with code ${code}`);
+              console.error(`Python stderr: ${stderr}`);
+              console.error(`Python stdout: ${stdout}`);
+            }
             resolve({ stdout, stderr, code });
           });
 
           pythonProcess.on('error', (error) => {
             clearTimeout(timeout);
+            console.error(`Python process error: ${error.message}`);
+            console.error(`Python script path: ${pythonScriptPath}`);
+            console.error(`Working directory: ${projectRoot}`);
             reject(error);
           });
         });
         
-        console.log('Python script response:', pythonApiResponse.stdout);
+        // Log Python script execution result
+        console.log(`Python script exit code: ${pythonApiResponse.code}`);
+        if (pythonApiResponse.stderr) {
+          console.error(`Python stderr output: ${pythonApiResponse.stderr}`);
+        }
+        console.log(`Python script stdout (first 500 chars): ${pythonApiResponse.stdout.substring(0, 500)}`);
+        
+        // Check if Python script failed
+        if (pythonApiResponse.code !== 0) {
+          const errorMsg = pythonApiResponse.stderr || pythonApiResponse.stdout || 'Unknown Python script error';
+          console.error(`Python script failed with code ${pythonApiResponse.code}: ${errorMsg}`);
+          throw new Error(`Python script failed: ${errorMsg.substring(0, 200)}`);
+        }
         
         let responseData;
         
