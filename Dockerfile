@@ -81,8 +81,8 @@ COPY shared ./shared
 # Create public directory for static files
 RUN mkdir -p public
 
-# Copy built static files if they exist
-COPY --from=node-builder /app/dist/client ./public
+# Copy built static files (vite builds to dist/public)
+COPY --from=node-builder /app/dist/public ./public
 
 # Set environment variables
 ENV NODE_ENV=production
