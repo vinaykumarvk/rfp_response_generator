@@ -3,8 +3,11 @@ sqlalchemy==2.0.26
 psycopg2-binary==2.9.9
 
 # AI/ML Models
-openai==1.12.0
+# OpenAI 1.40+ required for compatibility with modern httpx
+openai>=1.40.0
 anthropic>=0.37.0
+# Pin httpx to ensure compatibility
+httpx>=0.25.0,<1.0.0
 
 # Note: pgvector is a PostgreSQL extension, not a Python package
 # Install it in your database with: CREATE EXTENSION IF NOT EXISTS vector;
