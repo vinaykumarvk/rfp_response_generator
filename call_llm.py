@@ -165,7 +165,7 @@ def get_model_config(model_name):
             },
             'client_kwargs': {},
             'completion_args': {
-                'model': 'gpt-4.1',
+                'model': 'gpt-5.1',
                 'temperature': 0.2
             },
             'requires_system_message_handling': False,
