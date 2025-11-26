@@ -13,6 +13,7 @@ COPY vite.config.ts ./
 COPY tailwind.config.ts ./
 COPY postcss.config.js ./
 COPY drizzle.config.ts ./
+COPY theme.json ./
 
 # Install Node.js dependencies
 RUN npm ci --only=production=false
