@@ -54,22 +54,19 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y \
     python3.11 \
     python3.11-dev \
-    python3.11-distutils \
+    python3-pip \
     postgresql-client \
     gcc \
     g++ \
-    curl \
     && rm -rf /var/lib/apt/lists/*
-
-# Install pip for Python 3.11
-RUN curl -sS https://bootstrap.pypa.io/get-pip.py | python3.11
 
 # Create symlink for python3 -> python3.11
 RUN ln -sf /usr/bin/python3.11 /usr/bin/python3
 
 # Copy Python requirements and install dependencies directly in final stage
+# Use --break-system-packages flag to bypass PEP 668 protection in Docker container
 COPY python-requirements.txt ./
-RUN python3.11 -m pip install --no-cache-dir -r python-requirements.txt
+RUN python3.11 -m pip install --break-system-packages --no-cache-dir -r python-requirements.txt
 
 # Copy Node.js application from builder
 COPY --from=node-builder /app/dist ./dist
