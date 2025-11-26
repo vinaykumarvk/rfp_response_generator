@@ -61,13 +61,9 @@ RUN apt-get update && apt-get install -y \
 # Create symlink for python3 -> python3.11
 RUN ln -sf /usr/bin/python3.11 /usr/bin/python3
 
-# Copy Python runtime from python-runtime stage
-COPY --from=python-runtime /usr/local/lib/python3.11 /usr/local/lib/python3.11
-COPY --from=python-runtime /usr/local/bin/python3.11 /usr/local/bin/python3.11
-
-# Install Python dependencies
-COPY python-requirements.txt ./
-RUN pip3 install --no-cache-dir -r python-requirements.txt
+# Copy Python site-packages from python-runtime stage (contains all installed packages)
+COPY --from=python-runtime /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+COPY --from=python-runtime /usr/local/bin /usr/local/bin
 
 # Copy Node.js application from builder
 COPY --from=node-builder /app/dist ./dist
@@ -76,7 +72,6 @@ COPY --from=node-builder /app/package*.json ./
 
 # Copy Python scripts
 COPY *.py ./
-COPY database.py ./
 
 # Copy shared schema
 COPY shared ./shared
@@ -94,9 +89,9 @@ ENV PORT=8080
 # Expose port (GCP Cloud Run uses PORT env var)
 EXPOSE 8080
 
-# Health check
+# Health check (use PORT env var or default to 8080)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:${PORT}/api/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
+  CMD node -e "const port = process.env.PORT || '8080'; require('http').get('http://localhost:' + port + '/api/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
 
 # Start the application
 CMD ["node", "dist/index.js"]

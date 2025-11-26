@@ -1,26 +1,11 @@
-# Core Dependencies
-fastapi==0.109.2
-numpy==1.26.3
-pandas==2.2.0
-pydantic==2.6.1
-scikit-learn==1.4.0
+# Core Database
 sqlalchemy==2.0.26
-uvicorn==0.27.1
+psycopg2-binary==2.9.9
 
 # AI/ML Models
-anthropic==0.12.1
 openai==1.12.0
+anthropic==0.12.1
 
-# Database
-psycopg2-binary==2.9.9
-pgvector==0.2.4
-qdrant-client==1.7.0
-
-# Utilities
-openpyxl==3.1.2
-requests==2.31.0
-tqdm==4.66.1
-gdown==5.1.0
-
-# To add additional packages, modify pyproject.toml and regenerate this file with:
-# pip freeze > python-requirements.txt
+# Note: pgvector is a PostgreSQL extension, not a Python package
+# Install it in your database with: CREATE EXTENSION IF NOT EXISTS vector;
+# It does NOT need to be installed via pip
