@@ -239,8 +239,18 @@ def prompt_gpt(prompt, model_name='openAI'):
         
         logger.info(f"Calling {display_name} API with prompt")
         
+        # Validate API key before initializing client
+        api_key = config['client_args'].get('api_key')
+        if not api_key:
+            raise ValueError(f"{display_name} API key not found in environment variables. Please set {display_name.upper()}_API_KEY")
+        
         # Initialize the client with the configuration
-        client = config['client_class'](**config['client_args'], **config.get('client_kwargs', {}))
+        try:
+            client = config['client_class'](**config['client_args'], **config.get('client_kwargs', {}))
+            logger.info(f"{display_name} client initialized successfully")
+        except Exception as e:
+            logger.error(f"Failed to initialize {display_name} client: {str(e)}")
+            raise ValueError(f"Failed to initialize {display_name} client: {str(e)}")
         
         # Handle system message for models that require it separately
         if config['requires_system_message_handling']:
@@ -266,7 +276,14 @@ def prompt_gpt(prompt, model_name='openAI'):
             completion_args['messages'] = messages
             completion_args['system'] = system_message
             
-            response = client.messages.create(**completion_args)
+            logger.info(f"Calling {display_name} API with model: {completion_args.get('model')}, messages: {len(messages)}, system message length: {len(system_message)}")
+            try:
+                response = client.messages.create(**completion_args)
+                logger.info(f"{display_name} API call successful, response type: {type(response)}")
+            except Exception as e:
+                logger.error(f"{display_name} API call failed: {str(e)}")
+                logger.error(f"Completion args: {completion_args}")
+                raise
         else:
             # Check if this model uses the new Responses API (e.g., GPT-5)
             if config.get('use_responses_api', False):
