@@ -296,16 +296,37 @@ def prompt_gpt(prompt, model_name='openAI'):
                 print(f"Input: {str(prompt)[:200]}...")
                 print("===============================")
                 
-                response = client.responses.create(**completion_args)
+                logger.info(f"Calling {display_name} Responses API with model: {completion_args.get('model')}")
+                try:
+                    response = client.responses.create(**completion_args)
+                    logger.info(f"{display_name} Responses API call successful, response type: {type(response)}")
+                except Exception as e:
+                    logger.error(f"{display_name} Responses API call failed: {str(e)}")
+                    logger.error(f"Completion args: {completion_args}")
+                    raise
             else:
-                # Standard completion for models that use chat.completions API
+                # Standard completion for models that use chat.completions API (e.g., DeepSeek)
                 completion_args = config['completion_args'].copy()
                 completion_args['messages'] = prompt
                 
-                response = client.chat.completions.create(**completion_args)
+                logger.info(f"Calling {display_name} chat.completions API with model: {completion_args.get('model')}, messages: {len(prompt)}")
+                try:
+                    response = client.chat.completions.create(**completion_args)
+                    logger.info(f"{display_name} chat.completions API call successful, response type: {type(response)}")
+                except Exception as e:
+                    logger.error(f"{display_name} chat.completions API call failed: {str(e)}")
+                    logger.error(f"Completion args keys: {list(completion_args.keys())}")
+                    logger.error(f"Model: {completion_args.get('model')}, Messages count: {len(prompt)}")
+                    raise
         
         # Handle the response using the model-specific handler
-        content = config['response_handler'](response)
+        try:
+            content = config['response_handler'](response)
+            logger.info(f"{display_name} response handler executed successfully, content type: {type(content)}")
+        except Exception as e:
+            logger.error(f"{display_name} response handler failed: {str(e)}")
+            logger.error(f"Response type: {type(response)}, Response: {str(response)[:500]}")
+            raise ValueError(f"Failed to extract content from {display_name} response: {str(e)}")
         
         # Log the response for debugging
         print(f"====== FULL {display_name.upper()} RESPONSE ======")
@@ -313,6 +334,7 @@ def prompt_gpt(prompt, model_name='openAI'):
             print(f"Type: {type(response)}")
             print(f"Response object: {response}")
             print(f"Extracted content: {content}")
+            logger.warning(f"{display_name} response handler returned non-string: {type(content)}")
         else:
             print(f"Content preview: {content[:200]}...")
         print("=======================================")
@@ -320,7 +342,12 @@ def prompt_gpt(prompt, model_name='openAI'):
         # Validate and clean up the content
         if isinstance(content, str):
             content = content.strip()
+            if not content:
+                logger.warning(f"{display_name} response is empty after stripping")
             logger.info(f"Successfully generated {display_name} response of length: {len(content)} characters")
+        else:
+            logger.error(f"{display_name} response handler did not return a string, got: {type(content)}")
+            raise ValueError(f"{display_name} response handler returned invalid type: {type(content)}")
             
             # Ensure we don't return an empty string
             if not content:
