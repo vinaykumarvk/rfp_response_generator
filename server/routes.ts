@@ -672,8 +672,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } catch (pythonError) {
         // RELIABILITY: Return error instead of simulated responses
         // Simulated responses corrupt data and hide outages
-        console.error(`LLM generation failed for requirement ${requirementId} with model ${modelProvider}`);
-        console.error(`Python error: ${pythonError instanceof Error ? pythonError.message : String(pythonError)}`);
+        console.error(`==== LLM GENERATION FAILED ====`);
+        console.error(`Requirement ID: ${requirementId}`);
+        console.error(`Model Provider: ${modelProvider}`);
+        console.error(`Error type: ${pythonError instanceof Error ? pythonError.constructor.name : typeof pythonError}`);
+        console.error(`Error message: ${pythonError instanceof Error ? pythonError.message : String(pythonError)}`);
+        if (pythonError instanceof Error && pythonError.stack) {
+          console.error(`Error stack:\n${pythonError.stack}`);
+        }
         
         // Return explicit error - don't corrupt database with placeholder data
         return res.status(500).json({ 
