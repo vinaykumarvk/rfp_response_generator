@@ -20,6 +20,23 @@ const getDirPath = () => {
   return dirname(currentFilePath);
 };
 
+// Get the project root directory (where Python scripts are located)
+// In Docker/production, this is /app (Docker WORKDIR)
+// In development, this is the project root
+const getProjectRoot = () => {
+  // In Docker, WORKDIR is /app and Python scripts are copied there
+  // process.cwd() should be /app in production
+  const cwd = process.cwd();
+  
+  // If we're in a built environment (dist folder), go up to project root
+  if (cwd.includes('/dist/') || cwd.endsWith('/dist')) {
+    return path.resolve(cwd, '..');
+  }
+  
+  // Otherwise use current working directory (should be /app in Docker)
+  return cwd;
+};
+
 // Removed unused exec import - all Python calls now use secure spawn() with argument arrays
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -154,7 +171,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // Run embedding generation in background (don't wait for it)
         const { spawn } = await import('child_process');
-        const embeddingProcess = spawn('python3', ['generate_embeddings.py', requirementIds.join(',')]);
+        const projectRoot = getProjectRoot();
+        const pythonScriptPath = path.join(projectRoot, 'generate_embeddings.py');
+        console.log(`Generating embeddings - Python script: ${pythonScriptPath}, CWD: ${projectRoot}`);
+        const embeddingProcess = spawn('python3', [pythonScriptPath, requirementIds.join(',')], {
+          cwd: projectRoot,
+          env: process.env
+        });
         
         embeddingProcess.on('close', (code) => {
           if (code === 0) {
@@ -213,7 +236,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { spawn } = await import('child_process');
       const args = validatedIds ? [validatedIds] : [];
       
-      const pythonProcess = spawn('python3', ['generate_embeddings.py', ...args]);
+      const projectRoot = getProjectRoot();
+      const pythonScriptPath = path.join(projectRoot, 'generate_embeddings.py');
+      console.log(`Generating embeddings - Python script: ${pythonScriptPath}, CWD: ${projectRoot}`);
+      const pythonProcess = spawn('python3', [pythonScriptPath, ...args], {
+        cwd: projectRoot,
+        env: process.env
+      });
       
       let stdout = '';
       let stderr = '';
@@ -363,16 +392,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (pythonModel === 'openai') pythonModel = 'openAI';
         
         // SECURITY: Use spawn() with argument array instead of exec() with shell string
+        const projectRoot = getProjectRoot();
+        const pythonScriptPath = path.join(projectRoot, 'call_llm_wrapper.py');
+        
+        console.log(`Python script path: ${pythonScriptPath}`);
+        console.log(`Working directory: ${projectRoot}`);
+        
         const pythonApiResponse = await new Promise<{ stdout: string; stderr: string; code: number | null }>((resolve, reject) => {
           const pythonProcess = spawn('python3', [
-            'call_llm_wrapper.py',
+            pythonScriptPath,
             validatedRequirementId.toString(),
             pythonModel,
             validatedSkipSimilarity.toString()
           ], {
             stdio: ['pipe', 'pipe', 'pipe'],
             env: process.env,
-            cwd: process.cwd()
+            cwd: projectRoot
           });
 
           let stdout = '';
@@ -615,13 +650,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const validatedRequirementId = validateRequirementId(requirementId);
       
       const pythonResponse = await new Promise<{ stdout: string; stderr: string; code: number | null }>((resolve, reject) => {
+        const projectRoot = getProjectRoot();
+        const pythonScriptPath = path.join(projectRoot, 'find_matches_wrapper.py');
+        console.log(`Finding similar matches - Python script: ${pythonScriptPath}, CWD: ${projectRoot}`);
         const pythonProcess = spawn('python3', [
-          'find_matches_wrapper.py',
+          pythonScriptPath,
           validatedRequirementId.toString()
         ], {
           stdio: ['pipe', 'pipe', 'pipe'],
           env: process.env,
-          cwd: process.cwd()
+          cwd: projectRoot
         });
 
         let stdout = '';
@@ -759,13 +797,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const validatedId = validateRequirementId(id);
         
         const pythonResponse = await new Promise<{ stdout: string; stderr: string; code: number | null }>((resolve, reject) => {
+          const projectRoot = getProjectRoot();
+          const pythonScriptPath = path.join(projectRoot, 'find_matches_wrapper.py');
+          console.log(`Fetching references - Python script: ${pythonScriptPath}, CWD: ${projectRoot}`);
           const pythonProcess = spawn('python3', [
-            'find_matches_wrapper.py',
+            pythonScriptPath,
             validatedId.toString()
           ], {
             stdio: ['pipe', 'pipe', 'pipe'],
             env: process.env,
-            cwd: process.cwd()
+            cwd: projectRoot
           });
 
           let stdout = '';
@@ -897,12 +938,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Call Python script securely using wrapper
       const pythonResponse = await new Promise<{ stdout: string; stderr: string; code: number | null }>((resolve, reject) => {
+        const projectRoot = getProjectRoot();
+        const pythonScriptPath = path.join(projectRoot, 'call_llm_wrapper.py');
+        console.log(`Generating LLM response - Python script: ${pythonScriptPath}, CWD: ${projectRoot}`);
         const pythonProcess = spawn('python3', [
-          'call_llm_wrapper.py',
+          pythonScriptPath,
           validatedRequirementId.toString(),
           validatedModel,
           'false'
         ], {
+          cwd: projectRoot,
+          env: process.env
+        });
           stdio: ['pipe', 'pipe', 'pipe'],
           env: process.env,
           cwd: process.cwd()
