@@ -74,7 +74,11 @@ COPY --from=node-builder /app/package*.json ./
 
 # Copy Python scripts and ensure they're executable
 COPY *.py ./
-RUN chmod +x call_llm_wrapper.py find_matches_wrapper.py get_db_response_wrapper.py generate_embeddings.py 2>/dev/null || true
+RUN chmod +x *.py 2>/dev/null || true
+
+# Set PYTHONPATH to ensure Python can find modules
+ENV PYTHONPATH=/app
+ENV PYTHONUNBUFFERED=1
 
 # Copy shared schema
 COPY shared ./shared

@@ -437,25 +437,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           pythonProcess.on('error', (error) => {
             clearTimeout(timeout);
-            console.error(`Python process error: ${error.message}`);
+            console.error(`==== PYTHON PROCESS ERROR ====`);
+            console.error(`Error message: ${error.message}`);
+            console.error(`Error stack: ${error.stack}`);
             console.error(`Python script path: ${pythonScriptPath}`);
             console.error(`Working directory: ${projectRoot}`);
+            console.error(`Python executable: python3`);
+            console.error(`Environment vars present: ${Object.keys(process.env).filter(k => k.includes('API') || k.includes('DATABASE')).join(', ')}`);
             reject(error);
           });
         });
         
-        // Log Python script execution result
-        console.log(`Python script exit code: ${pythonApiResponse.code}`);
+        // Log Python script execution result with full details
+        console.log(`==== PYTHON SCRIPT EXECUTION RESULT ====`);
+        console.log(`Exit code: ${pythonApiResponse.code}`);
+        console.log(`Python script path: ${pythonScriptPath}`);
+        console.log(`Working directory: ${projectRoot}`);
+        console.log(`Command: python3 ${pythonScriptPath} ${validatedRequirementId} ${pythonModel} ${validatedSkipSimilarity}`);
+        
         if (pythonApiResponse.stderr) {
-          console.error(`Python stderr output: ${pythonApiResponse.stderr}`);
+          console.error(`==== PYTHON STDERR (FULL OUTPUT) ====`);
+          console.error(pythonApiResponse.stderr);
         }
-        console.log(`Python script stdout (first 500 chars): ${pythonApiResponse.stdout.substring(0, 500)}`);
+        
+        if (pythonApiResponse.stdout) {
+          console.log(`==== PYTHON STDOUT (FULL OUTPUT) ====`);
+          console.log(pythonApiResponse.stdout);
+        } else {
+          console.log(`==== PYTHON STDOUT: EMPTY ====`);
+        }
         
         // Check if Python script failed
         if (pythonApiResponse.code !== 0) {
           const errorMsg = pythonApiResponse.stderr || pythonApiResponse.stdout || 'Unknown Python script error';
-          console.error(`Python script failed with code ${pythonApiResponse.code}: ${errorMsg}`);
-          throw new Error(`Python script failed: ${errorMsg.substring(0, 200)}`);
+          console.error(`==== PYTHON SCRIPT FAILED ====`);
+          console.error(`Exit code: ${pythonApiResponse.code}`);
+          console.error(`Error message: ${errorMsg}`);
+          
+          // Try to parse JSON error from stdout if available
+          let parsedError = errorMsg;
+          try {
+            const jsonMatch = pythonApiResponse.stdout.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+              const errorJson = JSON.parse(jsonMatch[0]);
+              if (errorJson.error) {
+                parsedError = errorJson.error;
+                if (errorJson.traceback) {
+                  console.error(`Python traceback:\n${errorJson.traceback}`);
+                }
+              }
+            }
+          } catch (e) {
+            // If JSON parsing fails, use original error message
+          }
+          
+          throw new Error(`Python script failed (exit code ${pythonApiResponse.code}): ${parsedError.substring(0, 500)}`);
         }
         
         let responseData;
