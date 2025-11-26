@@ -6,7 +6,6 @@ from database import engine
 from generate_prompt import create_rfp_prompt, convert_prompt_to_claude, find_similar_matches_and_generate_prompt
 import logging
 import traceback
-import httpx
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
@@ -180,16 +179,7 @@ def get_model_config(model_name):
                 'api_key': os.environ.get("DEEPSEEK_API_KEY"),
                 'base_url': "https://api.deepseek.com/v1",
             },
-            'client_kwargs': {
-                # Create httpx client with headers for DeepSeek privacy settings
-                'http_client': httpx.Client(
-                    headers={
-                        "X-Privacy-Mode": "strict",
-                        "X-Data-Collection": "disabled"
-                    },
-                    timeout=60.0
-                )
-            },
+            'client_kwargs': {},
             'completion_args': {
                 'model': 'deepseek-chat',
                 'temperature': 0.2
@@ -347,19 +337,14 @@ def prompt_gpt(prompt, model_name='openAI'):
             content = content.strip()
             if not content:
                 logger.warning(f"{display_name} response is empty after stripping")
-            logger.info(f"Successfully generated {display_name} response of length: {len(content)} characters")
-        else:
-            logger.error(f"{display_name} response handler did not return a string, got: {type(content)}")
-            raise ValueError(f"{display_name} response handler returned invalid type: {type(content)}")
-            
-            # Ensure we don't return an empty string
-            if not content:
                 print(f"WARNING: Empty response from {display_name}, using fallback content")
                 return f"The system encountered an issue with the {display_name} response. Please try again or use another model."
             
+            logger.info(f"Successfully generated {display_name} response of length: {len(content)} characters")
             return content
         else:
-            raise ValueError(f"Invalid response format from {display_name}: {type(content)}")
+            logger.error(f"{display_name} response handler did not return a string, got: {type(content)}")
+            raise ValueError(f"{display_name} response handler returned invalid type: {type(content)}")
             
     except Exception as e:
         logger.error(f"Error generating response from {model_name}: {str(e)}")
