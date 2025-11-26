@@ -81,7 +81,8 @@ COPY *.py ./
 RUN chmod +x *.py 2>/dev/null || true
 
 # Set PYTHONPATH to ensure Python can find modules
-ENV PYTHONPATH=/app
+# Include both /app (for local scripts) and site-packages location
+ENV PYTHONPATH=/app:/usr/local/lib/python3.11/dist-packages:/usr/lib/python3.11/dist-packages
 ENV PYTHONUNBUFFERED=1
 
 # Copy shared schema
