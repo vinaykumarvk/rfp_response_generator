@@ -22,6 +22,7 @@ RUN npm ci --only=production=false
 COPY server ./server
 COPY client ./client
 COPY shared ./shared
+COPY attached_assets ./attached_assets
 
 # Build the application
 RUN npm run build
