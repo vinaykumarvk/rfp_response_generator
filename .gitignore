@@ -66,6 +66,9 @@ virtualenv/
 *.pickle
 *.h5
 *.hdf5
+server/rfp_embeddings.pkl
+rfp_response_generator_v*/*.tar.gz
+*.tar.gz
 
 # Replit specific
 .replit/
