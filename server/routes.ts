@@ -967,12 +967,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           validatedModel,
           'false'
         ], {
-          cwd: projectRoot,
-          env: process.env
-        });
           stdio: ['pipe', 'pipe', 'pipe'],
           env: process.env,
-          cwd: process.cwd()
+          cwd: projectRoot
         });
 
         let stdout = '';
