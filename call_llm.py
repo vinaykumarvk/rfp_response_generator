@@ -165,12 +165,12 @@ def get_model_config(model_name):
             },
             'client_kwargs': {},
             'completion_args': {
-                'model': 'gpt-4o',
+                'model': 'gpt-4.1',
                 'temperature': 0.2
             },
             'requires_system_message_handling': False,
-            'use_responses_api': False,  # Use standard chat completions API
-            'response_handler': lambda response: response.choices[0].message.content.strip()
+            'use_responses_api': True,  # Use Responses API for GPT-4.1
+            'response_handler': lambda response: response.output_text.strip() if hasattr(response, 'output_text') else str(response)
         },
         'deepseek': {
             'display_name': 'DeepSeek',
