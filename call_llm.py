@@ -179,13 +179,14 @@ def get_model_config(model_name):
             'client_args': {
                 'api_key': os.environ.get("DEEPSEEK_API_KEY"),
                 'base_url': "https://api.deepseek.com/v1",
+                'http_client': httpx.Client(
+                    headers={
+                        "X-Privacy-Mode": "strict",
+                        "X-Data-Collection": "disabled"
+                    }
+                )
             },
-            'client_kwargs': {
-                'default_headers': {
-                    "X-Privacy-Mode": "strict",
-                    "X-Data-Collection": "disabled"
-                }
-            },
+            'client_kwargs': {},
             'completion_args': {
                 'model': 'deepseek-chat',
                 'temperature': 0.2
