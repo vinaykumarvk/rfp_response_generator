@@ -21,6 +21,9 @@ export const excelRequirementResponses = pgTable("excel_requirement_responses", 
   category: text("category").notNull(),
   requirement: text("requirement").notNull(),
   
+  // Elaborated requirement (user-edited version of the original question)
+  elaboratedRequirement: text("elaborated_requirement"),
+  
   // Response fields
   finalResponse: text("final_response"),
   openaiResponse: text("openai_response"),

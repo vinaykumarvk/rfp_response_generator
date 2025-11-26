@@ -1,17 +1,22 @@
-import React from 'react';
+import React, { useState, useCallback } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
 import { 
   ChevronDown, 
   MessageSquare, 
-  BookOpen, 
+  Edit2, 
   Check,
-  Loader2
+  Loader2,
+  X,
+  Save
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { ExcelRequirementResponse } from '@shared/schema';
+import { useToast } from '@/hooks/use-toast';
+import { useQueryClient } from '@tanstack/react-query';
 
 type CategoryGroupProps = {
   category: string;
@@ -36,6 +41,61 @@ const CategoryGroup: React.FC<CategoryGroupProps> = ({
 }) => {
   // Track if this category is expanded (starts expanded by default)
   const [isExpanded, setIsExpanded] = React.useState(true);
+  
+  // Elaboration state
+  const [elaboratingId, setElaboratingId] = useState<number | null>(null);
+  const [elaboratedText, setElaboratedText] = useState<string>('');
+  const [isSavingElaboration, setIsSavingElaboration] = useState(false);
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  
+  // Handle starting elaboration
+  const handleStartElaborate = useCallback((row: ExcelRequirementResponse) => {
+    setElaboratingId(row.id);
+    // Use existing elaborated text or original requirement
+    setElaboratedText(row.elaboratedRequirement || row.requirement);
+  }, []);
+  
+  // Handle canceling elaboration
+  const handleCancelElaborate = useCallback(() => {
+    setElaboratingId(null);
+    setElaboratedText('');
+  }, []);
+  
+  // Handle saving elaboration
+  const handleSaveElaboration = useCallback(async (id: number) => {
+    setIsSavingElaboration(true);
+    try {
+      const response = await fetch(`/api/excel-requirements/${id}/elaborate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ elaboratedRequirement: elaboratedText })
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to save elaboration');
+      }
+      
+      toast({
+        title: 'Elaboration saved',
+        description: 'Your elaborated question has been saved and will be used for response generation.',
+      });
+      
+      // Invalidate and refetch data
+      queryClient.invalidateQueries({ queryKey: ['/api/excel-requirements'] });
+      
+      setElaboratingId(null);
+      setElaboratedText('');
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to save elaboration. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSavingElaboration(false);
+    }
+  }, [elaboratedText, toast, queryClient]);
   
   // Check if all items in this category are selected
   const allSelected = items.every(
@@ -192,7 +252,60 @@ const CategoryGroup: React.FC<CategoryGroupProps> = ({
                       {/* Requirement text */}
                       <div className="text-sm sm:text-base font-medium text-slate-800 dark:text-slate-100 line-clamp-3 mb-2">
                         {row.requirement}
+                        {/* Show indicator if elaborated */}
+                        {row.elaboratedRequirement && row.elaboratedRequirement !== row.requirement && (
+                          <Badge variant="outline" className="ml-2 text-[10px] bg-purple-50 text-purple-700 dark:bg-purple-950 dark:text-purple-200 border-purple-200 dark:border-purple-800">
+                            Elaborated
+                          </Badge>
+                        )}
                       </div>
+                      
+                      {/* Elaboration text area - shows when elaborating this row */}
+                      {elaboratingId === row.id && (
+                        <div className="mt-2 mb-3 p-3 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700">
+                          <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">
+                            Edit your question for better response:
+                          </label>
+                          <Textarea
+                            value={elaboratedText}
+                            onChange={(e) => setElaboratedText(e.target.value)}
+                            className="min-h-[100px] text-sm resize-y"
+                            placeholder="Enter your elaborated question..."
+                          />
+                          <div className="flex items-center gap-2 mt-2">
+                            <Button
+                              size="sm"
+                              variant="default"
+                              className="h-7 px-3 gap-1 text-xs"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleSaveElaboration(row.id);
+                              }}
+                              disabled={isSavingElaboration}
+                            >
+                              {isSavingElaboration ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <Save className="h-3.5 w-3.5" />
+                              )}
+                              <span>Save</span>
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 px-3 gap-1 text-xs"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleCancelElaborate();
+                              }}
+                              disabled={isSavingElaboration}
+                            >
+                              <X className="h-3.5 w-3.5" />
+                              <span>Cancel</span>
+                            </Button>
+                          </div>
+                        </div>
+                      )}
                       
                       {/* MOBILE: Action buttons stack on small screens, timestamp moves below */}
                       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mt-1">
@@ -217,20 +330,20 @@ const CategoryGroup: React.FC<CategoryGroupProps> = ({
                           
                           <Button
                             size="sm"
-                            variant={row.similarQuestions ? "secondary" : "outline"}
-                            className={`h-7 px-2 gap-1 text-xs ${!row.similarQuestions ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            variant={row.elaboratedRequirement ? "secondary" : "outline"}
+                            className="h-7 px-2 gap-1 text-xs"
                             onClick={(e) => {
                               e.stopPropagation();
-                              if (row.similarQuestions) {
-                                setActiveTab('references');
-                                handleViewResponse(row);
+                              if (elaboratingId === row.id) {
+                                handleCancelElaborate();
+                              } else {
+                                handleStartElaborate(row);
                               }
                             }}
-                            disabled={!row.similarQuestions}
-                            aria-label={row.similarQuestions ? "View references" : "No references available yet"}
+                            aria-label="Elaborate question"
                           >
-                            <BookOpen className="h-3.5 w-3.5" aria-hidden="true" />
-                            <span>References</span>
+                            <Edit2 className="h-3.5 w-3.5" aria-hidden="true" />
+                            <span>{elaboratingId === row.id ? 'Cancel' : 'Elaborate'}</span>
                           </Button>
                         </div>
                         

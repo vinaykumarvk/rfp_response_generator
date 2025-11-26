@@ -362,19 +362,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const modelProvider = provider || model || 'openAI';
       
       // Get the requirement text from the database if not provided in the request
+      // Priority: elaboratedRequirement > requirement from request > requirement from DB
       let requirementText = requirement;
-      if (!requirementText) {
-        try {
-          const requirementRecord = await storage.getExcelRequirementResponse(Number(requirementId));
-          if (requirementRecord && requirementRecord.requirement) {
+      let usingElaboratedQuestion = false;
+      
+      try {
+        const requirementRecord = await storage.getExcelRequirementResponse(Number(requirementId));
+        if (requirementRecord) {
+          // Check if elaborated requirement exists and use it if available
+          if (requirementRecord.elaboratedRequirement && requirementRecord.elaboratedRequirement.trim()) {
+            requirementText = requirementRecord.elaboratedRequirement;
+            usingElaboratedQuestion = true;
+            console.log(`Using elaborated question for requirement ${requirementId}`);
+          } else if (!requirementText && requirementRecord.requirement) {
             requirementText = requirementRecord.requirement;
           }
-        } catch (err) {
-          console.warn(`Could not fetch requirement text for ID ${requirementId}:`, err);
         }
+      } catch (err) {
+        console.warn(`Could not fetch requirement text for ID ${requirementId}:`, err);
       }
       
       console.log(`Processing request to generate response for requirement ${requirementId} with model ${modelProvider}`);
+      console.log(`Using ${usingElaboratedQuestion ? 'ELABORATED' : 'ORIGINAL'} question`);
       console.log(`Requirement text: ${requirementText?.substring(0, 100)}${requirementText?.length > 100 ? '...' : ''}`);
       
       try {
@@ -964,6 +973,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("Error updating response content:", error);
       return res.status(500).json({ 
         message: "Failed to update response content",
+        error: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
+
+  // Save elaborated requirement endpoint
+  app.post('/api/excel-requirements/:id/elaborate', async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { elaboratedRequirement } = req.body;
+      
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid ID format" });
+      }
+      
+      if (elaboratedRequirement === undefined) {
+        return res.status(400).json({ message: "elaboratedRequirement is required" });
+      }
+      
+      console.log(`Saving elaborated requirement for ID: ${id}`);
+      console.log(`Elaborated text: ${elaboratedRequirement?.substring(0, 100)}...`);
+      
+      // Update the elaborated requirement in the database
+      const result = await storage.updateExcelRequirementResponse(id, { 
+        elaboratedRequirement: elaboratedRequirement.trim() || null
+      });
+      
+      if (!result) {
+        return res.status(404).json({ message: "Requirement not found" });
+      }
+      
+      return res.json({ 
+        success: true, 
+        message: "Elaborated requirement saved successfully",
+        elaboratedRequirement: result.elaboratedRequirement
+      });
+    } catch (error) {
+      console.error("Error saving elaborated requirement:", error);
+      return res.status(500).json({ 
+        message: "Failed to save elaborated requirement",
         error: error instanceof Error ? error.message : "Unknown error"
       });
     }
