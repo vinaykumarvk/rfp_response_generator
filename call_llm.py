@@ -605,6 +605,44 @@ def get_llm_responses(requirement_id, model='moa', display_results=True, skip_si
                 
             print(f"Found {len(previous_responses)} similar questions")
 
+            # Check if we have any reference data - if not, return a simple message
+            NO_REFERENCE_MESSAGE = "This feature/capability is not available in our reference database. No matching documentation was found for this requirement."
+            
+            if len(previous_responses) == 0:
+                print("WARNING: No similar questions found in reference database")
+                print("Returning simple 'feature not available' message instead of calling LLM")
+                
+                # Save the simple response to database
+                no_ref_save_query = text("""
+                    UPDATE excel_requirement_responses
+                    SET 
+                        final_response = :final_response,
+                        similar_questions = :similar_questions,
+                        model_provider = :model_provider,
+                        timestamp = NOW()
+                    WHERE id = :req_id
+                """)
+                
+                connection.execute(no_ref_save_query, {
+                    "req_id": requirement_id,
+                    "final_response": NO_REFERENCE_MESSAGE,
+                    "similar_questions": "[]",
+                    "model_provider": model
+                })
+                connection.commit()
+                
+                # Return the result
+                return {
+                    "success": True,
+                    "requirement_id": requirement_id,
+                    "requirement": requirement[1],
+                    "category": requirement[2],
+                    "final_response": NO_REFERENCE_MESSAGE,
+                    "similar_questions": [],
+                    "model_provider": model,
+                    "no_references": True
+                }
+
             # Generate prompts based on model
             if model == 'moa':
                 print("3. Generating responses from all models")
