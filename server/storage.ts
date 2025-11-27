@@ -307,6 +307,7 @@ export class DatabaseStorage implements IStorage {
         ? response.moaResponse 
         : null;
       if (response.similarQuestions !== undefined) updateData.similarQuestions = response.similarQuestions;
+      if ((response as any).eventMappings !== undefined) (updateData as any).eventMappings = (response as any).eventMappings;
       
       // Update the existing response
       const updatedResponse = await this.updateExcelRequirementResponse(id, updateData);
@@ -342,6 +343,8 @@ export class DatabaseStorage implements IStorage {
         moaResponse: (response.moaResponse !== undefined && response.moaResponse !== null && response.moaResponse !== '') 
           ? response.moaResponse 
           : null,
+        
+        eventMappings: (response as any).eventMappings || null,
         
         similarQuestions: response.similarQuestions || ''
       };

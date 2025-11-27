@@ -30,6 +30,7 @@ export const excelRequirementResponses = pgTable("excel_requirement_responses", 
   anthropicResponse: text("anthropic_response"),
   deepseekResponse: text("deepseek_response"),
   moaResponse: text("moa_response"),
+  eventMappings: text("event_mappings"),
   
   // Similar questions (stored as JSON string)
   similarQuestions: text("similar_questions"),

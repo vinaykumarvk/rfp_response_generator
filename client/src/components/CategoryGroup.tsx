@@ -24,6 +24,7 @@ type CategoryGroupProps = {
   selectedItems: number[];
   setSelectedItems: React.Dispatch<React.SetStateAction<number[]>>;
   processingIndividualItems: {[key: number]: {stage: string, model: string}};
+  mappingIndividualItems: {[key: number]: boolean};
   handleViewResponse: (row: ExcelRequirementResponse) => void;
   toggleSelectItem: (id: number) => void;
   setActiveTab: React.Dispatch<React.SetStateAction<string>>;
@@ -35,6 +36,7 @@ const CategoryGroup: React.FC<CategoryGroupProps> = ({
   selectedItems,
   setSelectedItems,
   processingIndividualItems,
+  mappingIndividualItems,
   handleViewResponse,
   toggleSelectItem,
   setActiveTab
@@ -207,6 +209,16 @@ const CategoryGroup: React.FC<CategoryGroupProps> = ({
                       </div>
                     )}
                     
+                    {/* Mapping Events Indicator */}
+                    {row.id && mappingIndividualItems[row.id] && (
+                      <div className="absolute top-1 right-1 z-10">
+                        <div className="flex items-center gap-1.5 bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 text-xs rounded-full px-2 py-0.5 shadow-sm border border-purple-200 dark:border-purple-800">
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                          <span>Mapping events...</span>
+                        </div>
+                      </div>
+                    )}
+                    
                     <div className="flex-1 min-w-0">
                       {/* ACCESSIBILITY & MOBILE: Compact attributes with flex-wrap to prevent overflow */}
                       <div className="flex flex-wrap items-center gap-1 sm:gap-1.5 mb-1.5">
@@ -242,6 +254,10 @@ const CategoryGroup: React.FC<CategoryGroupProps> = ({
                               row.modelProvider === 'deepseek' ? 'DeepSeek' : 
                               row.modelProvider === 'moa' ? 'MOA' : 
                               'Generated'}
+                              {/* Show Event Mapped status */}
+                              {(row as any).eventMappings && (
+                                <span className="ml-1 text-[9px] opacity-75">• Event Mapped</span>
+                              )}
                             </>
                           ) : (
                             'Not Generated'

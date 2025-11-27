@@ -13,6 +13,7 @@ import { dirname } from "path";
 import { spawn } from "child_process";
 import { mapPythonResponseToDbFields } from "./field_mapping_fix";
 import { validateRequirementId, validateModelName, validateBoolean } from "./pythonRunner";
+import OpenAI from "openai";
 
 // Helper function for getting the directory path in ES modules
 const getDirPath = () => {
@@ -1161,6 +1162,132 @@ export async function registerRoutes(app: Express): Promise<Server> {
         },
         environment: process.env.NODE_ENV || 'development'
       });
+    }
+  });
+
+  // Map events to a requirement using OpenAI Responses API
+  app.post("/api/map-events", async (req: Request, res: Response) => {
+    try {
+      const requirementId = Number(req.body.requirementId);
+      if (!requirementId || Number.isNaN(requirementId)) {
+        return res.status(400).json({ success: false, message: "requirementId is required" });
+      }
+
+      const record = await storage.getExcelRequirementResponse(requirementId);
+      if (!record) {
+        return res.status(404).json({ success: false, message: "Requirement not found" });
+      }
+
+      const resp1 = record.finalResponse || record.openaiResponse || record.anthropicResponse || record.deepseekResponse || record.moaResponse;
+      if (!resp1) {
+        return res.status(400).json({ success: false, message: "No response text available to map events" });
+      }
+
+      if (!process.env.OPENAI_API_KEY) {
+        return res.status(400).json({ success: false, message: "Missing OPENAI_API_KEY" });
+      }
+
+      const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+      const input = `
+resp1 = '''${resp1}'''
+
+input = '''
+You are given a natural language description of a requirement:
+
+{resp1}
+
+You also have a list of event documents, where each event is represented by a filename.
+Each filename has the format:
+"EID003 - Customer Management_eMACH_User_Manual.docx"
+
+From the filename:
+- The event name is only the first part before the second underscore and before the file extension, e.g. "EID003 - Customer Management".
+- Ignore the rest of the filename contents.
+
+Your task:
+1. Compare the given requirement description to all available events.
+2. Identify the top three events that most closely match the requirement.
+3. Assign a confidence score between 0 and 1 for each selected event.
+4. Exclude any event whose confidence score is less than 0.60.
+
+Output format (very important):
+- Return ONLY a single JSON object.
+- The keys must be event1, event2, and event3.
+- The values must be the event name (as extracted above) and the confidence score, in this exact format:
+
+{
+  "event1": {
+    "name": "<event name>",
+    "confidence": <confidence score>
+  },
+  "event2": {
+    "name": "<event name>",
+    "confidence": <confidence score>
+  },
+  "event3": {
+    "name": "<event name>",
+    "confidence": <confidence score>
+  }
+}
+
+Rules:
+- Do not include any explanation, comments, or extra text.
+- If there are fewer than three events with confidence >= 0.60, still return event1–event3 keys, but set the missing ones to null, like:
+  "event3": null
+- Recheck that the output is valid JSON and strictly follows the format above before returning it.
+'''
+`;
+
+      const vectorStoreId = 'vs_69280c8c3ce48191ae7509ff03ecfb78';
+
+      const aiResponse = await client.responses.create({
+        model: "gpt-4o-mini",
+        input,
+        tools: [
+          {
+            type: "file_search",
+            vector_store_ids: [vectorStoreId]
+          }
+        ]
+      });
+
+      const rawText = (aiResponse as any).output_text ||
+        (Array.isArray((aiResponse as any).output) ? (aiResponse as any).output.map((o: any) => o.content || o.text || "").join("\n") : "") ||
+        "";
+
+      const jsonText = (() => {
+        if (!rawText) return "";
+        const start = rawText.indexOf("{");
+        const end = rawText.lastIndexOf("}");
+        if (start >= 0 && end > start) return rawText.substring(start, end + 1);
+        return rawText.trim();
+      })();
+
+      let parsed: any = null;
+      try {
+        parsed = JSON.parse(jsonText);
+      } catch (err) {
+        console.error("Failed to parse map-events JSON:", rawText);
+        return res.status(500).json({ success: false, message: "Failed to parse events JSON" });
+      }
+
+      const eventMappings = {
+        event1: parsed.event1 || null,
+        event2: parsed.event2 || null,
+        event3: parsed.event3 || null
+      };
+
+      await storage.updateExcelRequirementResponse(requirementId, { eventMappings: JSON.stringify(eventMappings) } as any);
+
+      return res.status(200).json({
+        success: true,
+        requirementId,
+        eventMappings
+      });
+    } catch (error: any) {
+      console.error("Error in map-events:", error);
+      return res.status(500).json({ success: false, message: error?.message || "Failed to map events" });
     }
   });
 

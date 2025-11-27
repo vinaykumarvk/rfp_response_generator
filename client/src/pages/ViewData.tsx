@@ -57,7 +57,8 @@ import {
   Search,
   Edit,
   Save,
-  X as CloseIcon
+  X as CloseIcon,
+  MapPin
 } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useToast } from '@/hooks/use-toast';
@@ -104,6 +105,8 @@ export default function ViewData() {
   ];
   const [isFeedbackSubmitting, setIsFeedbackSubmitting] = useState(false);
   const [isGeneratingResponse, setIsGeneratingResponse] = useState(false);
+  const [isMappingEvents, setIsMappingEvents] = useState(false);
+  const [mappingIndividualItems, setMappingIndividualItems] = useState<{[key: number]: boolean}>({});
   
   // Helper function to check if any response exists
   const hasAnyResponse = (response: ExcelRequirementResponse | null) => {
@@ -116,6 +119,21 @@ export default function ViewData() {
     if (!response) return null;
     return response.finalResponse || response.openaiResponse || response.anthropicResponse || response.deepseekResponse || response.moaResponse || null;
   };
+  
+  const parseEventMappings = (response: ExcelRequirementResponse | null) => {
+    if (!response) return null;
+    const raw = (response as any).eventMappings;
+    if (!raw) return null;
+    try {
+      if (typeof raw === 'string') return JSON.parse(raw);
+      return raw;
+    } catch (err) {
+      console.error("Failed to parse eventMappings", err);
+      return null;
+    }
+  };
+  
+  const eventMappingsData = useMemo(() => parseEventMappings(selectedResponse), [selectedResponse]);
   
   // Requirements cache for performance optimization
   const requirementsCache = React.useRef<Map<number, ExcelRequirementResponse>>(new Map());
@@ -1098,6 +1116,71 @@ export default function ViewData() {
     }
   };
   
+  const handleMapEvents = async (requirementId: number) => {
+    if (!requirementId) return;
+    try {
+      setIsMappingEvents(true);
+      setMappingIndividualItems(prev => ({ ...prev, [requirementId]: true }));
+      
+      const response = await fetch('/api/map-events', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requirementId })
+      });
+      const text = await response.text();
+      let data: any = {};
+      try {
+        data = text ? JSON.parse(text) : {};
+      } catch (err) {
+        console.error("Map events parse error:", text);
+      }
+      if (!response.ok || data.success === false) {
+        throw new Error(data?.message || data?.error || `${response.status} ${response.statusText}`);
+      }
+      
+      // Update state with mapped events
+      if (selectedResponse && selectedResponse.id === requirementId) {
+        setSelectedResponse({
+          ...selectedResponse,
+          eventMappings: JSON.stringify(data.eventMappings)
+        });
+      }
+      
+      // Update cache
+      queryClient.setQueryData<ExcelRequirementResponse[]>(['/api/excel-requirements'], (oldData) => {
+        if (!oldData) return oldData;
+        return oldData.map(item => {
+          if (item.id === requirementId) {
+            return { ...item, eventMappings: JSON.stringify(data.eventMappings) } as any;
+          }
+          return item;
+        });
+      });
+      
+      toast({
+        title: "Events mapped",
+        description: "Top events and confidence scores have been saved.",
+      });
+      return true;
+      
+    } catch (error) {
+      console.error('Error mapping events:', error);
+      toast({
+        title: "Mapping Failed",
+        description: error instanceof Error ? error.message : "Failed to map events",
+        variant: "destructive"
+      });
+      return false;
+    } finally {
+      setIsMappingEvents(false);
+      setMappingIndividualItems(prev => {
+        const newState = { ...prev };
+        delete newState[requirementId];
+        return newState;
+      });
+    }
+  };
+  
   // Optimized function to handle bulk generation of responses
   const handleGenerateResponses = async (modelProvider: 'openai' | 'anthropic' | 'deepseek' | 'moa') => {
     if (selectedItems.length === 0) {
@@ -1695,6 +1778,9 @@ export default function ViewData() {
       case 'consistency-check':
         runConsistencyCheck();
         break;
+      case 'map-events':
+        mapEventsForBulk();
+        break;
       case 'delete':
         console.log('Delete items:', selectedItems);
         alert(`Delete answers for ${selectedItems.length} selected items`);
@@ -1702,6 +1788,24 @@ export default function ViewData() {
       default:
         console.log('Unknown action:', action);
     }
+  };
+  
+  const mapEventsForBulk = async () => {
+    setIsMappingEvents(true);
+    let success = 0;
+    for (const id of selectedItems) {
+      const ok = await handleMapEvents(id);
+      if (ok !== false) success++;
+    }
+    setIsMappingEvents(false);
+    // Clear mapping state after a delay
+    setTimeout(() => {
+      setMappingIndividualItems({});
+    }, 1000);
+    toast({
+      title: "Mapping complete",
+      description: `Mapped events for ${success} of ${selectedItems.length} items.`
+    });
   };
   
   return (
@@ -1811,21 +1915,8 @@ export default function ViewData() {
               </label>
             </div>
             
-            {/* Separate Past Responses and Generate Answer Buttons */}
+            {/* Generate Answer and Map Events */}
             <div className="flex space-x-2">
-              {/* Find Past Responses Button */}
-              <Button 
-                size="sm" 
-                className="h-8"
-                variant="outline"
-                disabled={selectedItems.length === 0}
-                onClick={() => handleBulkAction('find-similar')}
-              >
-                <Search className="h-4 w-4 mr-1.5 text-blue-500" />
-                <span>Past Responses</span>
-              </Button>
-              
-              {/* Generate Answer Dropdown */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button 
@@ -1859,6 +1950,20 @@ export default function ViewData() {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
+              <Button 
+                size="sm" 
+                className="h-8"
+                variant="outline"
+                disabled={selectedItems.length === 0 || isMappingEvents}
+                onClick={() => handleBulkAction('map-events')}
+              >
+                {isMappingEvents ? (
+                  <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                ) : (
+                  <MapPin className="h-4 w-4 mr-1.5 text-blue-500" />
+                )}
+                <span>Map Events</span>
+              </Button>
             </div>
             
             {/* Export Options Dropdown */}
@@ -2513,6 +2618,7 @@ export default function ViewData() {
                       selectedItems={selectedItems}
                       setSelectedItems={setSelectedItems}
                       processingIndividualItems={processingIndividualItems}
+                      mappingIndividualItems={mappingIndividualItems}
                       handleViewResponse={handleViewResponse}
                       toggleSelectItem={toggleSelectItem}
                       setActiveTab={setActiveTab}
@@ -2544,30 +2650,9 @@ export default function ViewData() {
                 </DialogDescription>
               </div>
               
-              {/* Separate Past Responses and Generate Answer Buttons */}
+              {/* Generate Answer and Map Events */}
               {selectedResponse && selectedResponseId && (
                 <div className="flex items-center gap-2">
-                  {/* Past Responses Button */}
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    className="h-9 px-3 flex gap-2 items-center" 
-                    disabled={isFindingSimilar}
-                    onClick={() => handleFindSimilarMatches(selectedResponseId)}
-                  >
-                    {isFindingSimilar ? (
-                      <>
-                        <RefreshCcw className="h-4 w-4 animate-spin" />
-                        <span>Finding...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Search className="h-4 w-4 text-blue-500" />
-                        <span>Past Responses</span>
-                      </>
-                    )}
-                  </Button>
-                  
                   {/* Generate Answer Button */}
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -2627,6 +2712,27 @@ export default function ViewData() {
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
+                  
+                  {/* Map Events Button */}
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="h-9 px-3 flex gap-2 items-center" 
+                    disabled={isMappingEvents}
+                    onClick={() => handleMapEvents(selectedResponseId)}
+                  >
+                    {isMappingEvents ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <span>Mapping...</span>
+                      </>
+                    ) : (
+                      <>
+                        <MapPin className="h-4 w-4 text-blue-500" />
+                        <span>Map Events</span>
+                      </>
+                    )}
+                  </Button>
                 </div>
               )}
             </div>
@@ -2665,13 +2771,28 @@ export default function ViewData() {
               
               <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-md mb-4">
                 <h4 className="text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">AI Model Used:</h4>
-                <p className="text-slate-900 dark:text-slate-100">
-                  {selectedResponse.modelProvider === "openai" ? "OpenAI" :
-                   selectedResponse.modelProvider === "anthropic" ? "Anthropic/Claude" :
-                   selectedResponse.modelProvider === "deepseek" ? "DeepSeek" :
-                   selectedResponse.modelProvider === "moa" ? "Mixture of Agents (MOA)" :
-                   selectedResponse.modelProvider || "Not specified"}
-                </p>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="text-slate-900 dark:text-slate-100">
+                    {selectedResponse.modelProvider === "openai" ? "OpenAI" :
+                     selectedResponse.modelProvider === "anthropic" ? "Anthropic/Claude" :
+                     selectedResponse.modelProvider === "deepseek" ? "DeepSeek" :
+                     selectedResponse.modelProvider === "moa" ? "Mixture of Agents (MOA)" :
+                     selectedResponse.modelProvider || "Not specified"}
+                  </p>
+                  {/* Show Event Mapped status */}
+                  {(selectedResponse as any).eventMappings && (
+                    <Badge variant="outline" className="text-xs bg-purple-50 text-purple-700 dark:bg-purple-950 dark:text-purple-200 border-purple-200 dark:border-purple-800">
+                      Event Mapped
+                    </Badge>
+                  )}
+                  {/* Show mapping progress */}
+                  {selectedResponseId && mappingIndividualItems[selectedResponseId] && (
+                    <Badge variant="outline" className="text-xs bg-purple-50 text-purple-700 dark:bg-purple-950 dark:text-purple-200 border-purple-200 dark:border-purple-800">
+                      <Loader2 className="h-3 w-3 mr-1 animate-spin inline" />
+                      Mapping events...
+                    </Badge>
+                  )}
+                </div>
               </div>
               
               <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -2701,6 +2822,26 @@ export default function ViewData() {
                 </TabsList>
                 
                 <TabsContent value="response">
+                  {eventMappingsData && (
+                    <div className="grid sm:grid-cols-3 gap-3 mb-4">
+                      {['event1','event2','event3'].map((key) => {
+                        const item = (eventMappingsData as any)[key];
+                        return (
+                          <div key={key} className="p-3 rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900">
+                            <p className="text-xs uppercase tracking-wide text-slate-500">{key.toUpperCase()}</p>
+                            {item ? (
+                              <>
+                                <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">{item.name || 'Unnamed'}</p>
+                                <p className="text-xs text-slate-600 dark:text-slate-300">Confidence: {(item.confidence ?? 0).toFixed(2)}</p>
+                              </>
+                            ) : (
+                              <p className="text-sm text-slate-500">No event</p>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                   <div className="p-4 bg-slate-50 dark:bg-slate-900 rounded-md mb-4">
                     {!isEditingResponse ? (
                       <>
