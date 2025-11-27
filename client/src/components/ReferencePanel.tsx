@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { FileText, BookOpen, Database, ExternalLink } from "lucide-react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import ReactMarkdown from 'react-markdown';
+import { formatDistanceToNow } from "date-fns";
 
 // Define the structure of reference data
 interface Reference {
@@ -23,6 +24,65 @@ interface ReferencePanelProps {
   showTitle?: boolean;
   onReferencesLoaded?: (count: number) => void;
 }
+
+// Memoized individual reference item component - defined outside main component
+const ReferenceItem = React.memo(({ reference }: { reference: Reference }) => {
+  const lastUpdated = reference.timestamp
+    ? formatDistanceToNow(new Date(reference.timestamp), { addSuffix: true })
+    : "Not provided";
+  
+  const sourceTitle = reference.reference || reference.category || `Reference ${reference.id}`;
+  
+  return (
+    <div className="border border-slate-200 dark:border-slate-700 rounded-md overflow-hidden">
+      <Accordion type="single" collapsible className="w-full">
+        <AccordionItem value={`reference-${reference.id}`} className="border-none">
+          <AccordionTrigger className="px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-800">
+            <div className="flex items-center gap-3 text-left">
+              <FileText className="h-4 w-4 text-slate-500 dark:text-slate-400" />
+              <div className="flex-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-medium text-slate-900 dark:text-slate-100">
+                    {sourceTitle}
+                  </span>
+                  <Badge variant="outline" className="h-5 text-xs bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-200 border-slate-200 dark:border-slate-700">
+                    Confidence {(reference.score * 100).toFixed(1)}%
+                  </Badge>
+                  <Badge variant="secondary" className="h-5 text-[11px]">
+                    Last updated: {lastUpdated}
+                  </Badge>
+                </div>
+                <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
+                  {reference.category}
+                </p>
+              </div>
+            </div>
+          </AccordionTrigger>
+          <AccordionContent className="pb-4">
+            <div className="px-4 space-y-3">
+              <div className="p-3 bg-slate-50 dark:bg-slate-900 rounded-md border border-slate-200 dark:border-slate-700">
+                <span className="block text-xs font-medium text-slate-600 dark:text-slate-300 mb-1">Requirement:</span>
+                <p className="text-sm text-slate-800 dark:text-slate-100">{reference.requirement}</p>
+              </div>
+              <div className="p-3 bg-slate-50 dark:bg-slate-900 rounded-md border border-slate-200 dark:border-slate-700">
+                <span className="block text-xs font-medium text-slate-600 dark:text-slate-300 mb-1">Response Text:</span>
+                <div className="prose prose-sm max-w-none text-slate-800 dark:text-slate-100">
+                  <ReactMarkdown>{reference.response}</ReactMarkdown>
+                </div>
+              </div>
+              {reference.reference && (
+                <div className="flex items-center gap-2 text-sm text-blue-600 dark:text-blue-400">
+                  <ExternalLink className="h-4 w-4" />
+                  <span>Source Document: {reference.reference}</span>
+                </div>
+              )}
+            </div>
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
+    </div>
+  );
+});
 
 export default function ReferencePanel({ responseId, showTitle = true, onReferencesLoaded }: ReferencePanelProps) {
   const [loading, setLoading] = useState(false);
@@ -194,54 +254,6 @@ export default function ReferencePanel({ responseId, showTitle = true, onReferen
       <p>No reference information available for this response</p>
     </div>
   ), []);
-
-  // Create an optimized individual reference item component
-  const ReferenceItem = React.memo(({ reference }: { reference: Reference }) => (
-    <div className="border border-slate-200 dark:border-slate-700 rounded-md overflow-hidden">
-      <Accordion type="single" collapsible className="w-full">
-        <AccordionItem value={`reference-${reference.id}`} className="border-none">
-          <AccordionTrigger className="px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-800">
-            <div className="flex items-center gap-3 text-left">
-              <FileText className="h-4 w-4 text-slate-500 dark:text-slate-400" />
-              <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <span className="font-medium text-slate-900 dark:text-slate-100">
-                    Reference #{reference.id}{reference.reference ? ` - ${reference.reference}` : ''}
-                  </span>
-                  <Badge variant="outline" className="h-5 text-xs bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-200 border-slate-200 dark:border-slate-700">
-                    Score: {(reference.score * 100).toFixed(1)}%
-                  </Badge>
-                </div>
-                <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
-                  {reference.category}
-                </p>
-              </div>
-            </div>
-          </AccordionTrigger>
-          <AccordionContent className="pb-4">
-            <div className="px-4 space-y-3">
-              <div className="p-3 bg-slate-50 dark:bg-slate-900 rounded-md border border-slate-200 dark:border-slate-700">
-                <span className="block text-xs font-medium text-slate-600 dark:text-slate-300 mb-1">Requirement:</span>
-                <p className="text-sm text-slate-800 dark:text-slate-100">{reference.requirement}</p>
-              </div>
-              <div className="p-3 bg-slate-50 dark:bg-slate-900 rounded-md border border-slate-200 dark:border-slate-700">
-                <span className="block text-xs font-medium text-slate-600 dark:text-slate-300 mb-1">Response Text:</span>
-                <div className="prose prose-sm max-w-none text-slate-800 dark:text-slate-100">
-                  <ReactMarkdown>{reference.response}</ReactMarkdown>
-                </div>
-              </div>
-              {reference.reference && (
-                <div className="flex items-center gap-2 text-sm text-blue-600 dark:text-blue-400">
-                  <ExternalLink className="h-4 w-4" />
-                  <span>Source Document: {reference.reference}</span>
-                </div>
-              )}
-            </div>
-          </AccordionContent>
-        </AccordionItem>
-      </Accordion>
-    </div>
-  ));
 
   // Memoize the references list, only recreate when references array changes
   const renderReferences = useCallback(() => (

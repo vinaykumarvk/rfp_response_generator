@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,7 +11,9 @@ import {
   Plus, 
   RefreshCw, 
   FileInput, 
-  User
+  User,
+  Download,
+  Map
 } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
@@ -26,6 +28,7 @@ import { Label } from "@/components/ui/label";
 import * as XLSX from 'xlsx';
 import { HelpTooltip } from "@/components/HelpTooltip";
 import { queryClient } from "@/lib/queryClient";
+import { Progress } from "@/components/ui/progress";
 
 // Define the structure of our parsed Excel data
 interface ExcelRow {
@@ -48,6 +51,18 @@ export default function UploadRequirements() {
   const [recordsAdded, setRecordsAdded] = useState<number | null>(null);
   const [rfpName, setRfpName] = useState<string>("");
   const [uploadedBy, setUploadedBy] = useState<string>("");
+  const [uploadProgress, setUploadProgress] = useState<number>(0);
+  const [showMappingHelp, setShowMappingHelp] = useState<boolean>(false);
+
+  const sampleWorkbook = useMemo(() => {
+    const ws = XLSX.utils.json_to_sheet([
+      { Category: "Security", Requirement: "System must support SSO", Response: "We integrate with SAML 2.0 and OIDC." },
+      { Category: "Integrations", Requirement: "Provide REST API access", Response: "Documented REST APIs are available." }
+    ]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Sample");
+    return wb;
+  }, []);
   
   // Reset the form when file upload is successful
   const resetForm = () => {
@@ -57,6 +72,17 @@ export default function UploadRequirements() {
     if (fileInput) {
       fileInput.value = '';
     }
+  };
+
+  const downloadSample = () => {
+    const wbout = XLSX.write(sampleWorkbook, { bookType: "xlsx", type: "array" });
+    const blob = new Blob([wbout], { type: "application/octet-stream" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "rfp-sample.xlsx";
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -106,6 +132,7 @@ export default function UploadRequirements() {
   const processFile = async (replaceExisting: boolean) => {
     setShowDialog(false);
     setIsUploading(true);
+    setUploadProgress(0);
     
     // Make sure we have a file
     if (!file) {
@@ -124,10 +151,17 @@ export default function UploadRequirements() {
       // Process the file once it's loaded
       const parseExcel = () => {
         return new Promise<ExcelRow[]>((resolve, reject) => {
+          reader.onprogress = (e) => {
+            if (e.lengthComputable) {
+              const percent = Math.round((e.loaded / e.total) * 100);
+              setUploadProgress(percent);
+            }
+          };
           reader.onload = (e) => {
             try {
               const data = new Uint8Array(e.target?.result as ArrayBuffer);
               const workbook = XLSX.read(data, { type: 'array' });
+              setUploadProgress(100);
               
               // Check if workbook has any sheets
               if (workbook.SheetNames.length === 0) {
@@ -248,6 +282,7 @@ export default function UploadRequirements() {
           type: "success",
           message: `File processed successfully. ${result.recordsAdded || parsedData.length} records ${replaceExisting ? 'replaced existing data' : 'added to the database'}.`,
         });
+        setUploadProgress(0);
         
         // CRITICAL: Always invalidate React Query cache after upload to refresh RFP names dropdown
         // This ensures new RFP names appear in the filter dropdown immediately
@@ -341,6 +376,27 @@ export default function UploadRequirements() {
               <p className="mt-1 text-xs sm:text-sm text-slate-500 dark:text-slate-400">
                 Upload an Excel file with 'Category' and 'Requirement' columns to view the content.
               </p>
+              <div className="flex flex-wrap items-center gap-2 mt-3">
+                <Button variant="outline" size="sm" className="flex items-center gap-2" onClick={downloadSample}>
+                  <Download className="h-4 w-4" />
+                  Download sample file
+                </Button>
+                <Button variant="ghost" size="sm" className="flex items-center gap-2" onClick={() => setShowMappingHelp(!showMappingHelp)}>
+                  <Map className="h-4 w-4" />
+                  {showMappingHelp ? "Hide" : "Show"} column mapping
+                </Button>
+              </div>
+              {showMappingHelp && (
+                <div className="mt-3 text-sm text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-md p-3">
+                  <p className="font-medium mb-1">Required columns</p>
+                  <ul className="list-disc pl-5 space-y-1">
+                    <li><strong>Category</strong> – functional bucket (e.g., Security, Integrations)</li>
+                    <li><strong>Requirement</strong> – the question/ask text</li>
+                    <li className="text-slate-500">Optional: <strong>Response</strong>, <strong>Rating</strong></li>
+                  </ul>
+                  <p className="mt-2 text-xs">Alternate headers accepted: Category/category and Requirement/requirement/Text/content.</p>
+                </div>
+              )}
             </div>
             
             <CardContent className="px-4 sm:px-6 py-4 sm:py-5">
@@ -455,8 +511,8 @@ export default function UploadRequirements() {
                           <HelpTooltip text="Your Excel file must have two specific columns: 'Category' (the type of requirement) and 'Requirement' (the actual request text). The system will automatically extract and process these columns." />
                         </div>
                         <p id="file-upload-description" className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 mt-1 max-w-md mx-auto">
-                          <span className="hidden sm:inline">Drag & drop your Excel file here or click to browse. File must contain 'Category' and 'Requirement' columns.</span>
-                          <span className="sm:hidden">Select an Excel file with required columns.</span>
+                          <span className="hidden sm:inline">Drag & drop your Excel file here or click to browse. Required columns: 'Category' and 'Requirement'. Alternate headers are shown in the mapping helper above.</span>
+                          <span className="sm:hidden">Select an Excel file with the required columns.</span>
                         </p>
                       </div>
                       <div className="mt-1 sm:mt-2 flex flex-col sm:flex-row gap-3 sm:gap-0 w-full sm:w-auto">
@@ -516,7 +572,13 @@ export default function UploadRequirements() {
                     </div>
                   </div>
                 </div>
-                
+                {isUploading && (
+                  <div className="space-y-2">
+                    <p className="text-sm text-slate-600 dark:text-slate-300">Uploading and parsing...</p>
+                    <Progress value={uploadProgress} />
+                  </div>
+                )}
+
                 {uploadStatus.type && (
                   <Alert variant={uploadStatus.type === "error" ? "destructive" : "default"}>
                     {uploadStatus.type === "error" ? (

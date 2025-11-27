@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { format, formatDistanceToNow } from 'date-fns';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { generateMarkdownContent, downloadMarkdownFile, sendEmailWithContent, downloadExcelFile, shareViaWhatsApp } from '@/lib/exportUtils';
+import { generateMarkdownContent, downloadMarkdownFile, sendEmailWithContent, downloadExcelFile, shareViaWhatsApp, downloadDocxFile } from '@/lib/exportUtils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -92,6 +92,16 @@ export default function ViewData() {
   const [selectedItems, setSelectedItems] = useState<number[]>([]);
   const [selectAll, setSelectAll] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
+  const [showTour, setShowTour] = useState(false);
+  const [showTourOverlay, setShowTourOverlay] = useState(false);
+  const [tourStep, setTourStep] = useState(0);
+  const tourSteps = [
+    { title: "Upload requirements", description: "Load your Excel with Category and Requirement columns on the Upload page. Use the sample file if needed." },
+    { title: "Select & find references", description: "Pick rows and run Past Responses to enrich with similar answers and references." },
+    { title: "Generate responses", description: "Choose an AI model (OpenAI/Anthropic/DeepSeek/MOA) to draft answers. Compare outputs side by side." },
+    { title: "Review & edit", description: "Edit responses, compare to original text, and insert approved snippets quickly." },
+    { title: "Export & handoff", description: "Export to Markdown/Excel/Word/PDF and run consistency check before sharing." },
+  ];
   const [isFeedbackSubmitting, setIsFeedbackSubmitting] = useState(false);
   const [isGeneratingResponse, setIsGeneratingResponse] = useState(false);
   
@@ -115,6 +125,13 @@ export default function ViewData() {
   const [editedResponseText, setEditedResponseText] = useState('');
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [originalResponseText, setOriginalResponseText] = useState('');
+  const approvedSnippets = useMemo(() => [
+    "We comply with SOC 2 Type II and ISO 27001; audit reports available under NDA.",
+    "We provide RESTful APIs with OpenAPI documentation, OAuth2 client credentials, and sandbox keys on request.",
+    "All data is encrypted in transit (TLS 1.2+) and at rest (AES-256). Keys are managed via KMS with strict RBAC.",
+    "We support SSO via SAML 2.0 and OIDC; user provisioning is automated through SCIM.",
+    "We offer 24x7 support with defined SLAs; P1 response within 1 hour and P2 within 4 hours."
+  ], []);
   
   // Progress tracking
   const [bulkFindingProgress, setBulkFindingProgress] = useState({
@@ -235,6 +252,20 @@ export default function ViewData() {
         value && self.indexOf(value) === index
       );
     return categories.sort();
+  }, [excelData]);
+
+  const outcomeSummary = useMemo(() => {
+    const total = excelData.length;
+    const completed = excelData.filter(item => !!item.finalResponse).length;
+    const pending = total - completed;
+    const withRefs = excelData.filter(item => !!item.similarQuestions).length;
+    return {
+      total,
+      completed,
+      pending,
+      withRefs,
+      completionPct: total ? Math.round((completed / total) * 100) : 0
+    };
   }, [excelData]);
   
   // Function to handle sort request
@@ -407,6 +438,10 @@ export default function ViewData() {
     }
   };
   
+  const handleInsertSnippet = (snippet: string) => {
+    setEditedResponseText((prev) => prev ? `${prev}\n\n${snippet}` : snippet);
+  };
+  
   // Function to cancel editing
   const handleCancelEdit = () => {
     setIsEditingResponse(false);
@@ -415,7 +450,8 @@ export default function ViewData() {
   
   // Function to save edited response
   const handleSaveEdit = async () => {
-    if (!selectedResponseId || !editedResponseText.trim()) {
+    const targetId = selectedResponseId || selectedResponse?.id;
+    if (!targetId || !editedResponseText.trim()) {
       toast({
         title: "Cannot Save Edit",
         description: "No response ID or edited content is empty",
@@ -428,7 +464,7 @@ export default function ViewData() {
       setIsSavingEdit(true);
       
       // Update the response in the database
-      const response = await fetch(`/api/excel-requirements/${selectedResponseId}/update-response`, {
+      const response = await fetch(`/api/excel-requirements/${targetId}/update-response`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -437,15 +473,16 @@ export default function ViewData() {
           finalResponse: editedResponseText,
         }),
       });
-      
-      if (!response.ok) {
-        throw new Error(`Failed to update response: ${response.status} ${response.statusText}`);
+      const rawText = await response.text();
+      let result: any = {};
+      try {
+        result = rawText ? JSON.parse(rawText) : {};
+      } catch (err) {
+        console.error("Failed to parse update-response payload:", rawText);
       }
-      
-      const result = await response.json();
-      
-      if (!result.success) {
-        throw new Error(result.error || 'Failed to update response');
+      if (!response.ok || result.success === false) {
+        const message = result?.message || result?.error || `${response.status} ${response.statusText}`;
+        throw new Error(message);
       }
       
       // Update the selected response in the UI
@@ -477,6 +514,23 @@ export default function ViewData() {
       setIsSavingEdit(false);
     }
   };
+  
+  // Keyboard shortcuts while editing (Cmd/Ctrl+S to save, Esc to cancel)
+  React.useEffect(() => {
+    if (!isEditingResponse) return;
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        handleSaveEdit();
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        handleCancelEdit();
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [isEditingResponse, handleSaveEdit, handleCancelEdit]);
   
   // Function to find similar matches for a single requirement
   const [isFindingSimilar, setIsFindingSimilar] = useState(false);
@@ -1237,6 +1291,48 @@ export default function ViewData() {
     });
   };
   
+  // Lightweight consistency check to flag potential wording and placeholder issues before export
+  const runConsistencyCheck = () => {
+    const selectedData = excelData.filter(item => selectedItems.includes(item.id || 0));
+    if (!selectedData.length) {
+      toast({
+        title: "No Data Selected",
+        description: "Select at least one response to run the check.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    const forbidden = ["lorem ipsum", "tbd", "to be decided", "dummy text"];
+    const tenseHints = ["will ", "shall ", "plan to "];
+    
+    const findings: string[] = [];
+    selectedData.forEach((item) => {
+      const text = (item.finalResponse || "").toLowerCase();
+      const hits = forbidden.filter((f) => text.includes(f));
+      if (hits.length) {
+        findings.push(`ID ${item.id}: contains placeholder (${hits.join(", ")})`);
+      }
+      const tenseHits = tenseHints.filter((f) => text.includes(f));
+      if (tenseHits.length) {
+        findings.push(`ID ${item.id}: future-tense phrasing (${tenseHits.join(", ")})`);
+      }
+    });
+    
+    if (!findings.length) {
+      toast({
+        title: "Consistency Check Passed",
+        description: "No placeholders or tense issues found in selected responses.",
+      });
+    } else {
+      toast({
+        title: "Consistency Check Findings",
+        description: findings.slice(0, 4).join(" | ") + (findings.length > 4 ? ` (+${findings.length - 4} more)` : ""),
+        variant: "destructive",
+      });
+    }
+  };
+  
   // Function to email the selected responses directly with HTML formatting
   // and simultaneously generate a markdown file for download
   const handleEmailMarkdown = () => {
@@ -1287,6 +1383,34 @@ export default function ViewData() {
     }
   };
   
+  const handleExportDocx = async () => {
+    const selectedData = excelData.filter(item => selectedItems.includes(item.id || 0));
+    
+    if (selectedData.length === 0) {
+      toast({
+        title: "No Data Found",
+        description: "Select at least one item to export.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    try {
+      await downloadDocxFile(selectedData, "rfp-responses.docx");
+      toast({
+        title: "Word Export Ready",
+        description: `${selectedData.length} items exported to Word.`,
+      });
+    } catch (error) {
+      console.error('Error exporting DOCX:', error);
+      toast({
+        title: "Export Failed",
+        description: error instanceof Error ? error.message : "Failed to generate Word file.",
+        variant: "destructive"
+      });
+    }
+  };
+  
   // Function to export selected items as Excel file
   const handleExportToExcel = () => {
     // Get selected items data
@@ -1323,6 +1447,36 @@ export default function ViewData() {
         variant: "destructive"
       });
     }
+  };
+  
+  const handleExportPdf = () => {
+    const selectedData = excelData.filter(item => selectedItems.includes(item.id || 0));
+    if (!selectedData.length) {
+      toast({
+        title: "No Data Found",
+        description: "Select at least one item to export.",
+        variant: "destructive"
+      });
+      return;
+    }
+    const markdownContent = generateMarkdownContent(selectedData);
+    const win = window.open("", "_blank");
+    if (!win) {
+      toast({
+        title: "Popup Blocked",
+        description: "Allow popups to generate PDF/print.",
+        variant: "destructive"
+      });
+      return;
+    }
+    win.document.write(`<pre style="font-family:Inter,Arial,sans-serif; white-space:pre-wrap; font-size:14px; line-height:1.6; padding:16px;">${markdownContent.replace(/</g,"&lt;").replace(/>/g,"&gt;")}</pre>`);
+    win.document.close();
+    win.focus();
+    win.print();
+    toast({
+      title: "Print/PDF Ready",
+      description: "Use your browser print dialog to save as PDF.",
+    });
   };
 
   // Function to share responses via WhatsApp
@@ -1538,6 +1692,9 @@ export default function ViewData() {
       case 'whatsapp':
         handleShareViaWhatsApp();
         break;
+      case 'consistency-check':
+        runConsistencyCheck();
+        break;
       case 'delete':
         console.log('Delete items:', selectedItems);
         alert(`Delete answers for ${selectedItems.length} selected items`);
@@ -1717,7 +1874,7 @@ export default function ViewData() {
                   <span>Export</span>
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-40">
+              <DropdownMenuContent align="end" className="w-48">
                 <DropdownMenuItem onClick={handleExportToMarkdown} className="gap-2">
                   <Printer className="h-4 w-4" />
                   <span>Markdown</span>
@@ -1726,6 +1883,14 @@ export default function ViewData() {
                   <FileText className="h-4 w-4" />
                   <span>Excel</span>
                 </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleExportPdf} className="gap-2">
+                  <Printer className="h-4 w-4 text-amber-500" />
+                  <span>PDF (print)</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleExportDocx} className="gap-2">
+                  <FileText className="h-4 w-4 text-blue-500" />
+                  <span>Word (branded)</span>
+                </DropdownMenuItem>
                 <DropdownMenuItem onClick={handleEmailMarkdown} className="gap-2">
                   <Mail className="h-4 w-4" />
                   <span>Email</span>
@@ -1733,6 +1898,11 @@ export default function ViewData() {
                 <DropdownMenuItem onClick={() => handleBulkAction('whatsapp')} className="gap-2">
                   <MessageSquare className="h-4 w-4 text-green-500" />
                   <span>WhatsApp</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => handleBulkAction('consistency-check')} className="gap-2">
+                  <CheckSquare className="h-4 w-4 text-amber-500" />
+                  <span>Consistency check</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -1831,6 +2001,120 @@ export default function ViewData() {
         </div>
       </div>
       
+      {/* Outcome-first snapshot */}
+      <Card className="shadow-sm">
+        <CardContent className="py-4 sm:py-5">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            <div>
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-50">Progress overview</h3>
+              <p className="text-sm text-slate-600 dark:text-slate-300">Track how many requirements are answered and which need attention.</p>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 w-full lg:w-auto">
+              <div className="p-3 rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900">
+                <p className="text-xs text-slate-500">Total</p>
+                <p className="text-xl font-bold">{outcomeSummary.total}</p>
+              </div>
+              <div className="p-3 rounded-md border border-green-200 dark:border-green-900 bg-green-50 dark:bg-green-950/40">
+                <p className="text-xs text-green-700 dark:text-green-300">Completed</p>
+                <p className="text-xl font-bold text-green-700 dark:text-green-200">{outcomeSummary.completed}</p>
+              </div>
+              <div className="p-3 rounded-md border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/40">
+                <p className="text-xs text-amber-700 dark:text-amber-300">Pending</p>
+                <p className="text-xl font-bold text-amber-700 dark:text-amber-200">{outcomeSummary.pending}</p>
+              </div>
+              <div className="p-3 rounded-md border border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-950/40">
+                <p className="text-xs text-blue-700 dark:text-blue-300">With references</p>
+                <p className="text-xl font-bold text-blue-700 dark:text-blue-200">{outcomeSummary.withRefs}</p>
+              </div>
+            </div>
+          </div>
+          <div className="mt-3">
+            <Progress value={outcomeSummary.completionPct} className="h-2" />
+            <p className="text-xs text-slate-500 mt-1">{outcomeSummary.completionPct}% completed</p>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Lightweight tour mode */}
+      <Card className="shadow-sm">
+        <CardContent className="py-4 sm:py-5">
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-50">Guided walkthrough</h3>
+              <p className="text-sm text-slate-600 dark:text-slate-300">Follow the core workflow: upload → select → generate → export.</p>
+            </div>
+            <Button variant="outline" size="sm" onClick={() => { setShowTour(!showTour); setShowTourOverlay(!showTour); setTourStep(0); }}>
+              {showTour ? 'Hide steps' : 'Start tour'}
+            </Button>
+          </div>
+          {showTour && (
+            <div className="grid md:grid-cols-4 gap-3 mt-4 text-sm">
+              <div className="p-3 rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900">
+                <p className="font-semibold">1. Upload</p>
+                <p className="text-slate-600 dark:text-slate-300">Go to Upload, grab the sample file, map columns, and ingest.</p>
+              </div>
+              <div className="p-3 rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900">
+                <p className="font-semibold">2. Select & find</p>
+                <p className="text-slate-600 dark:text-slate-300">Pick requirements, run “Past responses” to populate references.</p>
+              </div>
+              <div className="p-3 rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900">
+                <p className="font-semibold">3. Generate & compare</p>
+                <p className="text-slate-600 dark:text-slate-300">Generate with your chosen model, compare variants, tweak text.</p>
+              </div>
+              <div className="p-3 rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900">
+                <p className="font-semibold">4. Export</p>
+                <p className="text-slate-600 dark:text-slate-300">Export markdown/Excel/Word; run consistency check before sending.</p>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Tour overlay */}
+      {showTourOverlay && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 flex items-center justify-center px-4">
+          <div className="bg-white dark:bg-slate-900 rounded-lg shadow-2xl max-w-lg w-full p-6 relative">
+            <button
+              className="absolute top-3 right-3 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
+              aria-label="Close tour"
+              onClick={() => setShowTourOverlay(false)}
+            >
+              <CloseIcon className="h-5 w-5" />
+            </button>
+            <p className="text-xs uppercase tracking-wide text-slate-500">Tour step {tourStep + 1} of {tourSteps.length}</p>
+            <h4 className="text-xl font-semibold text-slate-900 dark:text-slate-50 mt-1">{tourSteps[tourStep].title}</h4>
+            <p className="text-sm text-slate-600 dark:text-slate-300 mt-2">{tourSteps[tourStep].description}</p>
+            <div className="flex items-center justify-between mt-6">
+              <Button variant="ghost" size="sm" onClick={() => {
+                if (tourStep === 0) {
+                  setShowTourOverlay(false);
+                } else {
+                  setTourStep(Math.max(0, tourStep - 1));
+                }
+              }}>
+                {tourStep === 0 ? 'Skip' : 'Back'}
+              </Button>
+              <div className="flex items-center gap-2">
+                <div className="flex gap-1">
+                  {tourSteps.map((_, idx) => (
+                    <span key={idx} className={`h-2 w-2 rounded-full ${idx === tourStep ? 'bg-primary' : 'bg-slate-300 dark:bg-slate-700'}`} />
+                  ))}
+                </div>
+                <Button size="sm" onClick={() => {
+                  if (tourStep === tourSteps.length - 1) {
+                    setShowTourOverlay(false);
+                  } else {
+                    setTourStep(tourStep + 1);
+                  }
+                }}>
+                  {tourStep === tourSteps.length - 1 ? 'Done' : 'Next'}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="relative">
         <Card className="shadow-sm">
           {/* Filters panel - optimized for mobile with collapsible sections */}
@@ -2446,6 +2730,31 @@ export default function ViewData() {
                             </div>
                           )}
                         </div>
+                        {['openaiResponse','anthropicResponse','deepseekResponse','moaResponse'].some(
+                          (key) => (selectedResponse as any)?.[key]
+                        ) && (
+                          <div className="mt-4">
+                            <div className="flex items-center gap-2 mb-2">
+                              <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-200">Model comparisons</h4>
+                              <span className="text-xs text-slate-500">Quickly compare raw outputs</span>
+                            </div>
+                            <div className="grid md:grid-cols-2 gap-3">
+                              {[
+                                { label: 'OpenAI', value: selectedResponse?.openaiResponse },
+                                { label: 'Anthropic', value: selectedResponse?.anthropicResponse },
+                                { label: 'DeepSeek', value: selectedResponse?.deepseekResponse },
+                                { label: 'MOA', value: selectedResponse?.moaResponse },
+                              ].filter(item => item.value).map(item => (
+                                <div key={item.label} className="p-3 rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900">
+                                  <p className="text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">{item.label}</p>
+                                  <div className="text-sm text-slate-800 dark:text-slate-100 line-clamp-6">
+                                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{item.value || ''}</ReactMarkdown>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </>
                     ) : (
                       <>
@@ -2474,15 +2783,40 @@ export default function ViewData() {
                             </Button>
                           </div>
                         </div>
-                        <div className="prose prose-slate dark:prose-invert max-w-none">
-                          <div className="bg-white dark:bg-slate-800 rounded-md border border-slate-200 dark:border-slate-700">
-                            <textarea
-                              value={editedResponseText}
-                              onChange={(e) => setEditedResponseText(e.target.value)}
-                              className="w-full h-64 p-3 bg-transparent focus:outline-none resize-y text-slate-900 dark:text-slate-50 font-medium"
-                              placeholder="Enter response content..."
-                              disabled={isSavingEdit}
-                            />
+                        <div className="space-y-3">
+                          <div className="flex flex-wrap items-center gap-2 text-xs">
+                            <span className="text-slate-600 dark:text-slate-300">Insert approved snippet:</span>
+                            {approvedSnippets.map((snippet, idx) => (
+                              <Button
+                                key={idx}
+                                variant="secondary"
+                                size="sm"
+                                className="h-7 text-xs"
+                                onClick={() => handleInsertSnippet(snippet)}
+                                disabled={isSavingEdit}
+                              >
+                                Add #{idx + 1}
+                              </Button>
+                            ))}
+                          </div>
+                          <div className="grid md:grid-cols-2 gap-3">
+                            <div className="prose prose-slate dark:prose-invert max-w-none border border-slate-200 dark:border-slate-700 rounded-md bg-slate-50 dark:bg-slate-900 p-3">
+                              <p className="text-xs font-semibold text-slate-500 mb-2">Original</p>
+                              <div className="text-sm whitespace-pre-wrap text-slate-800 dark:text-slate-100">
+                                {originalResponseText || 'No prior content'}
+                              </div>
+                            </div>
+                            <div className="prose prose-slate dark:prose-invert max-w-none">
+                              <div className="bg-white dark:bg-slate-800 rounded-md border border-slate-200 dark:border-slate-700">
+                                <textarea
+                                  value={editedResponseText}
+                                  onChange={(e) => setEditedResponseText(e.target.value)}
+                                  className="w-full h-64 p-3 bg-transparent focus:outline-none resize-y text-slate-900 dark:text-slate-50 font-medium"
+                                  placeholder="Enter response content..."
+                                  disabled={isSavingEdit}
+                                />
+                              </div>
+                            </div>
                           </div>
                         </div>
                       </>
@@ -2558,4 +2892,3 @@ export default function ViewData() {
     </div>
   );
 }
-
