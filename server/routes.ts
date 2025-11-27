@@ -1183,6 +1183,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ success: false, message: "No response text available to map events" });
       }
 
+      // Check if the response indicates the feature is not available
+      // If so, skip event mapping and return empty mappings
+      const NO_REFERENCE_MESSAGE = "This feature/capability is not available in our reference database. No matching documentation was found for this requirement.";
+      if (resp1.trim() === NO_REFERENCE_MESSAGE || resp1.includes("not available in our reference database")) {
+        // Clear any existing event mappings since feature is not available
+        await storage.updateExcelRequirementResponse(requirementId, { eventMappings: JSON.stringify({ event1: null, event2: null, event3: null }) } as any);
+        
+        return res.status(200).json({
+          success: true,
+          requirementId,
+          eventMappings: { event1: null, event2: null, event3: null },
+          message: "Feature not available - no events mapped"
+        });
+      }
+
       if (!process.env.OPENAI_API_KEY) {
         return res.status(400).json({ success: false, message: "Missing OPENAI_API_KEY" });
       }
