@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { format, formatDistanceToNow } from 'date-fns';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { generateMarkdownContent, downloadMarkdownFile, sendEmailWithContent, downloadExcelFile, shareViaWhatsApp, downloadDocxFile } from '@/lib/exportUtils';
+import { generateMarkdownContent, downloadMarkdownFile, sendEmailWithContent, downloadExcelFile, shareViaWhatsApp, downloadDocxFile, downloadEventMappingCsv } from '@/lib/exportUtils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -1531,6 +1531,35 @@ export default function ViewData() {
       });
     }
   };
+
+  const handleExportEventMappings = () => {
+    const selectedData = excelData.filter(item => selectedItems.includes(item.id || 0));
+
+    if (selectedData.length === 0) {
+      toast({
+        title: "No Data Found",
+        description: "Select at least one item to export event mappings.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      const filename = `event-mapping-${new Date().toISOString().split('T')[0]}.csv`;
+      downloadEventMappingCsv(selectedData, filename);
+      toast({
+        title: "Event Mapping Exported",
+        description: `${selectedData.length} items exported to ${filename}`,
+      });
+    } catch (error) {
+      console.error('Error exporting event mapping CSV:', error);
+      toast({
+        title: "Export Failed",
+        description: error instanceof Error ? error.message : "Failed to generate event mapping CSV.",
+        variant: "destructive"
+      });
+    }
+  };
   
   const handleExportPdf = () => {
     const selectedData = excelData.filter(item => selectedItems.includes(item.id || 0));
@@ -1769,6 +1798,9 @@ export default function ViewData() {
       case 'excel':
         handleExportToExcel();
         break;
+      case 'event-mapping-csv':
+        handleExportEventMappings();
+        break;
       case 'mail':
         handleEmailMarkdown();
         break;
@@ -1995,6 +2027,10 @@ export default function ViewData() {
                 <DropdownMenuItem onClick={handleExportDocx} className="gap-2">
                   <FileText className="h-4 w-4 text-blue-500" />
                   <span>Word (branded)</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleExportEventMappings} className="gap-2">
+                  <MapPin className="h-4 w-4 text-purple-500" />
+                  <span>Event mapping (csv)</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={handleEmailMarkdown} className="gap-2">
                   <Mail className="h-4 w-4" />
@@ -2565,6 +2601,10 @@ export default function ViewData() {
                         <DropdownMenuItem onClick={() => handleBulkAction('excel')} className="gap-2">
                           <FileText className="h-4 w-4" />
                           <span>Export as Excel</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleBulkAction('event-mapping-csv')} className="gap-2">
+                          <MapPin className="h-4 w-4 text-purple-500" />
+                          <span>Event mapping (csv)</span>
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => handleBulkAction('mail')} className="gap-2">
                           <Mail className="h-4 w-4" />

@@ -313,6 +313,132 @@ export const downloadMarkdownFile = (
   URL.revokeObjectURL(url);
 };
 
+type EventMappingEntry = {
+  name?: string | null;
+  confidence?: number | null;
+};
+
+/**
+ * Safely parses the eventMappings payload (string or object)
+ */
+const parseEventMappingsPayload = (raw: unknown): Record<string, EventMappingEntry> | null => {
+  if (!raw) return null;
+  if (typeof raw === 'string') {
+    try {
+      return JSON.parse(raw);
+    } catch (err) {
+      console.error('Failed to parse eventMappings payload for export', err);
+      return null;
+    }
+  }
+  if (typeof raw === 'object') {
+    return raw as Record<string, EventMappingEntry>;
+  }
+  return null;
+};
+
+/**
+ * Orders the available events by confidence (desc) while keeping original order as tie-breaker.
+ */
+const getOrderedEvents = (raw: unknown): (EventMappingEntry | null)[] => {
+  const parsed = parseEventMappingsPayload(raw);
+  const normalizeName = (value: unknown): string | null => {
+    if (typeof value === 'string') return value;
+    if (value && typeof value === 'object') {
+      const obj = value as Record<string, unknown>;
+      if (typeof obj.name === 'string') return obj.name;
+      if (typeof obj.event === 'string') return obj.event;
+      if (typeof obj.title === 'string') return obj.title;
+    }
+    return null;
+  };
+
+  const normalizeConfidence = (value: unknown): number | null => {
+    if (typeof value === 'number' && Number.isFinite(value)) return value;
+    if (typeof value === 'string') {
+      const parsedValue = parseFloat(value);
+      return Number.isFinite(parsedValue) ? parsedValue : null;
+    }
+    return null;
+  };
+
+  const entries = ['event1', 'event2', 'event3'].map((key, index) => {
+    const value = parsed ? parsed[key] : null;
+    if (!value) return null;
+
+    const name = normalizeName(value);
+    const confidence = normalizeConfidence((value as EventMappingEntry)?.confidence);
+
+    if (!name && confidence === null) return null;
+
+    return { name: name || undefined, confidence, _index: index } as EventMappingEntry & { _index: number };
+  }).filter((item): item is EventMappingEntry & { _index: number } => item !== null);
+
+  const sorted = entries.sort((a, b) => {
+    const confA = typeof a.confidence === 'number' ? a.confidence : -1;
+    const confB = typeof b.confidence === 'number' ? b.confidence : -1;
+    if (confA === confB) return a._index - b._index;
+    return confB - confA;
+  });
+
+  const normalized: (EventMappingEntry | null)[] = sorted.map(({ _index, ...rest }) => rest);
+  while (normalized.length < 3) {
+    normalized.push(null);
+  }
+  return normalized.slice(0, 3);
+};
+
+const formatEventCell = (entry: EventMappingEntry | null): string => {
+  if (!entry || !entry.name) return 'Unmapped';
+  if (typeof entry.confidence === 'number') {
+    return `${entry.name} (${entry.confidence.toFixed(2)})`;
+  }
+  return entry.name;
+};
+
+const escapeCsvValue = (value: string): string => {
+  const safe = value ?? '';
+  const needsQuotes = /[",\n]/.test(safe);
+  const escaped = safe.replace(/"/g, '""');
+  return needsQuotes ? `"${escaped}"` : escaped;
+};
+
+/**
+ * Downloads a CSV showing Category, Requirement, and the top 3 mapped events.
+ * Maintains the incoming items order (e.g., upload order) and fills missing values with 'Unmapped'.
+ */
+export const downloadEventMappingCsv = (
+  items: ExcelRequirementResponse[],
+  filename = "event-mapping.csv"
+): void => {
+  const headers = ['Category', 'Requirement', 'Event1', 'Event2', 'Event3'];
+  const rows = [headers];
+
+  items.forEach((item) => {
+    const orderedEvents = getOrderedEvents(item.eventMappings);
+    const row = [
+      item.category || '',
+      item.requirement || '',
+      ...orderedEvents.map(formatEventCell)
+    ];
+    rows.push(row);
+  });
+
+  const csvContent = rows
+    .map((row) => row.map(escapeCsvValue).join(','))
+    .join('\n');
+
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+};
+
 /**
  * Strips markdown formatting from text to provide plain text for Excel export
  */
