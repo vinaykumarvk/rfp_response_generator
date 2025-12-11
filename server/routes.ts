@@ -380,17 +380,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Validate vector store IDs
-      const validVectorStores = vectorStores.filter((vs: any) => 
+      const validVectorStores = vectorStores.filter((vs: any) =>
         vs && typeof vs.id === 'string' && vs.id.trim() !== ''
       );
 
+      // OpenAI Responses API file_search tool has a hard limit of 2 vector stores per request
+      const MAX_VECTOR_STORES = 2;
+      
+      // Block saving more than the allowed limit
+      if (validVectorStores.length > MAX_VECTOR_STORES) {
+        return res.status(400).json({
+          success: false,
+          message: `Cannot bind more than ${MAX_VECTOR_STORES} vector stores. OpenAI's API has a hard limit of ${MAX_VECTOR_STORES} vector stores per file_search request. Please select only ${MAX_VECTOR_STORES} vector stores.`,
+          maxAllowed: MAX_VECTOR_STORES,
+          attempted: validVectorStores.length
+        });
+      }
+
       // Save mappings (replaces existing ones)
       const mappings = await storage.setRfpVectorStoreMappings(rfpName, validVectorStores);
-      
+
       return res.status(200).json({
         success: true,
-        message: validVectorStores.length === 0 
-          ? "Warning: No vector stores selected. Bindings cleared." 
+        message: validVectorStores.length === 0
+          ? "Warning: No vector stores selected. Bindings cleared."
           : `Successfully bound ${validVectorStores.length} vector store(s) to RFP "${rfpName}"`,
         data: mappings.map(m => ({
           id: m.vectorStoreId,
@@ -879,13 +892,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
             });
           }
 
-          // Use ALL bound vector stores (no artificial limit)
-          // If OpenAI API returns an error about limits, we'll handle it in the error handler
-          const vectorStoreIds = boundVectorStores;
-          const vectorStoreNamesFromBindings = boundVectorStoreNames.length > 0 
-            ? boundVectorStoreNames 
-            : boundVectorStores; // Use IDs as names if names not available (display only, not a fallback for selection)
+          // OpenAI Responses API file_search tool has a hard limit of 2 vector stores per request
+          const MAX_VECTOR_STORES = 2;
           
+          if (boundVectorStores.length > MAX_VECTOR_STORES) {
+            console.warn(`[EKG_WARNING] RFP "${rfpName}" has ${boundVectorStores.length} vector stores bound, but OpenAI only allows ${MAX_VECTOR_STORES}. Please update bindings.`);
+            return res.status(400).json({
+              success: false,
+              message: `This RFP has ${boundVectorStores.length} vector stores bound, but OpenAI's API only allows a maximum of ${MAX_VECTOR_STORES} per request. Please go to 'Bind EKG' and reduce the number of bound vector stores to ${MAX_VECTOR_STORES} or fewer.`,
+              vectorStoreCount: boundVectorStores.length,
+              maxAllowed: MAX_VECTOR_STORES
+            });
+          }
+          
+          const vectorStoreIds = boundVectorStores;
+          const vectorStoreNamesFromBindings = boundVectorStoreNames.length > 0
+            ? boundVectorStoreNames
+            : boundVectorStores; // Use IDs as names if names not available (display only, not a fallback for selection)
+
           console.log(`Using ${vectorStoreIds.length} bound vector store(s) for RFP "${rfpName}":`, vectorStoreIds);
 
           // Build vector store description for prompt

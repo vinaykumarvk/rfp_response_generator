@@ -24,6 +24,9 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 
+// OpenAI Responses API file_search tool has a hard limit of 2 vector stores per request
+const MAX_VECTOR_STORES = 2;
+
 interface VectorStore {
   id: string;
   name: string;
@@ -119,6 +122,15 @@ export default function BindEKG() {
       if (newSet.has(vectorStoreId)) {
         newSet.delete(vectorStoreId);
       } else {
+        // Check if we're at the limit before adding
+        if (newSet.size >= MAX_VECTOR_STORES) {
+          toast({
+            title: 'Vector Store Limit Reached',
+            description: `OpenAI's API allows a maximum of ${MAX_VECTOR_STORES} vector stores per request. Please deselect one before adding another.`,
+            variant: 'destructive',
+          });
+          return prev; // Return unchanged set
+        }
         newSet.add(vectorStoreId);
       }
       return newSet;
@@ -275,7 +287,7 @@ export default function BindEKG() {
                 <CardTitle>Available Vector Stores</CardTitle>
                 <CardDescription>
                   {isEditMode 
-                    ? `Select vector stores to bind to this RFP (${selectedVectorStores.size} selected)` 
+                    ? `Select vector stores to bind to this RFP (${selectedVectorStores.size}/${MAX_VECTOR_STORES} selected — OpenAI API limit)` 
                     : boundStores.length > 0
                       ? 'All available vector stores (bound stores are highlighted)'
                       : 'No vector stores are currently bound. Click "Edit" to bind vector stores.'}
@@ -320,6 +332,7 @@ export default function BindEKG() {
                 {vectorStores.map((store) => {
                   const isBound = boundStores.some(bs => bs.id === store.id);
                   const isSelected = selectedVectorStores.has(store.id);
+                  const isDisabled = !isSelected && selectedVectorStores.size >= MAX_VECTOR_STORES;
                   
                   return (
                     <div
@@ -328,7 +341,9 @@ export default function BindEKG() {
                         isEditMode
                           ? isSelected
                             ? 'border-primary bg-primary/5 dark:bg-primary/10'
-                            : 'border-slate-200 dark:border-slate-700'
+                            : isDisabled
+                              ? 'border-slate-200 dark:border-slate-700 opacity-40 cursor-not-allowed'
+                              : 'border-slate-200 dark:border-slate-700'
                           : isBound
                             ? 'border-primary bg-primary/5 dark:bg-primary/10'
                             : 'border-slate-200 dark:border-slate-700 opacity-50'
@@ -338,6 +353,7 @@ export default function BindEKG() {
                         {isEditMode && (
                           <Checkbox
                             checked={isSelected}
+                            disabled={isDisabled}
                             onCheckedChange={() => handleToggleVectorStore(store.id)}
                             className="mt-1"
                           />
@@ -376,6 +392,26 @@ export default function BindEKG() {
                 })}
               </div>
             )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Warning: Too many vector stores bound */}
+      {selectedRfpName && boundStores.length > MAX_VECTOR_STORES && !isEditMode && (
+        <Card className="border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/40">
+          <CardContent className="pt-6">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400 mt-0.5" />
+              <div>
+                <h3 className="font-semibold text-red-900 dark:text-red-100 mb-1">
+                  Too Many Vector Stores Bound
+                </h3>
+                <p className="text-sm text-red-800 dark:text-red-200">
+                  This RFP has {boundStores.length} vector stores bound, but OpenAI's API only allows a maximum of {MAX_VECTOR_STORES} per request. 
+                  EKG generation will fail until you reduce the bindings. Click "Edit" to select which {MAX_VECTOR_STORES} vector stores to keep.
+                </p>
+              </div>
+            </div>
           </CardContent>
         </Card>
       )}
