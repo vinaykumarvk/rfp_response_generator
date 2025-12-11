@@ -5,7 +5,10 @@ import {
   referenceResponses,
   type ReferenceResponse,
   type InsertReferenceResponse,
-  embeddings
+  embeddings,
+  rfpVectorStoreMappings,
+  type RfpVectorStoreMapping,
+  type InsertRfpVectorStoreMapping
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, sql, inArray } from "drizzle-orm";
@@ -24,6 +27,7 @@ export interface IStorage {
   updateExcelRequirementResponse(id: number, response: Partial<InsertExcelRequirementResponse>): Promise<ExcelRequirementResponse | undefined>;
   updateSimilarQuestions(id: number, similarQuestions: any[]): Promise<ExcelRequirementResponse | undefined>;
   deleteExcelRequirementResponse(id: number): Promise<boolean>;
+  deleteExcelRequirementResponses(ids: number[]): Promise<number>;
   deleteAllExcelRequirementResponses(): Promise<boolean>;
 
   // Reference Response Operations
@@ -40,6 +44,11 @@ export interface IStorage {
     response: ExcelRequirementResponse;
     references: ReferenceResponse[];
   }>;
+
+  // RFP Vector Store Mapping Operations
+  getRfpVectorStoreMappings(rfpName: string): Promise<RfpVectorStoreMapping[]>;
+  setRfpVectorStoreMappings(rfpName: string, vectorStores: Array<{ id: string; name?: string }>): Promise<RfpVectorStoreMapping[]>;
+  deleteRfpVectorStoreMappings(rfpName: string): Promise<boolean>;
 }
 
 // Database storage implementation
@@ -64,7 +73,17 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getExcelRequirementResponses(): Promise<ExcelRequirementResponse[]> {
-    return await db.select().from(excelRequirementResponses);
+    try {
+      console.log("[Storage] Fetching Excel requirement responses from database...");
+      const responses = await db.select().from(excelRequirementResponses);
+      console.log(`[Storage] Successfully fetched ${responses.length} responses`);
+      return responses;
+    } catch (error: any) {
+      console.error("[Storage] Error in getExcelRequirementResponses:", error);
+      console.error("[Storage] Error message:", error?.message);
+      console.error("[Storage] Error stack:", error?.stack);
+      throw error;
+    }
   }
 
   async createExcelRequirementResponse(response: InsertExcelRequirementResponse): Promise<ExcelRequirementResponse> {
@@ -104,6 +123,22 @@ export class DatabaseStorage implements IStorage {
     
     // In PostgreSQL, the count is not directly returned, but we can infer success if no error
     return true;
+  }
+
+  async deleteExcelRequirementResponses(ids: number[]): Promise<number> {
+    if (ids.length === 0) {
+      return 0;
+    }
+    
+    // Delete multiple requirements by IDs
+    // Note: reference_responses will be automatically deleted due to CASCADE constraint
+    const result = await db
+      .delete(excelRequirementResponses)
+      .where(inArray(excelRequirementResponses.id, ids))
+      .returning({ id: excelRequirementResponses.id });
+    
+    // Return the actual count of deleted items
+    return result.length;
   }
   
   async deleteAllExcelRequirementResponses(): Promise<boolean> {
@@ -308,6 +343,15 @@ export class DatabaseStorage implements IStorage {
         : null;
       if (response.similarQuestions !== undefined) updateData.similarQuestions = response.similarQuestions;
       if ((response as any).eventMappings !== undefined) (updateData as any).eventMappings = (response as any).eventMappings;
+      if ((response as any).ekgStatus !== undefined) (updateData as any).ekgStatus = (response as any).ekgStatus || null;
+      if ((response as any).ekgAvailableFeatures !== undefined) {
+        const val = (response as any).ekgAvailableFeatures;
+        (updateData as any).ekgAvailableFeatures = Array.isArray(val) ? JSON.stringify(val) : val || null;
+      }
+      if ((response as any).ekgGapsCustomizations !== undefined) {
+        const val = (response as any).ekgGapsCustomizations;
+        (updateData as any).ekgGapsCustomizations = Array.isArray(val) ? JSON.stringify(val) : val || null;
+      }
       
       // Update the existing response
       const updatedResponse = await this.updateExcelRequirementResponse(id, updateData);
@@ -345,6 +389,15 @@ export class DatabaseStorage implements IStorage {
           : null,
         
         eventMappings: (response as any).eventMappings || null,
+        ekgStatus: (response as any).ekgStatus || null,
+        ekgAvailableFeatures: (() => {
+          const val = (response as any).ekgAvailableFeatures;
+          return Array.isArray(val) ? JSON.stringify(val) : val || null;
+        })(),
+        ekgGapsCustomizations: (() => {
+          const val = (response as any).ekgGapsCustomizations;
+          return Array.isArray(val) ? JSON.stringify(val) : val || null;
+        })(),
         
         similarQuestions: response.similarQuestions || ''
       };
@@ -398,6 +451,61 @@ export class DatabaseStorage implements IStorage {
       response: responseRecord,
       references: referenceRecords
     };
+  }
+
+  // RFP Vector Store Mapping Operations
+  async getRfpVectorStoreMappings(rfpName: string): Promise<RfpVectorStoreMapping[]> {
+    try {
+      const mappings = await db
+        .select()
+        .from(rfpVectorStoreMappings)
+        .where(eq(rfpVectorStoreMappings.rfpName, rfpName))
+        .orderBy(rfpVectorStoreMappings.createdAt);
+      
+      return mappings;
+    } catch (error) {
+      console.error("Error fetching RFP vector store mappings:", error);
+      throw error;
+    }
+  }
+
+  async setRfpVectorStoreMappings(rfpName: string, vectorStores: Array<{ id: string; name?: string }>): Promise<RfpVectorStoreMapping[]> {
+    try {
+      // Delete existing mappings for this RFP
+      await db
+        .delete(rfpVectorStoreMappings)
+        .where(eq(rfpVectorStoreMappings.rfpName, rfpName));
+
+      // Insert new mappings
+      if (vectorStores.length > 0) {
+        const newMappings: InsertRfpVectorStoreMapping[] = vectorStores.map(vs => ({
+          rfpName,
+          vectorStoreId: vs.id,
+          vectorStoreName: vs.name || null,
+        }));
+
+        await db.insert(rfpVectorStoreMappings).values(newMappings);
+      }
+
+      // Return updated mappings
+      return await this.getRfpVectorStoreMappings(rfpName);
+    } catch (error) {
+      console.error("Error setting RFP vector store mappings:", error);
+      throw error;
+    }
+  }
+
+  async deleteRfpVectorStoreMappings(rfpName: string): Promise<boolean> {
+    try {
+      await db
+        .delete(rfpVectorStoreMappings)
+        .where(eq(rfpVectorStoreMappings.rfpName, rfpName));
+      
+      return true;
+    } catch (error) {
+      console.error("Error deleting RFP vector store mappings:", error);
+      throw error;
+    }
   }
 }
 

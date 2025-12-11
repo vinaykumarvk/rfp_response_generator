@@ -159,9 +159,10 @@ export function validateRequirementId(id: unknown): number {
  * Validate model name to prevent injection
  */
 export function validateModelName(model: unknown): string {
-  const allowedModels = ['openai', 'openAI', 'anthropic', 'claude', 'deepseek', 'moa'];
+  const allowedModels = ['openai', 'openAI', 'anthropic', 'claude', 'deepseek', 'moa', 'ekg'];
   if (typeof model === 'string' && allowedModels.includes(model.toLowerCase())) {
-    return model.toLowerCase() === 'claude' ? 'anthropic' : model.toLowerCase();
+    if (model.toLowerCase() === 'claude') return 'anthropic';
+    return model.toLowerCase();
   }
   throw new Error(`Invalid model name: ${model}`);
 }
@@ -176,4 +177,3 @@ export function validateBoolean(value: unknown): boolean {
   }
   return false;
 }
-

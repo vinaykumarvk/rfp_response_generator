@@ -3,9 +3,19 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { format, formatDistanceToNow } from 'date-fns';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { generateMarkdownContent, downloadMarkdownFile, sendEmailWithContent, downloadExcelFile, shareViaWhatsApp, downloadDocxFile, downloadEventMappingCsv } from '@/lib/exportUtils';
+import { generateMarkdownContent, downloadMarkdownFile, sendEmailWithContent, downloadExcelFile, shareViaWhatsApp, downloadDocxFile, downloadEventMappingCsv, downloadEkgAssessmentExcel, downloadMultiEkgAssessmentExcel, MultiEkgExportData } from '@/lib/exportUtils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
@@ -58,7 +68,8 @@ import {
   Edit,
   Save,
   X as CloseIcon,
-  MapPin
+  MapPin,
+  Download
 } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useToast } from '@/hooks/use-toast';
@@ -93,6 +104,8 @@ export default function ViewData() {
   const [selectedItems, setSelectedItems] = useState<number[]>([]);
   const [selectAll, setSelectAll] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [showTour, setShowTour] = useState(false);
   const [showTourOverlay, setShowTourOverlay] = useState(false);
   const [tourStep, setTourStep] = useState(0);
@@ -107,17 +120,33 @@ export default function ViewData() {
   const [isGeneratingResponse, setIsGeneratingResponse] = useState(false);
   const [isMappingEvents, setIsMappingEvents] = useState(false);
   const [mappingIndividualItems, setMappingIndividualItems] = useState<{[key: number]: boolean}>({});
+  const [markedAvailableSubrequirements, setMarkedAvailableSubrequirements] = useState<string[]>([]);
+  const [isUpdatingSubreqAvailability, setIsUpdatingSubreqAvailability] = useState(false);
+  const [isRegeneratingResponse, setIsRegeneratingResponse] = useState(false);
   
   // Helper function to check if any response exists
   const hasAnyResponse = (response: ExcelRequirementResponse | null) => {
     if (!response) return false;
-    return !!(response.finalResponse || response.openaiResponse || response.anthropicResponse || response.deepseekResponse || response.moaResponse);
+    return !!(
+      (response as any).ekgCustomerResponse ||
+      response.finalResponse ||
+      response.openaiResponse ||
+      response.anthropicResponse ||
+      response.deepseekResponse ||
+      response.moaResponse
+    );
   };
   
   // Helper function to get the best available response text
   const getBestResponse = (response: ExcelRequirementResponse | null) => {
     if (!response) return null;
-    return response.finalResponse || response.openaiResponse || response.anthropicResponse || response.deepseekResponse || response.moaResponse || null;
+    return (response as any).ekgCustomerResponse ||
+      response.finalResponse ||
+      response.openaiResponse ||
+      response.anthropicResponse ||
+      response.deepseekResponse ||
+      response.moaResponse ||
+      null;
   };
   
   const parseEventMappings = (response: ExcelRequirementResponse | null) => {
@@ -132,8 +161,88 @@ export default function ViewData() {
       return null;
     }
   };
-  
+
+  const parseStringArray = (value: any): string[] => {
+    if (!value) return [];
+    if (Array.isArray(value)) return value.map(String);
+    if (typeof value === 'string') {
+      try {
+        const parsed = JSON.parse(value);
+        return Array.isArray(parsed) ? parsed.map(String) : [];
+      } catch (err) {
+        console.error("Failed to parse string array", err);
+        return [];
+      }
+    }
+    return [];
+  };
+
+  const parseNumberOrNull = (value: any): number | null => {
+    if (value === null || value === undefined) return null;
+    const num = typeof value === 'string' ? Number(value) : value;
+    if (typeof num === 'number' && !Number.isNaN(num)) return num;
+    return null;
+  };
+
+  const parseSubrequirements = (value: any): any[] => {
+    if (!value) return [];
+    if (Array.isArray(value)) return value;
+    if (typeof value === 'string') {
+      try {
+        const parsed = JSON.parse(value);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch (err) {
+        console.error("Failed to parse subrequirements", err);
+        return [];
+      }
+    }
+    return [];
+  };
+
   const eventMappingsData = useMemo(() => parseEventMappings(selectedResponse), [selectedResponse]);
+  const ekgAvailableFeatures = useMemo(
+    () => parseStringArray((selectedResponse as any)?.ekgAvailableFeatures),
+    [selectedResponse]
+  );
+  const ekgGapsCustomizations = useMemo(
+    () => parseStringArray((selectedResponse as any)?.ekgGapsCustomizations),
+    [selectedResponse]
+  );
+  const ekgSubrequirements = useMemo(
+    () => parseSubrequirements((selectedResponse as any)?.ekgSubrequirements),
+    [selectedResponse]
+  );
+  const ekgSubrequirementsAvailable = useMemo(
+    () => parseStringArray((selectedResponse as any)?.ekgSubrequirementsAvailable),
+    [selectedResponse]
+  );
+  const ekgOverallFitmentPercentage = useMemo(() => {
+    const raw = parseNumberOrNull((selectedResponse as any)?.ekgOverallFitmentPercentage);
+    if (raw !== null) return Math.round(raw);
+    const fitmentScore = parseNumberOrNull((selectedResponse as any)?.fitmentScore);
+    if (fitmentScore !== null) return Math.round(fitmentScore * 100);
+    return null;
+  }, [selectedResponse]);
+  const ekgCustomerResponse = useMemo(
+    () => (selectedResponse as any)?.ekgCustomerResponse || selectedResponse?.finalResponse,
+    [selectedResponse]
+  );
+  const displayResponseText = ekgCustomerResponse || selectedResponse?.finalResponse || '';
+  const ekgVectorStoreNames = useMemo(() => {
+    const names = (selectedResponse as any)?.vectorStoreNames;
+    if (!names) return [];
+    if (Array.isArray(names)) return names.map(String);
+    try {
+      const parsed = JSON.parse(names);
+      return Array.isArray(parsed) ? parsed.map(String) : [];
+    } catch {
+      return [];
+    }
+  }, [selectedResponse]);
+
+  useEffect(() => {
+    setMarkedAvailableSubrequirements(ekgSubrequirementsAvailable);
+  }, [ekgSubrequirementsAvailable, selectedResponse]);
   
   // Requirements cache for performance optimization
   const requirementsCache = React.useRef<Map<number, ExcelRequirementResponse>>(new Map());
@@ -166,6 +275,10 @@ export default function ViewData() {
     model: ''
   });
   
+  // Cancel mechanism for response generation
+  const [isCancelling, setIsCancelling] = useState(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  
   const [requirementsLoadingProgress, setRequirementsLoadingProgress] = useState({
     total: 0,
     loaded: 0,
@@ -186,7 +299,7 @@ export default function ViewData() {
     rfpName: 'all',
     category: 'all',
     hasResponse: 'all', // 'all', 'yes', 'no'
-    generationMode: 'all', // 'all', 'openai', 'anthropic', 'deepseek', 'moa'
+    requirementId: '', // Empty string means no filter, otherwise filter by ID
   });
   
   // Sorting
@@ -217,13 +330,54 @@ export default function ViewData() {
       refetch();
     };
     
+    const handleFitmentScoresRecalculated = async () => {
+      console.log('Fitment scores recalculated - refreshing selected response');
+      // If a response dialog is open, refresh the selected response to get updated fitment score
+      if (selectedResponseId) {
+        try {
+          const response = await fetch(`/api/excel-requirements/${selectedResponseId}`);
+          if (response.ok) {
+            const freshData = await response.json();
+            setSelectedResponse(freshData);
+          }
+        } catch (error) {
+          console.error('Failed to refresh selected response after fitment score recalculation:', error);
+        }
+      }
+      // Also refresh the main data list
+      queryClient.invalidateQueries({ queryKey: ['/api/excel-requirements'] });
+      refetch();
+    };
+    
     window.addEventListener('requirements-replaced', handleRequirementsReplaced);
     window.addEventListener('requirements-updated', handleRequirementsUpdated);
+    window.addEventListener('fitmentScoresRecalculated', handleFitmentScoresRecalculated);
     return () => {
       window.removeEventListener('requirements-replaced', handleRequirementsReplaced);
       window.removeEventListener('requirements-updated', handleRequirementsUpdated);
+      window.removeEventListener('fitmentScoresRecalculated', handleFitmentScoresRecalculated);
     };
-  }, [refetch]);
+  }, [refetch, queryClient, selectedResponseId]);
+  
+  // Ensure processing continues even when tab is in background
+  // This effect prevents browser from throttling the processing loop
+  React.useEffect(() => {
+    if (!bulkGenerationProgress.isProcessing) return;
+    
+    // Use a more aggressive polling mechanism when tab is in background
+    const handleVisibilityChange = () => {
+      if (document.hidden && bulkGenerationProgress.isProcessing) {
+        console.log('Tab is in background, but processing will continue');
+        // Force a small operation to keep the event loop active
+        // This helps prevent excessive throttling
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [bulkGenerationProgress.isProcessing]);
   
   // Set initial loading state
   React.useEffect(() => {
@@ -300,7 +454,7 @@ export default function ViewData() {
     return filters.rfpName !== 'all' || 
            filters.category !== 'all' || 
            filters.hasResponse !== 'all' ||
-           filters.generationMode !== 'all';
+           filters.requirementId !== '';
   }, [filters]);
 
   // Apply filters to the data - optimized for performance
@@ -315,7 +469,7 @@ export default function ViewData() {
       filters.rfpName !== 'all' || 
       filters.category !== 'all' || 
       filters.hasResponse !== 'all' ||
-      filters.generationMode !== 'all';
+      filters.requirementId !== '';
     
     // Filter data - only process if we have active filters
     const filtered = hasActiveFilters ? excelData.filter(row => {
@@ -339,23 +493,13 @@ export default function ViewData() {
         }
       }
       
-      // Filter by generation mode/model provider
-      if (filters.generationMode !== 'all') {
-        if (row.modelProvider) {
-          // Direct comparison when modelProvider is available
-          if (row.modelProvider !== filters.generationMode) {
-            return false;
-          }
-        } else {
-          // Fallback for legacy data
-          const responseMap = {
-            'openai': row.openaiResponse,
-            'anthropic': row.anthropicResponse,
-            'deepseek': row.deepseekResponse,
-            'moa': row.moaResponse
-          };
-          
-          if (!responseMap[filters.generationMode as keyof typeof responseMap]) {
+      // Filter by requirement ID
+      if (filters.requirementId !== '') {
+        const searchId = filters.requirementId.trim();
+        if (searchId !== '') {
+          // Try to match as number or string
+          const rowId = row.id?.toString() || '';
+          if (rowId !== searchId && !rowId.includes(searchId)) {
             return false;
           }
         }
@@ -414,13 +558,26 @@ export default function ViewData() {
     return [...filtered].sort(getSortFn());
   }, [excelData, filters, sortConfig]);
   
-  const handleViewResponse = (row: ExcelRequirementResponse) => {
+  const handleViewResponse = async (row: ExcelRequirementResponse) => {
+    // Set initial response data
     setSelectedResponse(row);
     setSelectedResponseId(row.id);
     setReferenceCount(0); // Reset reference count when opening a new response
     
     // Reset editing state
     setIsEditingResponse(false);
+    
+    // Fetch fresh data from API to ensure we have the latest fitment score
+    try {
+      const response = await fetch(`/api/excel-requirements/${row.id}`);
+      if (response.ok) {
+        const freshData = await response.json();
+        setSelectedResponse(freshData);
+      }
+    } catch (error) {
+      console.error('Failed to fetch fresh response data:', error);
+      // Continue with existing data if fetch fails
+    }
     
     // USABILITY: Default to "Response" tab when opening dialog if response exists
     // This ensures users see the generated content immediately
@@ -439,15 +596,15 @@ export default function ViewData() {
   
   // Function to start editing response
   const handleStartEditing = () => {
-    if (selectedResponse?.finalResponse) {
+    if (displayResponseText) {
       // Store original text for undo functionality
-      setOriginalResponseText(selectedResponse.finalResponse
+      setOriginalResponseText(displayResponseText
         .replace(/\\n/g, '\n')
         .replace(/\\"/g, '"')
         .replace(/\\\\/g, '\\'));
       
       // Initialize editable text
-      setEditedResponseText(selectedResponse.finalResponse
+      setEditedResponseText(displayResponseText
         .replace(/\\n/g, '\n')
         .replace(/\\"/g, '"')
         .replace(/\\\\/g, '\\'));
@@ -530,6 +687,101 @@ export default function ViewData() {
       });
     } finally {
       setIsSavingEdit(false);
+    }
+  };
+
+  const handleToggleSubreqAvailability = async (subreqId: string, checked: boolean) => {
+    const normalizedId = String(subreqId);
+    const next = checked
+      ? Array.from(new Set([...markedAvailableSubrequirements, normalizedId]))
+      : markedAvailableSubrequirements.filter(id => id !== normalizedId);
+    
+    setMarkedAvailableSubrequirements(next);
+    const targetId = selectedResponseId || selectedResponse?.id;
+    if (!targetId) return;
+    try {
+      setIsUpdatingSubreqAvailability(true);
+      const resp = await fetch(`/api/excel-requirements/${targetId}/ekg/subrequirements-availability`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ availableIds: next })
+      });
+      if (!resp.ok) {
+        throw new Error(`Failed to update availability (${resp.status})`);
+      }
+      setSelectedResponse(prev => prev ? { ...prev, ekgSubrequirementsAvailable: JSON.stringify(next) } as any : prev);
+    } catch (err: any) {
+      console.error("Failed to update subrequirement availability", err);
+      toast({
+        title: "Update failed",
+        description: err?.message || "Could not save selection",
+        variant: "destructive"
+      });
+      // revert
+      setMarkedAvailableSubrequirements(ekgSubrequirementsAvailable);
+    } finally {
+      setIsUpdatingSubreqAvailability(false);
+    }
+  };
+
+  const handleRegenerateWithAvailable = async () => {
+    const targetId = selectedResponseId || selectedResponse?.id;
+    if (!targetId) return;
+    if (markedAvailableSubrequirements.length === 0) {
+      toast({
+        title: "Select subrequirements",
+        description: "Mark at least one subrequirement as available to regenerate.",
+        variant: "destructive"
+      });
+      return;
+    }
+    try {
+      setIsRegeneratingResponse(true);
+      let resp: Response;
+      try {
+        resp = await fetch(`/api/excel-requirements/${targetId}/ekg/regenerate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ availableIds: markedAvailableSubrequirements })
+        });
+      } catch (networkError: any) {
+        // Handle network errors (server not reachable, CORS, etc.)
+        console.error('Network error during regeneration:', networkError);
+        throw new Error(`Failed to connect to server: ${networkError.message || 'Network error'}`);
+      }
+      
+      const text = await resp.text();
+      let data: any = {};
+      try { 
+        data = text ? JSON.parse(text) : {}; 
+      } catch (parseError) {
+        console.error('Failed to parse regeneration response:', parseError);
+        throw new Error(`Invalid server response: ${text.substring(0, 100)}`);
+      }
+      
+      if (!resp.ok || data.success === false) {
+        throw new Error(data?.message || data?.error || `Regeneration failed (${resp.status})`);
+      }
+      setSelectedResponse(prev => prev ? {
+        ...prev,
+        finalResponse: data.finalResponse || prev.finalResponse,
+        ekgCustomerResponse: data.ekgCustomerResponse || (prev as any).ekgCustomerResponse,
+        ekgAvailableFeatures: JSON.stringify(data.ekgAvailableFeatures || ekgAvailableFeatures),
+        ekgSubrequirementsAvailable: JSON.stringify(data.ekgSubrequirementsAvailable || markedAvailableSubrequirements),
+      } as any : prev);
+      toast({
+        title: "Response regenerated",
+        description: "Customer response updated with marked available features."
+      });
+    } catch (err: any) {
+      console.error("Regeneration failed", err);
+      toast({
+        title: "Regeneration failed",
+        description: err?.message || "Unable to regenerate answer",
+        variant: "destructive"
+      });
+    } finally {
+      setIsRegeneratingResponse(false);
     }
   };
   
@@ -768,24 +1020,6 @@ export default function ViewData() {
     }
   };
   
-  const handleRefresh = async () => {
-    try {
-      // Force a fresh fetch from the server with cache bypass
-      await refetch();
-      toast({
-        title: "Data Refreshed",
-        description: "All requirements have been refreshed from the database.",
-      });
-    } catch (error) {
-      console.error('Error refreshing data:', error);
-      toast({
-        title: "Refresh Error",
-        description: `Failed to refresh data: ${error instanceof Error ? error.message : String(error)}`,
-        variant: "destructive",
-      });
-    }
-  };
-  
   const handleFeedbackSubmit = async (responseId: number, feedback: 'positive' | 'negative') => {
     if (!responseId) return;
     
@@ -855,7 +1089,7 @@ export default function ViewData() {
   const [isGenerating, setIsGenerating] = useState(false);
   
   // For tracking individual requirements being processed (with their model info)
-  const [processingIndividualItems, setProcessingIndividualItems] = useState<{[key: number]: {stage: string, model: string}}>({}); 
+  const [processingIndividualItems, setProcessingIndividualItems] = useState<{[key: number]: {stage: string, model: string, vectorStores?: string[]}}>({}); 
   
   // Note: Removed the following unused states that were only needed for the old progress indicator:
   // - processedCount
@@ -868,7 +1102,7 @@ export default function ViewData() {
   // Optimized function for generating response for a single requirement
   const generateResponseForRequirement = async (
     requirementId: number, 
-    modelProvider: 'openai' | 'anthropic' | 'deepseek' | 'moa'
+    modelProvider: 'openai' | 'anthropic' | 'deepseek' | 'moa' | 'ekg'
   ) => {
     try {
       // Find the requirement data - using memoized lookup if available
@@ -889,12 +1123,36 @@ export default function ViewData() {
         return false;
       }
       
+      // Check if cancellation was requested
+      if (isCancelling || abortControllerRef.current?.signal.aborted) {
+        return false;
+      }
+      
       // Make API call to generate response with timeout
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60-second timeout for LLM calls
+      // Use the global abort controller if available, otherwise create a local one
+      const controller = abortControllerRef.current || new AbortController();
+      
+      // Use a more reliable timeout that works even when tab is in background
+      let timeoutId: NodeJS.Timeout | null = null;
+      const timeoutPromise = new Promise<void>((_, reject) => {
+        const start = Date.now();
+        const timeout = 60000; // 60-second timeout for LLM calls
+        const checkInterval = setInterval(() => {
+          if (Date.now() - start >= timeout) {
+            clearInterval(checkInterval);
+            controller.abort();
+            reject(new Error('Request timeout'));
+          }
+          if (controller.signal.aborted) {
+            clearInterval(checkInterval);
+          }
+        }, 1000); // Check every second
+        timeoutId = checkInterval as any;
+      });
       
       try {
-        const response = await fetch('/api/generate-response', {
+        // Make the fetch request - it will continue even when tab is in background
+        const fetchPromise = fetch('/api/generate-response', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -910,22 +1168,42 @@ export default function ViewData() {
           }),
         });
         
-        clearTimeout(timeoutId);
+        // Race between fetch and timeout
+        const response = await Promise.race([
+          fetchPromise,
+          timeoutPromise.then(() => { throw new Error('Request timeout'); })
+        ]);
         
-        if (!response.ok) {
-          throw new Error(`API returned ${response.status} ${response.statusText}`);
+        // Clear timeout interval if fetch completes first
+        if (timeoutId) {
+          clearInterval(timeoutId);
         }
         
+        // Parse response body first to get error details
         const data = await response.json();
         
-        if (data.error) {
-          throw new Error(data.error);
+        // Check for API error response (check both HTTP status and API success flag)
+        if (!response.ok || data.success === false || data.error) {
+          const errorMsg = data.message || data.error || `API returned ${response.status} ${response.statusText}`;
+          console.error(`[API_ERROR] Error from API for requirement ${requirementId}:`, errorMsg);
+          console.error(`[API_ERROR] HTTP Status:`, response.status);
+          console.error(`[API_ERROR] Full API response:`, JSON.stringify(data, null, 2));
+          if (data.vectorStoreCount !== undefined) {
+            console.error(`[API_ERROR] Vector store count attempted:`, data.vectorStoreCount);
+            console.error(`[API_ERROR] Vector store IDs attempted:`, data.vectorStoreIds);
+          }
+          throw new Error(errorMsg);
         }
         
-        return true;
+        // Return data object to include vector store names for progress display
+        return data;
       } catch (err) {
+        // Clear timeout interval on error
+        if (timeoutId) {
+          clearInterval(timeoutId);
+        }
         // Handle abort error specifically
-        if (err instanceof Error && err.name === 'AbortError') {
+        if (err instanceof Error && (err.name === 'AbortError' || err.message === 'Request timeout')) {
           console.error(`Request timeout for requirement ${requirementId}`);
           throw new Error(`Request timed out after 60 seconds`);
         }
@@ -1001,7 +1279,14 @@ export default function ViewData() {
       });
       
       if (!response.ok) {
-        throw new Error(`Failed to generate response: ${response.status} ${response.statusText}`);
+        let errMsg = `Failed to generate response: ${response.status} ${response.statusText}`;
+        try {
+          const errJson = await response.json();
+          if (errJson?.message) errMsg = errJson.message;
+        } catch (_err) {
+          // ignore parse failure
+        }
+        throw new Error(errMsg);
       }
       
       // Update to saving response stage
@@ -1016,6 +1301,18 @@ export default function ViewData() {
         throw new Error(data.error || 'Failed to generate response');
       }
       
+      // Update progress with vector store names if available (for EKG)
+      if (data.vectorStoreNames && Array.isArray(data.vectorStoreNames) && data.vectorStoreNames.length > 0) {
+        setProcessingIndividualItems(prev => ({
+          ...prev,
+          [requirementId]: { 
+            ...prev[requirementId], 
+            stage: `Using vector stores: ${data.vectorStoreNames.join(', ')}`,
+            vectorStores: data.vectorStoreNames
+          }
+        }));
+      }
+      
       // Update the selected response with the generated response
       if (selectedResponse && selectedResponse.id === requirementId) {
         setSelectedResponse({
@@ -1024,8 +1321,16 @@ export default function ViewData() {
           openaiResponse: data.openaiResponse || selectedResponse.openaiResponse,
           anthropicResponse: data.anthropicResponse || selectedResponse.anthropicResponse,
           deepseekResponse: data.deepseekResponse || selectedResponse.deepseekResponse,
-          moaResponse: data.moaResponse || selectedResponse.moaResponse
-        });
+          moaResponse: data.moaResponse || selectedResponse.moaResponse,
+          modelProvider: data.modelProvider || selectedResponse.modelProvider,
+          ekgStatus: (data as any).ekgStatus || (selectedResponse as any).ekgStatus,
+          ekgAvailableFeatures: (data as any).ekgAvailableFeatures || (selectedResponse as any).ekgAvailableFeatures,
+          ekgGapsCustomizations: (data as any).ekgGapsCustomizations || (selectedResponse as any).ekgGapsCustomizations,
+          fitmentScore: (data as any).fitmentScore !== undefined ? (data as any).fitmentScore : (selectedResponse as any).fitmentScore,
+          vectorStoreIds: (data as any).vectorStoreIds || (selectedResponse as any).vectorStoreIds,
+          vectorStoreNames: (data as any).vectorStoreNames || (selectedResponse as any).vectorStoreNames,
+          similarQuestions: (data as any).similarQuestions || selectedResponse.similarQuestions
+        } as any);
         
         // Set tab to response view since we now have a response
         setActiveTab('response');
@@ -1063,7 +1368,12 @@ export default function ViewData() {
                 anthropicResponse: data.anthropicResponse || item.anthropicResponse,
                 deepseekResponse: data.deepseekResponse || item.deepseekResponse,
                 moaResponse: data.moaResponse || item.moaResponse,
-                modelProvider: data.modelProvider || item.modelProvider
+                modelProvider: data.modelProvider || item.modelProvider,
+                ekgStatus: (data as any).ekgStatus || (item as any).ekgStatus,
+                ekgAvailableFeatures: (data as any).ekgAvailableFeatures || (item as any).ekgAvailableFeatures,
+                ekgGapsCustomizations: (data as any).ekgGapsCustomizations || (item as any).ekgGapsCustomizations,
+                similarQuestions: (data as any).similarQuestions || item.similarQuestions,
+                vectorStoreNames: (data as any).vectorStoreNames || (item as any).vectorStoreNames
               };
             }
             return item;
@@ -1181,8 +1491,20 @@ export default function ViewData() {
     }
   };
   
+  // Cancel handler for response generation
+  const handleCancelGeneration = () => {
+    setIsCancelling(true);
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    toast({
+      title: "Cancelling Generation",
+      description: "Stopping response generation...",
+    });
+  };
+  
   // Optimized function to handle bulk generation of responses
-  const handleGenerateResponses = async (modelProvider: 'openai' | 'anthropic' | 'deepseek' | 'moa') => {
+  const handleGenerateResponses = async (modelProvider: 'openai' | 'anthropic' | 'deepseek' | 'moa' | 'ekg') => {
     if (selectedItems.length === 0) {
       toast({
         title: "No Items Selected",
@@ -1191,6 +1513,10 @@ export default function ViewData() {
       });
       return;
     }
+    
+    // Reset cancel flag and create new AbortController
+    setIsCancelling(false);
+    abortControllerRef.current = new AbortController();
     
     // Reset any stale progress indicators before starting
     setIsGeneratingResponse(false);
@@ -1220,9 +1546,10 @@ export default function ViewData() {
         description: `Processing ${totalItems} requirements with ${modelProvider}...`,
       });
       
-      // For LLM requests, we want to be careful with concurrency to avoid rate limits
-      // So we'll process items in small batches with throttling
-      const BATCH_SIZE = modelProvider === 'moa' ? 1 : 2; // MOA makes 3 API calls, so use smaller batch size
+      // For LLM requests, we use parallel processing to maximize throughput
+      // MOA makes 3 API calls per requirement, so use smaller batch size
+      // Other models can handle more parallelism
+      const BATCH_SIZE = modelProvider === 'moa' ? 2 : 5; // Process 5 items in parallel for most models, 2 for MOA
       
       // Cache the requirements lookup for performance
       const requirementsMap = new Map(
@@ -1233,16 +1560,26 @@ export default function ViewData() {
       
       // Process items in small concurrent batches
       for (let i = 0; i < selectedItems.length; i += BATCH_SIZE) {
+        // Check if cancellation was requested
+        if (isCancelling || abortControllerRef.current?.signal.aborted) {
+          console.log('Generation cancelled by user');
+          break;
+        }
+        
         const currentBatch = selectedItems.slice(i, i + BATCH_SIZE);
         
-        // Process this batch with limited concurrency
+        // Process this batch with true parallel execution
+        // Log batch start for debugging
+        console.log(`[PARALLEL] Starting batch ${Math.floor(i / BATCH_SIZE) + 1} with ${currentBatch.length} items at ${new Date().toISOString()}`);
+        const batchStartTime = Date.now();
+        
         const batchPromises = currentBatch.map(async (requirementId, batchIndex) => {
+          // Check cancellation before processing each item
+          if (isCancelling || abortControllerRef.current?.signal.aborted) {
+            return false;
+          }
           try {
-            // Stagger requests within batch by 200ms to reduce API load spikes
-            if (batchIndex > 0) {
-              await new Promise(resolve => setTimeout(resolve, batchIndex * 200));
-            }
-            
+            // Process items in parallel - all items in batch start simultaneously
             const requirement = requirementsMap.get(requirementId);
             
             if (!requirement) {
@@ -1252,33 +1589,75 @@ export default function ViewData() {
             
             const reqText = requirement.requirement || "";
             const shortText = reqText.length > 50 ? reqText.substring(0, 50) + '...' : reqText;
+            const reqRfpName = requirement.rfpName || 'Unknown RFP';
+            
+            // Log individual item start with RFP name for validation
+            const itemStartTime = Date.now();
+            console.log(`[PARALLEL] Starting item ${requirementId} (RFP: ${reqRfpName}, batch index ${batchIndex}) at ${new Date().toISOString()}`);
             
             // Add this item to the individual processing indicators
             setProcessingIndividualItems(prev => ({
               ...prev,
               [requirementId]: { 
-                stage: `Processing ${i + batchIndex + 1}/${totalItems}`, 
+                stage: `Processing ${i + batchIndex + 1}/${totalItems} (${reqRfpName})`, 
                 model: modelProvider 
               }
             }));
             
-            // Generate response for this requirement
+            // Generate response for this requirement (this is the actual parallel work)
+            // Each requirement will use its own RFP's vector stores (validated on backend)
             const result = await generateResponseForRequirement(requirementId, modelProvider);
             
+            const itemDuration = Date.now() - itemStartTime;
+            console.log(`[PARALLEL] Completed item ${requirementId} (RFP: ${reqRfpName}) in ${itemDuration}ms`);
+            
+            // Update progress with vector store info if available (from API response)
+            // The API response will include vectorStoreNames for EKG responses
+            if (result && typeof result === 'object' && 'vectorStoreNames' in result) {
+              const vectorStoreNames = (result as any).vectorStoreNames;
+              if (Array.isArray(vectorStoreNames) && vectorStoreNames.length > 0) {
+                setProcessingIndividualItems(prev => ({
+                  ...prev,
+                  [requirementId]: { 
+                    ...prev[requirementId], 
+                    stage: `Using: ${vectorStoreNames.join(', ')}`,
+                    vectorStores: vectorStoreNames
+                  }
+                }));
+              }
+            }
+            
             // Invalidate cache after each successful generation to update UI immediately
-            if (result) {
+            // result can be true, false, or an object with response data
+            const success = result === true || (result && typeof result === 'object' && result.success !== false);
+            if (success) {
               await queryClient.invalidateQueries({ queryKey: ['/api/excel-requirements'] });
             }
             
-            return result;
+            return success;
           } catch (error) {
-            console.error(`Error in batch processing for req ${requirementId}:`, error);
+            console.error(`[BATCH_ERROR] Error in batch processing for req ${requirementId}:`, error);
+            // Show error toast for individual item failures
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            toast({
+              title: `Generation Failed for Requirement ${requirementId}`,
+              description: errorMessage,
+              variant: "destructive",
+            });
             return false;
           }
         });
         
-        // Wait for the current batch to complete
+        // Wait for the current batch to complete - all items process in parallel
         const batchResults = await Promise.all(batchPromises);
+        const batchDuration = Date.now() - batchStartTime;
+        console.log(`[PARALLEL] Completed batch ${Math.floor(i / BATCH_SIZE) + 1} in ${batchDuration}ms (${currentBatch.length} items processed in parallel)`);
+        
+        // Check if cancelled during batch processing
+        if (isCancelling || abortControllerRef.current?.signal.aborted) {
+          console.log('Generation cancelled during batch processing');
+          break;
+        }
         
         // Count successes in this batch
         successCount += batchResults.filter(Boolean).length;
@@ -1289,10 +1668,41 @@ export default function ViewData() {
           completed: Math.min(prev.completed + currentBatch.length, prev.total)
         }));
         
-        // Small delay between batches to avoid overloading the server
-        if (i + BATCH_SIZE < selectedItems.length) {
-          await new Promise(resolve => setTimeout(resolve, 500));
+        // Small delay between batches to avoid overloading the server/API
+        // Reduced delay since we're processing in parallel batches
+        if (i + BATCH_SIZE < selectedItems.length && !isCancelling && !abortControllerRef.current?.signal.aborted) {
+          // Only a brief delay between batches to prevent API rate limiting
+          await new Promise<void>(resolve => {
+            const start = Date.now();
+            const delay = 200; // Reduced from 500ms since we're using parallel processing
+            const checkInterval = setInterval(() => {
+              // Check actual elapsed time, not just interval count
+              const elapsed = Date.now() - start;
+              if (elapsed >= delay) {
+                clearInterval(checkInterval);
+                resolve();
+              }
+              // Also check if cancelled
+              if (isCancelling || abortControllerRef.current?.signal.aborted) {
+                clearInterval(checkInterval);
+                resolve();
+              }
+            }, Math.min(50, delay / 4)); // Check frequently but not too often
+          });
         }
+      }
+      
+      // If cancelled, show cancellation message
+      if (isCancelling || abortControllerRef.current?.signal.aborted) {
+        toast({
+          title: "Generation Cancelled",
+          description: `Stopped after generating ${successCount} out of ${totalItems} responses.`,
+          variant: "default",
+        });
+        // Invalidate cache to refresh UI
+        await queryClient.invalidateQueries({ queryKey: ['/api/excel-requirements'] });
+        await refetch();
+        return;
       }
       
       // Invalidate and refresh data after all items are processed
@@ -1322,6 +1732,10 @@ export default function ViewData() {
         variant: "destructive",
       });
     } finally {
+      // Reset cancel flag
+      setIsCancelling(false);
+      abortControllerRef.current = null;
+      
       // Keep status visible for a moment
       setTimeout(() => {
         setIsGenerating(false);
@@ -1560,6 +1974,135 @@ export default function ViewData() {
       });
     }
   };
+
+  // Helper function to parse subrequirements for export
+  const parseSubreqsForExport = (value: any): any[] => {
+    if (!value) return [];
+    if (Array.isArray(value)) return value;
+    if (typeof value === 'string') {
+      try {
+        const parsed = JSON.parse(value);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch {
+        return [];
+      }
+    }
+    return [];
+  };
+
+  // Helper function to parse string arrays for export
+  const parseStrArrayForExport = (value: any): string[] => {
+    if (!value) return [];
+    if (Array.isArray(value)) return value.map(v => String(v));
+    if (typeof value === 'string') {
+      try {
+        const parsed = JSON.parse(value);
+        return Array.isArray(parsed) ? parsed.map((v: any) => String(v)) : [];
+      } catch {
+        return [];
+      }
+    }
+    return [];
+  };
+
+  // Helper function to parse number
+  const parseNumForExport = (value: any): number | null => {
+    if (value === null || value === undefined) return null;
+    const num = typeof value === 'string' ? Number(value) : value;
+    if (typeof num === 'number' && !Number.isNaN(num)) return num;
+    return null;
+  };
+
+  // Function to export selected items as EKG Assessment Excel
+  const handleExportEkgAssessments = async () => {
+    const selectedData = excelData.filter(item => selectedItems.includes(item.id || 0));
+
+    if (selectedData.length === 0) {
+      toast({
+        title: "No Data Found",
+        description: "Select at least one item to export EKG assessments.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Check if any selected items have EKG data
+    const itemsWithEkg = selectedData.filter(item => 
+      (item as any).ekgStatus || 
+      (item as any).ekgAvailableFeatures || 
+      (item as any).ekgSubrequirements
+    );
+
+    if (itemsWithEkg.length === 0) {
+      toast({
+        title: "No EKG Data",
+        description: "None of the selected items have EKG assessment data. Generate EKG responses first.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      // Get RFP name and creator from first item
+      const rfpNames = new Set(selectedData.map(item => item.rfpName).filter(Boolean));
+      const rfpName = rfpNames.size === 1 ? Array.from(rfpNames)[0] || "Unknown RFP" : `Multiple RFPs (${rfpNames.size})`;
+      
+      const creators = new Set(selectedData.map(item => item.uploadedBy).filter(Boolean));
+      const creatorName = creators.size === 1 ? Array.from(creators)[0] || "Unknown" : `Multiple (${creators.size})`;
+
+      // Build export data structure with original items for event mapping
+      const exportData: MultiEkgExportData & { originalItems?: typeof selectedData } = {
+        rfpName,
+        creatorName,
+        originalItems: selectedData,  // Pass original items for event mapping data
+        items: selectedData.map(item => {
+          const subreqs = parseSubreqsForExport((item as any).ekgSubrequirements);
+          const fitmentRaw = parseNumForExport((item as any).ekgOverallFitmentPercentage);
+          const fitmentFromScore = parseNumForExport((item as any).fitmentScore);
+          const fitmentPercentage = fitmentRaw !== null 
+            ? Math.round(fitmentRaw) 
+            : (fitmentFromScore !== null ? Math.round(fitmentFromScore * 100) : null);
+
+          return {
+            requirementId: item.id || 0,
+            requirementText: item.requirement || '',
+            category: item.category || 'Uncategorized',
+            ekgStatus: String((item as any).ekgStatus || '').replace('_', ' '),
+            fitmentPercentage,
+            response: (item as any).ekgCustomerResponse || item.finalResponse || '',
+            availableFeatures: parseStrArrayForExport((item as any).ekgAvailableFeatures),
+            gapsCustomizations: parseStrArrayForExport((item as any).ekgGapsCustomizations),
+            subrequirements: subreqs.map((sr: any, idx: number) => ({
+              id: sr?.id || `SR${idx + 1}`,
+              title: sr?.title || sr?.description || '',
+              status: (sr?.status || '').replace('_', ' '),
+              weight: parseNumForExport(sr?.weight),
+              fitment: parseNumForExport(sr?.fitment_percentage),
+              integrationRelated: Boolean(sr?.integration_related),
+              reportingRelated: Boolean(sr?.reporting_related),
+              customizationNotes: sr?.customization_notes || '',
+              referencesCount: Array.isArray(sr?.references) ? sr.references.length : 0
+            }))
+          };
+        })
+      };
+
+      const filename = `ekg-assessment-${rfpName.replace(/[^a-zA-Z0-9]/g, '-')}-${new Date().toISOString().split('T')[0]}.xlsx`;
+      await downloadMultiEkgAssessmentExcel(exportData, filename);
+
+      toast({
+        title: "EKG Assessment Export",
+        description: `${selectedData.length} items exported to Excel.`,
+      });
+    } catch (error) {
+      console.error('Error exporting EKG assessments:', error);
+      toast({
+        title: "Export Failed",
+        description: error instanceof Error ? error.message : "Failed to export EKG assessments.",
+        variant: "destructive"
+      });
+    }
+  };
   
   const handleExportPdf = () => {
     const selectedData = excelData.filter(item => selectedItems.includes(item.id || 0));
@@ -1697,7 +2240,14 @@ export default function ViewData() {
         });
 
         if (!response.ok) {
-          throw new Error(`Failed to generate response for requirement ${requirement.id}`);
+          let errMsg = `Failed to generate response for requirement ${requirement.id}`;
+          try {
+            const errJson = await response.json();
+            if (errJson?.message) errMsg = errJson.message;
+          } catch (_err) {
+            // ignore parse failure
+          }
+          throw new Error(errMsg);
         }
         
         // Update bulk generation progress
@@ -1723,8 +2273,14 @@ export default function ViewData() {
             anthropicResponse: result.anthropicResponse || selectedResponse.anthropicResponse,
             deepseekResponse: result.deepseekResponse || selectedResponse.deepseekResponse,
             moaResponse: result.moaResponse || selectedResponse.moaResponse,
-            modelProvider: result.modelProvider || selectedResponse.modelProvider
-          });
+            modelProvider: result.modelProvider || selectedResponse.modelProvider,
+            ekgStatus: (result as any).ekgStatus || (selectedResponse as any).ekgStatus,
+            ekgAvailableFeatures: (result as any).ekgAvailableFeatures || (selectedResponse as any).ekgAvailableFeatures,
+            ekgGapsCustomizations: (result as any).ekgGapsCustomizations || (selectedResponse as any).ekgGapsCustomizations,
+            fitmentScore: (result as any).fitmentScore !== undefined ? (result as any).fitmentScore : (selectedResponse as any).fitmentScore,
+            similarQuestions: (result as any).similarQuestions || selectedResponse.similarQuestions,
+            vectorStoreNames: (result as any).vectorStoreNames || (selectedResponse as any).vectorStoreNames
+          } as any);
           
           // Set tab to response view since we now have a response
           setActiveTab('response');
@@ -1792,6 +2348,9 @@ export default function ViewData() {
       case 'generate-moa':
         handleGenerateResponses('moa');
         break;
+      case 'generate-ekg':
+        handleGenerateResponses('ekg');
+        break;
       case 'print':
         handleExportToMarkdown();
         break;
@@ -1800,6 +2359,9 @@ export default function ViewData() {
         break;
       case 'event-mapping-csv':
         handleExportEventMappings();
+        break;
+      case 'ekg-assessment':
+        handleExportEkgAssessments();
         break;
       case 'mail':
         handleEmailMarkdown();
@@ -1814,8 +2376,7 @@ export default function ViewData() {
         mapEventsForBulk();
         break;
       case 'delete':
-        console.log('Delete items:', selectedItems);
-        alert(`Delete answers for ${selectedItems.length} selected items`);
+        setShowDeleteDialog(true);
         break;
       default:
         console.log('Unknown action:', action);
@@ -1838,6 +2399,85 @@ export default function ViewData() {
       title: "Mapping complete",
       description: `Mapped events for ${success} of ${selectedItems.length} items.`
     });
+  };
+
+  const handleDeleteRequirements = async () => {
+    if (selectedItems.length === 0) {
+      toast({
+        title: "No Items Selected",
+        description: "Please select at least one requirement to delete",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      let response: Response;
+      try {
+        response = await fetch('/api/excel-requirements/bulk-delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ids: selectedItems }),
+        });
+      } catch (networkError: any) {
+        // Handle network errors (server not reachable, CORS, etc.)
+        console.error('Network error during delete:', networkError);
+        throw new Error(`Failed to connect to server: ${networkError.message || 'Network error'}`);
+      }
+
+      if (!response.ok) {
+        // Try to parse as JSON, but handle HTML error pages
+        let errorMessage = 'Failed to delete requirements';
+        try {
+          const contentType = response.headers.get('content-type');
+          if (contentType && contentType.includes('application/json')) {
+            const errorData = await response.json();
+            errorMessage = errorData.message || errorData.error || errorMessage;
+          } else {
+            // If it's HTML or other format, read as text
+            const text = await response.text();
+            errorMessage = `Server error (${response.status}): ${text.substring(0, 100)}`;
+          }
+        } catch (parseError) {
+          errorMessage = `Server error (${response.status}). Please check server logs.`;
+        }
+        throw new Error(errorMessage);
+      }
+
+      const result = await response.json();
+      
+      // Close the dialog
+      setShowDeleteDialog(false);
+      
+      // Clear selected items
+      setSelectedItems([]);
+      setSelectAll(false);
+      
+      // Close response dialog if a deleted item was being viewed
+      if (selectedResponseId && selectedItems.includes(selectedResponseId)) {
+        setShowResponseDialog(false);
+        setSelectedResponse(null);
+        setSelectedResponseId(null);
+      }
+      
+      // Invalidate and refetch data
+      queryClient.invalidateQueries({ queryKey: ['/api/excel-requirements'] });
+      
+      toast({
+        title: "Requirements Deleted",
+        description: `Successfully deleted ${result.deletedCount} requirement(s) and all associated data (answers, references, fitment scores).`,
+      });
+    } catch (error) {
+      console.error('Error deleting requirements:', error);
+      toast({
+        title: "Delete Failed",
+        description: error instanceof Error ? error.message : "Failed to delete requirements. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeleting(false);
+    }
   };
   
   return (
@@ -1876,13 +2516,35 @@ export default function ViewData() {
       
       {/* ACCESSIBILITY: Progress bar for bulk generation operations with live region */}
       {bulkGenerationProgress.isProcessing && (
-        <div className="fixed top-0 left-0 right-0 z-50 bg-white dark:bg-slate-800 p-3 shadow-md" role="status" aria-live="polite" aria-atomic="true">
+        <div className="fixed top-0 left-0 right-0 z-50 bg-white dark:bg-slate-800 p-3 shadow-md border-b border-slate-200 dark:border-slate-700" role="status" aria-live="polite" aria-atomic="true">
           <div className="max-w-7xl mx-auto">
-            <div className="flex items-center gap-3 mb-2">
-              <Loader2 className="animate-spin h-5 w-5 text-primary" aria-hidden="true" />
-              <p className="font-medium text-sm">
-                Generating responses with {bulkGenerationProgress.model} for {bulkGenerationProgress.completed}/{bulkGenerationProgress.total} requirements
-              </p>
+            <div className="flex items-center justify-between gap-3 mb-2">
+              <div className="flex items-center gap-3 flex-1">
+                <Loader2 className="animate-spin h-5 w-5 text-primary" aria-hidden="true" />
+                <p className="font-medium text-sm">
+                  Generating responses with {bulkGenerationProgress.model} for {bulkGenerationProgress.completed}/{bulkGenerationProgress.total} requirements
+                  {bulkGenerationProgress.model?.toLowerCase() === 'ekg' && ' (using bound vector stores per RFP)'}
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleCancelGeneration}
+                disabled={isCancelling}
+                className="h-8 px-3 text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:text-red-300 dark:hover:bg-red-950/40"
+              >
+                {isCancelling ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                    <span>Cancelling...</span>
+                  </>
+                ) : (
+                  <>
+                    <CloseIcon className="h-4 w-4 mr-1.5" />
+                    <span>Cancel</span>
+                  </>
+                )}
+              </Button>
             </div>
             <Progress value={(bulkGenerationProgress.completed / bulkGenerationProgress.total) * 100} 
               className="h-2" aria-label={`Progress: ${bulkGenerationProgress.completed} of ${bulkGenerationProgress.total} responses generated`} />
@@ -1919,10 +2581,35 @@ export default function ViewData() {
       )}
       
       {/* Sticky header with all controls */}
-      <div className="sticky top-0 z-20 bg-slate-50 dark:bg-slate-900 py-3 px-4 -mx-4 sm:-mx-6 md:-mx-8 lg:-mx-10 shadow-md">
+      <div className="sticky top-0 z-30 bg-slate-50 dark:bg-slate-900 py-3 px-4 -mx-4 sm:-mx-6 md:-mx-8 lg:-mx-10 shadow-md border-b border-slate-200 dark:border-slate-700">
         <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <h1 className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-primary to-primary/70 text-transparent bg-clip-text">View Requirements</h1>
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-3">
+              <h1 className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-primary to-primary/70 text-transparent bg-clip-text">Generate Responses</h1>
+              
+              <div className="flex items-center gap-2">
+                <Label htmlFor="header-rfp-select" className="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+                  RFP
+                </Label>
+                <Select
+                  value={filters.rfpName}
+                  onValueChange={(value) => setFilters({...filters, rfpName: value})}
+                >
+                  <SelectTrigger
+                    id="header-rfp-select"
+                    className="h-9 w-[180px] bg-white/80 dark:bg-slate-800/80 border-slate-200 dark:border-slate-700"
+                  >
+                    <SelectValue placeholder="All RFPs" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All RFPs</SelectItem>
+                    {uniqueRfpNames.filter(name => name).map(name => (
+                      <SelectItem key={name} value={name}>{name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
             
             <p className="text-sm text-slate-600 dark:text-slate-300 whitespace-nowrap">
               {filteredData.length} {filteredData.length === 1 ? 'item' : 'items'}
@@ -1946,6 +2633,18 @@ export default function ViewData() {
                 Select All
               </label>
             </div>
+            
+            {/* Guided Walkthrough Button */}
+            <Button 
+              size="sm" 
+              className="h-8"
+              variant="outline"
+              onClick={() => { setShowTour(!showTour); setShowTourOverlay(!showTour); setTourStep(0); }}
+              title="Start guided walkthrough"
+            >
+              <BookOpen className="h-4 w-4 mr-1.5 text-purple-500" />
+              <span>Guided Walkthrough</span>
+            </Button>
             
             {/* Generate Answer and Map Events */}
             <div className="flex space-x-2">
@@ -1974,6 +2673,10 @@ export default function ViewData() {
                   <DropdownMenuItem onClick={() => generateResponse('deepseek')} className="gap-2">
                     <Brain className="h-4 w-4 text-amber-500" />
                     <span>DeepSeek</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => generateResponse('ekg')} className="gap-2">
+                    <Network className="h-4 w-4 text-purple-500" />
+                    <span>EKG (OpenAI)</span>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => handleBulkAction('generate-moa')} className="gap-2">
@@ -2031,6 +2734,10 @@ export default function ViewData() {
                 <DropdownMenuItem onClick={handleExportEventMappings} className="gap-2">
                   <MapPin className="h-4 w-4 text-purple-500" />
                   <span>Event mapping (csv)</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleExportEkgAssessments} className="gap-2">
+                  <Activity className="h-4 w-4 text-purple-600" />
+                  <span>EKG Assessment (Excel)</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={handleEmailMarkdown} className="gap-2">
                   <Mail className="h-4 w-4" />
@@ -2117,24 +2824,24 @@ export default function ViewData() {
               </DropdownMenuContent>
             </DropdownMenu>
             
-            {/* Refresh Button */}
+            {/* Delete Button */}
             <Button 
               size="sm" 
-              onClick={handleRefresh}
-              className="h-8 px-3"
-              variant="outline"
-              title="Refresh all data from database"
-              disabled={loading}
+              onClick={() => handleBulkAction('delete')}
+              className="h-8 px-3 bg-red-600 hover:bg-red-700 text-white"
+              variant="default"
+              title="Delete selected requirements"
+              disabled={selectedItems.length === 0 || isDeleting}
             >
-              {loading ? (
+              {isDeleting ? (
                 <>
-                  <RefreshCcw className="h-4 w-4 mr-1.5 animate-spin" />
-                  <span>Refreshing...</span>
+                  <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                  <span>Deleting...</span>
                 </>
               ) : (
                 <>
-                  <RefreshCcw className="h-4 w-4 mr-1.5" />
-                  <span>Refresh Data</span>
+                  <Trash2 className="h-4 w-4 mr-1.5" />
+                  <span>Delete</span>
                 </>
               )}
             </Button>
@@ -2142,61 +2849,27 @@ export default function ViewData() {
         </div>
       </div>
       
-      {/* Outcome-first snapshot */}
-      <Card className="shadow-sm">
-        <CardContent className="py-4 sm:py-5">
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-            <div>
-              <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-50">Progress overview</h3>
-              <p className="text-sm text-slate-600 dark:text-slate-300">Track how many requirements are answered and which need attention.</p>
+      {/* Lightweight tour mode - Steps only (button moved to header) */}
+      {showTour && (
+        <Card className="shadow-sm">
+          <CardContent className="py-4 sm:py-5">
+            <div className="flex items-start justify-between gap-2 mb-4">
+              <div>
+                <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-50">Guided walkthrough</h3>
+                <p className="text-sm text-slate-600 dark:text-slate-300">Follow the core workflow: upload → select → generate → export.</p>
+              </div>
+              <Button variant="outline" size="sm" onClick={() => { setShowTour(false); setShowTourOverlay(false); setTourStep(0); }}>
+                Hide steps
+              </Button>
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 w-full lg:w-auto">
-              <div className="p-3 rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900">
-                <p className="text-xs text-slate-500">Total</p>
-                <p className="text-xl font-bold">{outcomeSummary.total}</p>
-              </div>
-              <div className="p-3 rounded-md border border-green-200 dark:border-green-900 bg-green-50 dark:bg-green-950/40">
-                <p className="text-xs text-green-700 dark:text-green-300">Completed</p>
-                <p className="text-xl font-bold text-green-700 dark:text-green-200">{outcomeSummary.completed}</p>
-              </div>
-              <div className="p-3 rounded-md border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/40">
-                <p className="text-xs text-amber-700 dark:text-amber-300">Pending</p>
-                <p className="text-xl font-bold text-amber-700 dark:text-amber-200">{outcomeSummary.pending}</p>
-              </div>
-              <div className="p-3 rounded-md border border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-950/40">
-                <p className="text-xs text-blue-700 dark:text-blue-300">With references</p>
-                <p className="text-xl font-bold text-blue-700 dark:text-blue-200">{outcomeSummary.withRefs}</p>
-              </div>
-            </div>
-          </div>
-          <div className="mt-3">
-            <Progress value={outcomeSummary.completionPct} className="h-2" />
-            <p className="text-xs text-slate-500 mt-1">{outcomeSummary.completionPct}% completed</p>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Lightweight tour mode */}
-      <Card className="shadow-sm">
-        <CardContent className="py-4 sm:py-5">
-          <div className="flex items-start justify-between gap-2">
-            <div>
-              <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-50">Guided walkthrough</h3>
-              <p className="text-sm text-slate-600 dark:text-slate-300">Follow the core workflow: upload → select → generate → export.</p>
-            </div>
-            <Button variant="outline" size="sm" onClick={() => { setShowTour(!showTour); setShowTourOverlay(!showTour); setTourStep(0); }}>
-              {showTour ? 'Hide steps' : 'Start tour'}
-            </Button>
-          </div>
-          {showTour && (
-            <div className="grid md:grid-cols-4 gap-3 mt-4 text-sm">
+            <div className="grid md:grid-cols-4 gap-3 text-sm">
               <div className="p-3 rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900">
                 <p className="font-semibold">1. Upload</p>
                 <p className="text-slate-600 dark:text-slate-300">Go to Upload, grab the sample file, map columns, and ingest.</p>
               </div>
               <div className="p-3 rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900">
                 <p className="font-semibold">2. Select & find</p>
-                <p className="text-slate-600 dark:text-slate-300">Pick requirements, run “Past responses” to populate references.</p>
+                <p className="text-slate-600 dark:text-slate-300">Pick requirements, run "Past responses" to populate references.</p>
               </div>
               <div className="p-3 rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900">
                 <p className="font-semibold">3. Generate & compare</p>
@@ -2207,9 +2880,9 @@ export default function ViewData() {
                 <p className="text-slate-600 dark:text-slate-300">Export markdown/Excel/Word; run consistency check before sending.</p>
               </div>
             </div>
-          )}
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Tour overlay */}
       {showTourOverlay && (
@@ -2266,7 +2939,7 @@ export default function ViewData() {
                   <div className="flex flex-col xs:flex-row justify-between items-start xs:items-center gap-2 xs:gap-0">
                     <div className="flex items-center gap-2">
                       <h3 className="font-medium text-base">Filter Requirements</h3>
-                      <HelpTooltip text="Use these filters to narrow down the list of requirements based on different criteria. You can filter by RFP name, category, response status, and AI model type." />
+                      <HelpTooltip text="Use these filters to narrow down the list of requirements based on different criteria. You can filter by category, response status, and requirement ID. Use the RFP selector in the header to switch documents." />
                     </div>
                     
                     <DropdownMenu>
@@ -2302,6 +2975,10 @@ export default function ViewData() {
                           <Brain className="h-4 w-4 text-amber-500" />
                           <span>DeepSeek</span>
                         </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => generateResponse('ekg')} className="gap-2">
+                          <Network className="h-4 w-4 text-purple-500" />
+                          <span>EKG (OpenAI)</span>
+                        </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem onClick={() => handleBulkAction('generate-moa')} className="gap-2">
                           <Network className="h-4 w-4 text-green-500" />
@@ -2314,43 +2991,7 @@ export default function ViewData() {
                   {/* Mobile-friendly accordion for filters */}
                   {isMobile ? (
                     <div className="rounded-md border border-slate-200 dark:border-slate-700 overflow-hidden">
-                      {/* RFP Name Accordion */}
                       <Accordion type="single" collapsible className="w-full">
-                        <AccordionItem value="rfp-name" className="border-0 border-b">
-                          <AccordionTrigger className="px-3 py-2 hover:no-underline hover:bg-slate-50 dark:hover:bg-slate-800">
-                            <div className="flex items-center gap-2">
-                              <FileText className="h-4 w-4 text-slate-600 dark:text-slate-300" aria-hidden="true" />
-                              <span className="text-sm font-medium">RFP Name</span>
-                              {filters.rfpName !== 'all' && (
-                                <Badge variant="outline" className="ml-2 text-[10px]">
-                                  {filters.rfpName}
-                                </Badge>
-                              )}
-                            </div>
-                          </AccordionTrigger>
-                          <AccordionContent className="px-3 py-2">
-                            <div className="space-y-1">
-                              <Label className="text-xs text-slate-500 dark:text-slate-400">
-                                Select RFP
-                              </Label>
-                              <Select
-                                value={filters.rfpName}
-                                onValueChange={(value) => setFilters({...filters, rfpName: value})}
-                              >
-                                <SelectTrigger className="h-8 text-xs">
-                                  <SelectValue placeholder="Select RFP" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="all">All RFPs</SelectItem>
-                                  {uniqueRfpNames.filter(name => name).map(name => (
-                                    <SelectItem key={name} value={name}>{name}</SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                          </AccordionContent>
-                        </AccordionItem>
-                        
                         {/* Category Accordion */}
                         <AccordionItem value="category" className="border-0 border-b">
                           <AccordionTrigger className="px-3 py-2 hover:no-underline hover:bg-slate-50 dark:hover:bg-slate-800">
@@ -2426,11 +3067,11 @@ export default function ViewData() {
                         <AccordionItem value="model-provider" className="border-0">
                           <AccordionTrigger className="px-3 py-2 hover:no-underline hover:bg-slate-50 dark:hover:bg-slate-800">
                             <div className="flex items-center gap-2">
-                              <Sparkles className="h-4 w-4 text-slate-600 dark:text-slate-300" aria-hidden="true" />
-                              <span className="text-sm font-medium">Model Provider</span>
-                              {filters.generationMode !== 'all' && (
+                              <Hash className="h-4 w-4 text-slate-600 dark:text-slate-300" aria-hidden="true" />
+                              <span className="text-sm font-medium">Requirement ID</span>
+                              {filters.requirementId !== '' && (
                                 <Badge variant="outline" className="ml-2 text-[10px]">
-                                  {filters.generationMode}
+                                  {filters.requirementId}
                                 </Badge>
                               )}
                             </div>
@@ -2438,51 +3079,22 @@ export default function ViewData() {
                           <AccordionContent className="px-3 py-2">
                             <div className="space-y-1">
                               <Label className="text-xs text-slate-500 dark:text-slate-400">
-                                Filter by Model
+                                Filter by Requirement ID
                               </Label>
-                              <Select
-                                value={filters.generationMode}
-                                onValueChange={(value) => setFilters({...filters, generationMode: value})}
-                              >
-                                <SelectTrigger className="h-8 text-xs">
-                                  <SelectValue placeholder="Filter by Model" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="all">All Models</SelectItem>
-                                  <SelectItem value="openai">OpenAI</SelectItem>
-                                  <SelectItem value="anthropic">Anthropic</SelectItem>
-                                  <SelectItem value="deepseek">Deepseek</SelectItem>
-                                  <SelectItem value="moa">MOA</SelectItem>
-                                </SelectContent>
-                              </Select>
+                              <Input
+                                type="text"
+                                placeholder="Enter requirement ID"
+                                value={filters.requirementId}
+                                onChange={(e) => setFilters({...filters, requirementId: e.target.value})}
+                                className="h-8 text-xs"
+                              />
                             </div>
                           </AccordionContent>
                         </AccordionItem>
                       </Accordion>
                     </div>
                   ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-                      <div className="space-y-1.5">
-                        <div className="flex items-center gap-2">
-                          <Label htmlFor="filter-rfp" className="text-sm">RFP Name</Label>
-                          <HelpTooltip text="Filter requirements by their source RFP document name. Choose 'All RFPs' to see requirements across all documents." />
-                        </div>
-                        <Select
-                          value={filters.rfpName}
-                          onValueChange={(value) => setFilters({...filters, rfpName: value})}
-                        >
-                          <SelectTrigger id="filter-rfp" className="w-full">
-                            <SelectValue placeholder="Select RFP name" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="all">All RFPs</SelectItem>
-                            {uniqueRfpNames.filter(name => name).map(name => (
-                              <SelectItem key={name} value={name}>{name}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                       <div className="space-y-1.5">
                         <div className="flex items-center gap-2">
                           <Label htmlFor="filter-category" className="text-sm">Category</Label>
@@ -2526,24 +3138,17 @@ export default function ViewData() {
                       
                       <div className="space-y-1.5">
                         <div className="flex items-center gap-2">
-                          <Label htmlFor="filter-model" className="text-sm">AI Model</Label>
-                          <HelpTooltip text="Filter to see only responses generated by a specific AI model. MOA combines all three models for the most comprehensive answers." />
+                          <Label htmlFor="filter-requirement-id" className="text-sm">Requirement ID</Label>
+                          <HelpTooltip text="Filter by requirement ID. Enter a specific ID or partial ID to find matching requirements." />
                         </div>
-                        <Select
-                          value={filters.generationMode}
-                          onValueChange={(value) => setFilters({...filters, generationMode: value})}
-                        >
-                          <SelectTrigger id="filter-model" className="w-full">
-                            <SelectValue placeholder="Generation Model" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="all">All Models</SelectItem>
-                            <SelectItem value="openai">OpenAI</SelectItem>
-                            <SelectItem value="anthropic">Anthropic</SelectItem>
-                            <SelectItem value="deepseek">Deepseek</SelectItem>
-                            <SelectItem value="moa">MOA</SelectItem>
-                          </SelectContent>
-                        </Select>
+                        <Input
+                          id="filter-requirement-id"
+                          type="text"
+                          placeholder="Enter requirement ID"
+                          value={filters.requirementId}
+                          onChange={(e) => setFilters({...filters, requirementId: e.target.value})}
+                          className="w-full"
+                        />
                       </div>
                     </div>
                   )}
@@ -2556,7 +3161,7 @@ export default function ViewData() {
                         rfpName: 'all',
                         category: 'all',
                         hasResponse: 'all',
-                        generationMode: 'all',
+                        requirementId: '',
                       })}
                       className="flex items-center gap-1"
                     >
@@ -2605,6 +3210,10 @@ export default function ViewData() {
                         <DropdownMenuItem onClick={() => handleBulkAction('event-mapping-csv')} className="gap-2">
                           <MapPin className="h-4 w-4 text-purple-500" />
                           <span>Event mapping (csv)</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleBulkAction('ekg-assessment')} className="gap-2">
+                          <Activity className="h-4 w-4 text-purple-600" />
+                          <span>EKG Assessment (Excel)</span>
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => handleBulkAction('mail')} className="gap-2">
                           <Mail className="h-4 w-4" />
@@ -2678,9 +3287,9 @@ export default function ViewData() {
         </Card>
       </div>
       
-      {/* MOBILE: Detail Dialog - responsive width */}
+      {/* MOBILE: Detail Dialog - responsive width - expanded for better visibility */}
       <Dialog open={showResponseDialog} onOpenChange={setShowResponseDialog}>
-        <DialogContent className="max-w-[90vw] sm:max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-[95vw] sm:max-w-7xl lg:max-w-[90vw] max-h-[95vh] overflow-y-auto">
           <DialogHeader>
             <div className="flex items-center justify-between">
               <div>
@@ -2779,44 +3388,45 @@ export default function ViewData() {
           </DialogHeader>
           
           {selectedResponse && (
-            <div className="space-y-4 py-2">
-              <div className="flex space-x-4 mb-4">
-                <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-md flex-1">
-                  <h4 className="text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">ID:</h4>
-                  <p className="text-slate-900 dark:text-slate-100 font-medium">{selectedResponse.id}</p>
+            <div className="space-y-5 py-3">
+              <div className="flex space-x-4 mb-5">
+                <div className="p-5 bg-slate-50 dark:bg-slate-800 rounded-md flex-1">
+                  <h4 className="text-sm font-semibold text-slate-600 dark:text-slate-300 mb-2">ID:</h4>
+                  <p className="text-slate-900 dark:text-slate-100 font-medium text-base">{selectedResponse.id}</p>
                 </div>
-                <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-md flex-1">
-                  <h4 className="text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">Category:</h4>
-                  <p className="text-slate-900 dark:text-slate-100 font-medium">{selectedResponse.category}</p>
+                <div className="p-5 bg-slate-50 dark:bg-slate-800 rounded-md flex-1">
+                  <h4 className="text-sm font-semibold text-slate-600 dark:text-slate-300 mb-2">Category:</h4>
+                  <p className="text-slate-900 dark:text-slate-100 font-medium text-base">{selectedResponse.category}</p>
                 </div>
               </div>
               
-              <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-md mb-4">
-                <h4 className="text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">Original Requirement:</h4>
-                <p className="text-slate-900 dark:text-slate-100">{selectedResponse.requirement}</p>
+              <div className="p-5 bg-slate-50 dark:bg-slate-800 rounded-md mb-5">
+                <h4 className="text-sm font-semibold text-slate-600 dark:text-slate-300 mb-2">Original Requirement:</h4>
+                <p className="text-slate-900 dark:text-slate-100 text-base leading-relaxed">{selectedResponse.requirement}</p>
               </div>
               
               {/* Show the question that was actually sent to LLM */}
-              <div className="p-4 bg-blue-50 dark:bg-blue-900/30 rounded-md mb-4 border border-blue-200 dark:border-blue-800">
-                <h4 className="text-sm font-medium text-blue-700 dark:text-blue-300 mb-1">
+              <div className="p-5 bg-blue-50 dark:bg-blue-900/30 rounded-md mb-5 border border-blue-200 dark:border-blue-800">
+                <h4 className="text-sm font-semibold text-blue-700 dark:text-blue-300 mb-2">
                   Question Sent to LLM:
                   {selectedResponse.elaboratedRequirement && selectedResponse.elaboratedRequirement !== selectedResponse.requirement && (
                     <span className="ml-2 text-xs font-normal text-blue-600 dark:text-blue-400">(Elaborated)</span>
                   )}
                 </h4>
-                <p className="text-slate-900 dark:text-slate-100">
+                <p className="text-slate-900 dark:text-slate-100 text-base leading-relaxed">
                   {selectedResponse.elaboratedRequirement || selectedResponse.requirement}
                 </p>
               </div>
               
-              <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-md mb-4">
-                <h4 className="text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">AI Model Used:</h4>
+              <div className="p-5 bg-slate-50 dark:bg-slate-800 rounded-md mb-5">
+                <h4 className="text-sm font-semibold text-slate-600 dark:text-slate-300 mb-2">AI Model Used:</h4>
                 <div className="flex items-center gap-2 flex-wrap">
                   <p className="text-slate-900 dark:text-slate-100">
                     {selectedResponse.modelProvider === "openai" ? "OpenAI" :
                      selectedResponse.modelProvider === "anthropic" ? "Anthropic/Claude" :
                      selectedResponse.modelProvider === "deepseek" ? "DeepSeek" :
                      selectedResponse.modelProvider === "moa" ? "Mixture of Agents (MOA)" :
+                     selectedResponse.modelProvider === "ekg" ? "OpenAI EKG" :
                      selectedResponse.modelProvider || "Not specified"}
                   </p>
                   {/* Show Event Mapped status */}
@@ -2840,19 +3450,30 @@ export default function ViewData() {
                   <TabsTrigger 
                     value="response" 
                     className="flex items-center gap-2"
-                    disabled={!selectedResponse?.finalResponse}
+                    disabled={!displayResponseText}
                   >
                     <MessageSquare className="h-4 w-4" />
                     Response
-                    {!selectedResponse?.finalResponse && <span className="ml-1 text-xs opacity-60">(Not available)</span>}
+                    {!displayResponseText && <span className="ml-1 text-xs opacity-60">(Not available)</span>}
                   </TabsTrigger>
                   <TabsTrigger 
                     value="references" 
-                    className="flex items-center gap-2"
-                    disabled={!selectedResponse?.similarQuestions}
-                  >
-                    <BookOpen className="h-4 w-4" />
-                    References
+                        className="flex items-center gap-2"
+                        disabled={!selectedResponse?.similarQuestions}
+                      >
+                        <BookOpen className="h-4 w-4" />
+                        <span className="flex items-center gap-2">
+                          <span>References</span>
+                          {selectedResponse?.modelProvider === 'ekg' && (
+                            <span className="flex items-center gap-1">
+                              {(ekgVectorStoreNames.length ? ekgVectorStoreNames : ['Product Documentation Store', 'Pre-Sales Response Store']).map((name, idx) => (
+                                <Badge key={`${name}-${idx}`} variant="outline" className="text-[10px] bg-white/60 dark:bg-slate-900/60 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700">
+                                  {name}
+                                </Badge>
+                              ))}
+                            </span>
+                          )}
+                        </span>
                     {referenceCount > 0 && (
                       <Badge variant="secondary" className="ml-1">
                         {referenceCount}
@@ -2882,11 +3503,185 @@ export default function ViewData() {
                       })}
                     </div>
                   )}
-                  <div className="p-4 bg-slate-50 dark:bg-slate-900 rounded-md mb-4">
+                  {(selectedResponse?.modelProvider === 'ekg' || selectedResponse?.ekgStatus || ekgAvailableFeatures.length > 0 || ekgGapsCustomizations.length > 0) && (
+                    <div className="p-5 bg-purple-50 dark:bg-purple-950/30 rounded-md border border-purple-200 dark:border-purple-800 mb-5">
+                      <div className="flex items-center gap-2 mb-2 flex-wrap">
+                        <h4 className="text-sm font-semibold text-purple-800 dark:text-purple-100">EKG Assessment</h4>
+                        {selectedResponse?.ekgStatus && (
+                          <Badge variant="outline" className="text-xs bg-white/60 dark:bg-purple-900/60 text-purple-800 dark:text-purple-100 border-purple-300 dark:border-purple-700">
+                            {String(selectedResponse.ekgStatus).replace('_', ' ')}
+                          </Badge>
+                        )}
+                        <div className="ml-auto flex items-center gap-2">
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="flex items-center gap-1"
+                            onClick={() => {
+                              const assessmentData = {
+                                requirementText: selectedResponse?.requirement || '',
+                                ekgStatus: String(selectedResponse?.ekgStatus || '').replace('_', ' '),
+                                fitmentPercentage: ekgOverallFitmentPercentage,
+                                availableFeatures: ekgAvailableFeatures,
+                                gapsCustomizations: ekgGapsCustomizations,
+                                subrequirements: ekgSubrequirements.map((sr: any, idx: number) => ({
+                                  id: sr?.id || `SR${idx + 1}`,
+                                  title: sr?.title || sr?.description || '',
+                                  status: (sr?.status || '').replace('_', ' '),
+                                  weight: parseNumberOrNull(sr?.weight),
+                                  fitment: parseNumberOrNull(sr?.fitment_percentage),
+                                  integrationRelated: Boolean(sr?.integration_related),
+                                  reportingRelated: Boolean(sr?.reporting_related),
+                                  customizationNotes: sr?.customization_notes || '',
+                                  referencesCount: Array.isArray(sr?.references) ? sr.references.length : 0
+                                }))
+                              };
+                              downloadEkgAssessmentExcel(assessmentData, `ekg-assessment-${selectedResponse?.id || 'export'}.xlsx`);
+                            }}
+                            title="Download EKG Assessment as Excel"
+                          >
+                            <Download className="h-3 w-3" />
+                            <span>Download</span>
+                          </Button>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="flex items-center gap-1"
+                            onClick={handleRegenerateWithAvailable}
+                            disabled={isRegeneratingResponse || markedAvailableSubrequirements.length === 0}
+                          >
+                            {isRegeneratingResponse ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCcw className="h-3 w-3" />}
+                            <span>Regenerate answer</span>
+                          </Button>
+                        </div>
+                        {/* Fitment Score Badge - displayed right next to status */}
+                        {(() => {
+                          const scorePercent = ekgOverallFitmentPercentage !== null 
+                            ? ekgOverallFitmentPercentage 
+                            : (selectedResponse?.fitmentScore !== null && selectedResponse?.fitmentScore !== undefined
+                                ? selectedResponse.fitmentScore * 100
+                                : null);
+                          if (scorePercent !== null) {
+                            const normalized = scorePercent / 100;
+                            return (
+                              <Badge 
+                                variant="outline" 
+                                className={`text-xs font-semibold ${
+                                  normalized >= 0.8 ? 'bg-green-100 text-green-800 dark:bg-green-900/60 dark:text-green-200 border-green-300 dark:border-green-700' :
+                                  normalized >= 0.5 ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-200 border-amber-300 dark:border-amber-700' :
+                                  'bg-red-100 text-red-800 dark:bg-red-900/60 dark:text-red-200 border-red-300 dark:border-red-700'
+                                }`}
+                                title={`Fitment Score: ${scorePercent.toFixed(1)}%`}
+                              >
+                                Fitment: {scorePercent.toFixed(0)}%
+                              </Badge>
+                            );
+                          } else if (selectedResponse?.ekgStatus) {
+                            return (
+                              <Badge 
+                                variant="outline" 
+                                className="text-xs bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 border-slate-300 dark:border-slate-700"
+                                title="Fitment score not yet calculated"
+                              >
+                                Fitment: Not calculated
+                              </Badge>
+                            );
+                          }
+                          return null;
+                        })()}
+                      </div>
+                      {ekgAvailableFeatures.length > 0 && (
+                        <div className="mb-3">
+                          <p className="text-xs uppercase tracking-wide text-purple-700 dark:text-purple-200 mb-1">Available features</p>
+                          <ul className="list-disc list-inside text-sm text-purple-900 dark:text-purple-50 space-y-1">
+                            {ekgAvailableFeatures.map((item, idx) => (
+                              <li key={idx}>{item}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      {ekgGapsCustomizations.length > 0 && (
+                        <div>
+                          <p className="text-xs uppercase tracking-wide text-purple-700 dark:text-purple-200 mb-1">Gaps / customizations</p>
+                          <ul className="list-disc list-inside text-sm text-purple-900 dark:text-purple-50 space-y-1">
+                            {ekgGapsCustomizations.map((item, idx) => (
+                              <li key={idx}>{item}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      {ekgSubrequirements.length > 0 && (
+                        <div className="mt-3">
+                          <p className="text-xs uppercase tracking-wide text-purple-700 dark:text-purple-200 mb-2">Subrequirements</p>
+                          <div className="overflow-x-auto overflow-y-visible rounded-md border border-purple-200 dark:border-purple-800 bg-white/60 dark:bg-purple-900/30 max-h-[60vh]">
+                            <table className="min-w-full text-xs text-left">
+                              <thead className="bg-purple-100/60 dark:bg-purple-900/40 text-purple-900 dark:text-purple-100 sticky top-0 z-10">
+                                <tr>
+                                  <th className="px-4 py-2.5 font-semibold whitespace-nowrap">ID</th>
+                                  <th className="px-4 py-2.5 font-semibold whitespace-nowrap">Title</th>
+                                  <th className="px-4 py-2.5 font-semibold whitespace-nowrap">Status</th>
+                                  <th className="px-4 py-2.5 font-semibold whitespace-nowrap">Weight</th>
+                                  <th className="px-4 py-2.5 font-semibold whitespace-nowrap">Fitment</th>
+                                  <th className="px-4 py-2.5 font-semibold whitespace-nowrap">Flags</th>
+                                  <th className="px-4 py-2.5 font-semibold whitespace-nowrap">Customization</th>
+                                  <th className="px-4 py-2.5 font-semibold text-center whitespace-nowrap">Mark as available</th>
+                                  <th className="px-4 py-2.5 font-semibold whitespace-nowrap">Refs</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {ekgSubrequirements.map((sr, idx) => {
+                                  const srStatus = (sr?.status || '').replace('_', ' ');
+                                  const fitment = parseNumberOrNull(sr?.fitment_percentage);
+                                  const weight = parseNumberOrNull(sr?.weight);
+                                  const integration = sr?.integration_related;
+                                  const reporting = sr?.reporting_related;
+                                  const customization = sr?.customization_notes || '';
+                                  const refs = Array.isArray(sr?.references) ? sr.references : [];
+                                  return (
+                                    <tr key={`${sr?.id || idx}-${sr?.title || ''}`} className="border-t border-purple-100 dark:border-purple-800 hover:bg-purple-50/50 dark:hover:bg-purple-900/20">
+                                      <td className="px-4 py-2.5 whitespace-nowrap font-medium text-purple-900 dark:text-purple-100">{sr?.id || `SR${idx + 1}`}</td>
+                                      <td className="px-3 py-2 min-w-[200px] max-w-[300px] text-purple-900 dark:text-purple-50 break-words">{sr?.title || sr?.description || '—'}</td>
+                                      <td className="px-4 py-2.5 whitespace-nowrap">
+                                        {srStatus ? (
+                                          <Badge variant="outline" className="text-[11px] bg-white/70 dark:bg-purple-900/40 border-purple-200 dark:border-purple-700 text-purple-800 dark:text-purple-100">
+                                            {srStatus}
+                                          </Badge>
+                                        ) : '—'}
+                                      </td>
+                                      <td className="px-4 py-2.5 whitespace-nowrap text-purple-900 dark:text-purple-50">{weight !== null ? `${weight}` : '—'}</td>
+                                      <td className="px-4 py-2.5 whitespace-nowrap text-purple-900 dark:text-purple-50">{fitment !== null ? `${fitment}%` : '—'}</td>
+                                      <td className="px-4 py-2.5 whitespace-nowrap text-purple-900 dark:text-purple-50 space-x-1">
+                                        {integration && <Badge variant="outline" className="text-[10px] bg-blue-50 text-blue-700 dark:bg-blue-900/50 dark:text-blue-100 border-blue-200 dark:border-blue-700">Integration</Badge>}
+                                        {reporting && <Badge variant="outline" className="text-[10px] bg-emerald-50 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-100 border-emerald-200 dark:border-emerald-700">Reporting</Badge>}
+                                        {!integration && !reporting && '—'}
+                                      </td>
+                                      <td className="px-3 py-2 min-w-[200px] max-w-[300px] text-purple-900 dark:text-purple-50 break-words">{customization || (sr?.customization_required ? 'Customization required' : '—')}</td>
+                                      <td className="px-4 py-2.5 text-center">
+                                        <Checkbox 
+                                          checked={markedAvailableSubrequirements.includes(String(sr?.id || idx + 1))}
+                                          onCheckedChange={(checked) => handleToggleSubreqAvailability(String(sr?.id || idx + 1), Boolean(checked))}
+                                          disabled={isUpdatingSubreqAvailability}
+                                        />
+                                      </td>
+                                      <td className="px-4 py-2.5 whitespace-nowrap text-purple-900 dark:text-purple-50">{refs.length || '—'}</td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      )}
+                      {ekgAvailableFeatures.length === 0 && ekgGapsCustomizations.length === 0 && (
+                        <></>
+                      )}
+                    </div>
+                  )}
+                  <div className="p-5 bg-slate-50 dark:bg-slate-900 rounded-md mb-5">
                     {!isEditingResponse ? (
                       <>
-                        <div className="flex justify-between items-center mb-3">
-                          <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-200">Response:</h4>
+                        <div className="flex justify-between items-center mb-4">
+                          <h4 className="text-base font-semibold text-slate-700 dark:text-slate-200">Response:</h4>
                           {selectedResponse?.finalResponse && (
                             <Button 
                               size="sm" 
@@ -2900,10 +3695,10 @@ export default function ViewData() {
                           )}
                         </div>
                         <div className="prose prose-slate dark:prose-invert max-w-none text-slate-900 dark:text-slate-50 font-medium">
-                          {selectedResponse?.finalResponse && (
+                          {displayResponseText && (
                             <div className="bg-white dark:bg-slate-800 p-3 rounded-md border border-slate-200 dark:border-slate-700">
                               <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                                {selectedResponse.finalResponse
+                                {displayResponseText
                                   .replace(/\\n/g, '\n')
                                   .replace(/\\"/g, '"')
                                   .replace(/\\\\/g, '\\')}
@@ -3070,6 +3865,47 @@ export default function ViewData() {
           </Button>
         </div>
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Requirements</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete {selectedItems.length} selected requirement(s)? 
+              This will permanently delete all associated data including:
+              <ul className="list-disc list-inside mt-2 space-y-1">
+                <li>All AI-generated responses (OpenAI, Anthropic, DeepSeek, MOA, EKG)</li>
+                <li>Reference responses</li>
+                <li>Fitment scores</li>
+                <li>Event mappings</li>
+                <li>Similar questions</li>
+              </ul>
+              <strong className="block mt-3 text-red-600 dark:text-red-400">This action cannot be undone.</strong>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteRequirements}
+              disabled={isDeleting}
+              className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+            >
+              {isDeleting ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete
+                </>
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

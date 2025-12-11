@@ -12,7 +12,9 @@ import {
   X,
   FileText,
   Terminal,
-  TerminalSquare
+  TerminalSquare,
+  BarChart3,
+  Link as LinkIcon
 } from 'lucide-react';
 import intellectLogo from '@assets/intellect_logo.png';
 import { Button } from '@/components/ui/button';
@@ -33,16 +35,28 @@ export default function Sidebar() {
 
   const navItems = [
     {
-      title: 'View Requirements',
+      title: 'Upload Requirements',
+      icon: <Upload className="h-5 w-5" />,
+      path: '/upload',
+      active: location === '/upload'
+    },
+    {
+      title: 'Generate Responses',
       icon: <FileText className="h-5 w-5" />,
       path: '/',
       active: location === '/'
     },
     {
-      title: 'Upload Requirements',
-      icon: <Upload className="h-5 w-5" />,
-      path: '/upload',
-      active: location === '/upload'
+      title: 'Bind EKG',
+      icon: <LinkIcon className="h-5 w-5" />,
+      path: '/bind-ekg',
+      active: location === '/bind-ekg'
+    },
+    {
+      title: 'Analytics',
+      icon: <BarChart3 className="h-5 w-5" />,
+      path: '/analytics',
+      active: location === '/analytics'
     }
   ];
 

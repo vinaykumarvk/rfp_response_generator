@@ -31,6 +31,17 @@ export const excelRequirementResponses = pgTable("excel_requirement_responses", 
   deepseekResponse: text("deepseek_response"),
   moaResponse: text("moa_response"),
   eventMappings: text("event_mappings"),
+  ekgStatus: text("ekg_status"),
+  ekgAvailableFeatures: text("ekg_available_features"),
+  ekgGapsCustomizations: text("ekg_gaps_customizations"),
+  ekgOverallFitmentPercentage: integer("ekg_overall_fitment_percentage"),
+  ekgCustomerResponse: text("ekg_customer_response"),
+  ekgSubrequirements: text("ekg_subrequirements"),
+  ekgReferences: text("ekg_references"),
+  ekgRawResponse: text("ekg_raw_response"),
+  ekgSubrequirementsAvailable: text("ekg_subrequirements_available"),
+  fitmentScore: real("fitment_score"), // Individual fitment score (0.0 to 1.0)
+  vectorStoreIds: text("vector_store_ids"), // JSON array of vector store IDs used for this response
   
   // Similar questions (stored as JSON string)
   similarQuestions: text("similar_questions"),
@@ -122,3 +133,24 @@ export const insertEmbeddingSchema = createInsertSchema(embeddings).omit({
 // Types
 export type InsertEmbedding = z.infer<typeof insertEmbeddingSchema> & { embedding: number[] };
 export type Embedding = typeof embeddings.$inferSelect & { embedding: number[] };
+
+// RFP Vector Store Mappings table
+export const rfpVectorStoreMappings = pgTable("rfp_vector_store_mappings", {
+  id: serial("id").primaryKey(),
+  rfpName: text("rfp_name").notNull(),
+  vectorStoreId: text("vector_store_id").notNull(),
+  vectorStoreName: text("vector_store_name"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Insert schema for RFP vector store mappings
+export const insertRfpVectorStoreMappingSchema = createInsertSchema(rfpVectorStoreMappings).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+// Types
+export type InsertRfpVectorStoreMapping = z.infer<typeof insertRfpVectorStoreMappingSchema>;
+export type RfpVectorStoreMapping = typeof rfpVectorStoreMappings.$inferSelect;

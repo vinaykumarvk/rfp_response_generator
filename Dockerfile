@@ -27,25 +27,7 @@ COPY attached_assets ./attached_assets
 # Build the application
 RUN npm run build
 
-# Stage 2: Python runtime
-FROM python:3.11-slim AS python-runtime
-
-WORKDIR /app
-
-# Install system dependencies for PostgreSQL and Python packages
-RUN apt-get update && apt-get install -y \
-    postgresql-client \
-    gcc \
-    g++ \
-    && rm -rf /var/lib/apt/lists/*
-
-# Copy Python requirements
-COPY python-requirements.txt ./
-
-# Install Python dependencies
-RUN pip install --no-cache-dir -r python-requirements.txt
-
-# Stage 3: Final runtime image
+# Stage 2: Final runtime image
 FROM node:20-slim
 
 WORKDIR /app
@@ -85,11 +67,14 @@ ENV PYTHONUNBUFFERED=1
 # Copy shared schema
 COPY shared ./shared
 
-# Create public directory for static files
-RUN mkdir -p public
+# Create dist/public directory for static files
+# The server looks for 'public' relative to dist/index.js, so it needs to be at dist/public
+RUN mkdir -p dist/public
 
 # Copy built static files (vite builds to dist/public)
-COPY --from=node-builder /app/dist/public ./public
+# Server's serveStatic() looks for path.resolve(import.meta.dirname, "public")
+# Since server runs from dist/index.js, it expects files at dist/public/
+COPY --from=node-builder /app/dist/public ./dist/public
 
 # Set environment variables
 ENV NODE_ENV=production

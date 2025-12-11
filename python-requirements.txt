@@ -6,8 +6,14 @@ psycopg2-binary==2.9.9
 # OpenAI 1.40+ required for compatibility with modern httpx
 openai>=1.40.0
 anthropic>=0.37.0
-# Pin httpx to ensure compatibility
+
+# HTTP client - Pin httpx to ensure compatibility with openai/anthropic
 httpx>=0.25.0,<1.0.0
+
+# Required utilities (used in Python scripts)
+requests>=2.31.0
+numpy>=1.24.0
+tqdm>=4.66.0
 
 # Note: pgvector is a PostgreSQL extension, not a Python package
 # Install it in your database with: CREATE EXTENSION IF NOT EXISTS vector;

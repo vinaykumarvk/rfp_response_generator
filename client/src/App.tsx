@@ -6,6 +6,8 @@ import { ThemeProvider } from "@/components/ThemeProvider";
 import NotFound from "@/pages/not-found";
 import UploadRequirements from "@/pages/UploadRequirements";
 import ViewData from "@/pages/ViewData";
+import Analytics from "@/pages/Analytics";
+import BindEKG from "@/pages/BindEKG";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import Sidebar from "@/components/Sidebar";
@@ -57,6 +59,8 @@ function Router() {
       <Switch>
         <Route path="/" component={ViewData} />
         <Route path="/upload" component={UploadRequirements} />
+        <Route path="/bind-ekg" component={BindEKG} />
+        <Route path="/analytics" component={Analytics} />
         <Route component={NotFound} />
       </Switch>
     </AppLayout>

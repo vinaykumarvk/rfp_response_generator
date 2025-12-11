@@ -253,6 +253,7 @@ const CategoryGroup: React.FC<CategoryGroupProps> = ({
                               row.modelProvider === 'anthropic' ? 'Anthropic' : 
                               row.modelProvider === 'deepseek' ? 'DeepSeek' : 
                               row.modelProvider === 'moa' ? 'MOA' : 
+                              row.modelProvider === 'ekg' ? 'EKG' : 
                               'Generated'}
                               {/* Show Event Mapped status */}
                               {(row as any).eventMappings && (
@@ -263,6 +264,21 @@ const CategoryGroup: React.FC<CategoryGroupProps> = ({
                             'Not Generated'
                           )}
                         </Badge>
+                        
+                        {/* Fitment Score Badge - only show for EKG responses with fitment score */}
+                        {row.modelProvider === 'ekg' && row.fitmentScore !== null && row.fitmentScore !== undefined && (
+                          <Badge 
+                            variant="outline" 
+                            className={`text-[10px] sm:text-xs px-1.5 py-0 ${
+                              row.fitmentScore >= 0.8 ? 'bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-200 border-green-200 dark:border-green-800' :
+                              row.fitmentScore >= 0.5 ? 'bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-200 border-amber-200 dark:border-amber-800' :
+                              'bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-200 border-red-200 dark:border-red-800'
+                            }`}
+                            title={`Fitment Score: ${(row.fitmentScore * 100).toFixed(1)}%`}
+                          >
+                            Fitment: {(row.fitmentScore * 100).toFixed(0)}%
+                          </Badge>
+                        )}
                       </div>
                       
                       {/* Requirement text */}
